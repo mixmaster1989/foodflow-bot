@@ -14,11 +14,11 @@ class OCRService:
     3) Дальше прежние бесплатные fallback'и.
     """
     MODELS = [
-        "openai/gpt-4o-mini",
-        "openai/gpt-4o-mini-2024-07-18",
-        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen2.5-vl-32b-instruct:free",  # Priority 1: Free & Good
+        "google/gemini-2.0-flash-exp:free",   # Priority 2: Free & Fast
         "google/gemma-3-27b-it:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
+        "openai/gpt-4o-mini",                 # Fallback: Paid but reliable
     ]
     
     @staticmethod
@@ -53,30 +53,41 @@ class OCRService:
             ]
         }
         
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=60
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        if 'error' in result:
-                             logger.error(f"Model {model} returned API error: {result['error']}")
-                             return None
-                             
-                        content = result['choices'][0]['message']['content']
-                        # Clean markdown if present
-                        content = content.replace("```json", "").replace("```", "").strip()
-                        return json.loads(content)
-                    else:
-                        logger.error(f"Model {model} failed with status {response.status}: {await response.text()}")
-                        return None
-            except Exception as e:
-                logger.error(f"Exception calling {model}: {e}")
-                return None
+        import asyncio
+        
+        # Retry logic: 3 attempts with 0.5s delay
+        for attempt in range(3):
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            if 'error' in result:
+                                 logger.error(f"Model {model} returned API error: {result['error']}")
+                                 return None
+                                 
+                            content = result['choices'][0]['message']['content']
+                            # Clean markdown if present
+                            content = content.replace("```json", "").replace("```", "").strip()
+                            return json.loads(content)
+                        else:
+                            logger.warning(f"Model {model} attempt {attempt+1}/3 failed with status {response.status}")
+                            if attempt < 2:
+                                await asyncio.sleep(0.5)
+                                continue
+                            return None
+                except Exception as e:
+                    logger.error(f"Exception calling {model} (attempt {attempt+1}/3): {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(0.5)
+                        continue
+                    return None
+        return None
 
     @classmethod
     async def parse_receipt(cls, image_bytes: bytes) -> dict:
