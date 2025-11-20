@@ -49,7 +49,7 @@ FoodFlow - это умный Telegram-бот, который помогает у
 
 1. Клонировать репозиторий:
 ```bash
-git clone https://github.com/mixmastr1989/foodflow-bot.git
+git clone https://github.com/mixmaster1989/foodflow-bot.git
 cd foodflow-bot
 ```
 
@@ -160,7 +160,7 @@ pytest tests/
 
 ## 👤 Автор
 
-mixmastr1989 - [@mixmastr1989](https://github.com/mixmastr1989)
+mixmaster1989 - [@mixmaster1989](https://github.com/mixmaster1989)
 
 ## 🙏 Благодарности
 
@@ -171,8 +171,8 @@ mixmastr1989 - [@mixmastr1989](https://github.com/mixmastr1989)
 ## 📞 Поддержка
 
 Если у вас возникли вопросы или проблемы:
-- Откройте [Issue](https://github.com/mixmastr1989/foodflow-bot/issues)
-- Напишите в Telegram: [@mixmastr1989](https://t.me/mixmastr1989)
+- Откройте [Issue](https://github.com/mixmaster1989/foodflow-bot/issues)
+- Напишите в Telegram: [@mixmaster1989](https://t.me/mixmaster1989)
 
 ---
 
