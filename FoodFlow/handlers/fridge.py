@@ -5,7 +5,8 @@ from aiogram import Router, F, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 from FoodFlow.database.base import get_db
-from FoodFlow.database.models import Product, Receipt
+from FoodFlow.database.models import Product, Receipt, ConsumptionLog
+from datetime import datetime
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -77,6 +78,51 @@ async def export_fridge(callback: types.CallbackQuery):
     document = types.BufferedInputFile(file_bytes, filename="fridge_export.csv")
     await callback.message.answer_document(document, caption="Экспорт холодильника (CSV)")
     await callback.answer("Экспорт готов!")
+
+
+@router.callback_query(F.data.startswith("eat_"))
+async def eat_product(callback: types.CallbackQuery):
+    try:
+        product_id = int(callback.data.split("_")[1])
+    except (IndexError, ValueError):
+        await callback.answer("Ошибка", show_alert=True)
+        return
+    
+    async for session in get_db():
+        product = await session.get(Product, product_id)
+        if not product:
+            await callback.answer("Продукт не найден", show_alert=True)
+            return
+        
+        # Log consumption
+        log = ConsumptionLog(
+            user_id=callback.from_user.id,
+            product_name=product.name,
+            calories=product.calories,
+            protein=product.protein,
+            fat=product.fat,
+            carbs=product.carbs,
+            date=datetime.utcnow()
+        )
+        session.add(log)
+        
+        # Decrease quantity or delete
+        if product.quantity > 1:
+            product.quantity -= 1
+        else:
+            await session.delete(product)
+        
+        await session.commit()
+        product_name = product.name
+        break
+    
+    await callback.answer(f"✅ Съел {product_name}!")
+    # Refresh page
+    total = await _get_total_products(callback.from_user.id)
+    if total > 0:
+        await _update_fridge_page(callback.message, callback.from_user.id, page=0, forced_total=total)
+    else:
+        await callback.message.edit_text("Холодильник пуст! 🕸️")
 
 
 async def _get_total_products(user_id: int) -> int:
@@ -162,11 +208,18 @@ async def _update_fridge_page(
     for product in products:
         lines.append(
             f"▫️ <b>{product.name}</b>\n"
-            f"   {product.quantity} шт · {product.price}₽ · {product.category or 'Без категории'}"
+            f"   {product.quantity} шт · {product.price}₽ · {product.category or 'Без категории'}\n"
+            f"   🔥 {product.calories}ккал | 🥩 {product.protein}г | 🥑 {product.fat}г | 🍞 {product.carbs}г"
         )
     text = "\n".join(lines)
 
     builder = InlineKeyboardBuilder()
+    # Add eat buttons for each product
+    for product in products:
+        builder.button(text=f"🍽️ {product.name[:15]}", callback_data=f"eat_{product.id}")
+    builder.adjust(2)  # 2 buttons per row
+    
+    # Navigation buttons
     if page > 0:
         builder.button(text="⬅️ Назад", callback_data=f"fridge_page:{page - 1}")
     if page < total_pages - 1:

@@ -25,7 +25,9 @@
 - 🧇 **Virtual Fridge** - Smart inventory management with real-time tracking  
 - 👨‍🍳 **AI Recipe Generation** - Personalized recipes based on your available ingredients
 - 📊 **Nutrition Tracking** - KBZHU (calories, proteins, fats, carbs) monitoring
-- 🛒 **Smart Shopping Mode** - Product barcode scanning with nutritional data extraction
+- 🛒 **Shopping Mode** - Scan product labels in-store, match with receipt, auto-fill KBZHU
+- 🏷️ **Price Tag Scanner** - OCR price tags & compare prices across stores
+- 🌐 **Real-Time Price Search** - Find current prices online via Perplexity AI
 
 ---
 
@@ -50,11 +52,26 @@
 - 🇷🇺 Russian-language responses
 - ⚡ Powered by OpenRouter API
 
-### 4. Shopping Mode (In Development)
+### 4. Shopping Mode ✅
 
-- 🛍️ Barcode scanning
-- 🣋 Automatic KBZHU extraction
-- ✅ Receipt matching
+- 📸 **Label Scanning** - Photo product labels in-store
+- 🔍 **KBZHU Extraction** - Auto-extract nutrition data from labels
+- 🛒 **Session Management** - Track shopping trips
+- 🤝 **Receipt Matching** - Fuzzy matching with receipt items
+- ✏️ **Manual Correction** - UI for mismatched items
+
+### 5. Price Tag Processing ✅
+
+- 🏷️ **OCR Price Tags** - Extract product name, price, store
+- 📊 **Price Comparison** - Compare with your previous scans
+- 🌐 **Real-Time Search** - Find current prices via Perplexity Sonar
+- 💰 **Best Deal Alert** - "🎉 Отличная цена!" or "⚠️ Дешевле в других магазинах"
+
+### 6. Product Correction ✅
+
+- ✏️ **Interactive Editing** - Fix OCR errors with inline buttons
+- 💾 **Instant Updates** - Changes saved immediately
+- 📝 **Pre-filled Forms** - Current name shown for easy editing
 
 ---
 
@@ -103,10 +120,15 @@ FoodFlow/
 │   ├── receipt.py        # Receipt processing
 │   ├── fridge.py         # Virtual fridge
 │   ├── recipes.py        # Recipe generation
+│   ├── shopping.py       # Shopping mode
 │   ├── stats.py          # Statistics
 │   └── correction.py     # Product correction
 ├── services/           ━ Business logic
 │   ├── ocr.py            # OCR processing
+│   ├── label_ocr.py      # Label scanning
+│   ├── price_tag_ocr.py  # Price tag OCR
+│   ├── price_search.py   # Real-time price search
+│   ├── matching.py       # Fuzzy matching
 │   ├── normalization.py  # Data normalization
 │   └── ai.py             # AI integrations
 ├── config.py           ━ Pydantic configuration

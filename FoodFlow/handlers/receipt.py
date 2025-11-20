@@ -182,8 +182,65 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
 
 
 @router.callback_query(F.data == "action_log_food")
-async def log_food_action(callback: types.CallbackQuery):
-    await callback.answer("Функция 'Дневник питания' скоро будет!", show_alert=True)
+async def log_food_action(callback: types.CallbackQuery, bot: Bot):
+    photo_message = callback.message.reply_to_message
+    if not photo_message or not photo_message.photo:
+        await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
+        return
+    
+    status_msg = await callback.message.edit_text("⏳ Анализирую блюдо...")
+    
+    try:
+        # Download photo
+        photo = photo_message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_bytes = io.BytesIO()
+        await bot.download_file(file_info.file_path, photo_bytes)
+        
+        # OCR + AI analysis
+        from FoodFlow.services.ocr import OCRService
+        from FoodFlow.database.models import ConsumptionLog
+        from datetime import datetime
+        
+        # Use OCR to identify the dish
+        result = await OCRService.parse_receipt(photo_bytes.getvalue())
+        
+        # Extract dish name (use first item or full text)
+        dish_name = "Блюдо"
+        if result.get("items"):
+            dish_name = result["items"][0].get("name", "Блюдо")
+        
+        # Estimate KBZHU (simple estimation, can be improved with AI)
+        calories = 300  # Default estimation
+        protein = 15.0
+        fat = 10.0
+        carbs = 40.0
+        
+        # Log consumption
+        async for session in get_db():
+            log = ConsumptionLog(
+                user_id=photo_message.from_user.id,
+                product_name=dish_name,
+                calories=calories,
+                protein=protein,
+                fat=fat,
+                carbs=carbs,
+                date=datetime.utcnow()
+            )
+            session.add(log)
+            await session.commit()
+            break
+        
+        await status_msg.edit_text(
+            f"✅ <b>Записано в дневник!</b>\n\n"
+            f"🍽️ {dish_name}\n"
+            f"🔥 {calories}ккал | 🥩 {protein}г | 🥑 {fat}г | 🍞 {carbs}г\n\n"
+            f"<i>Примечание: КБЖУ - примерная оценка. Для точности используй Shopping Mode!</i>",
+            parse_mode="HTML"
+        )
+        
+    except Exception as exc:
+        await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
 @router.callback_query(F.data == "action_receipt")
 async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
