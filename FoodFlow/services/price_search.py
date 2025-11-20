@@ -48,45 +48,54 @@ class PriceSearchService:
             "messages": [{"role": "user", "content": prompt}]
         }
         
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=60
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        content = result["choices"][0]["message"]["content"]
+        import asyncio
+        
+        # Retry logic: 3 attempts with 0.5s delay
+        for attempt in range(3):
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            content = result["choices"][0]["message"]["content"]
+                            
+                            # Try to extract JSON from response
+                            content = content.replace("```json", "").replace("```", "").strip()
+                            
+                            try:
+                                data = json.loads(content)
+                                prices = data.get("prices", [])
+                                
+                                if not prices:
+                                    return None
+                                
+                                # Calculate stats
+                                price_values = [p["price"] for p in prices if p.get("price")]
+                                
+                                return {
+                                    "product": product_name,
+                                    "prices": prices,
+                                    "min_price": min(price_values) if price_values else None,
+                                    "max_price": max(price_values) if price_values else None,
+                                    "avg_price": sum(price_values) / len(price_values) if price_values else None
+                                }
+                            except json.JSONDecodeError:
+                                # If JSON parsing fails, return raw content for debugging
+                                logger.warning(f"Failed to parse JSON from Perplexity: {content}")
+                                return {"raw_response": content}
                         
-                        # Try to extract JSON from response
-                        content = content.replace("```json", "").replace("```", "").strip()
-                        
-                        try:
-                            data = json.loads(content)
-                            prices = data.get("prices", [])
-                            
-                            if not prices:
-                                return None
-                            
-                            # Calculate stats
-                            price_values = [p["price"] for p in prices if p.get("price")]
-                            
-                            return {
-                                "product": product_name,
-                                "prices": prices,
-                                "min_price": min(price_values) if price_values else None,
-                                "max_price": max(price_values) if price_values else None,
-                                "avg_price": sum(price_values) / len(price_values) if price_values else None
-                            }
-                        except json.JSONDecodeError:
-                            # If JSON parsing fails, return raw content for debugging
-                            logger.warning(f"Failed to parse JSON from Perplexity: {content}")
-                            return {"raw_response": content}
-                    
-                    logger.error(f"Price search failed: {await response.text()}")
-                    return None
-            except Exception as exc:
-                logger.error(f"Price search exception: {exc}")
-                return None
+                        logger.warning(f"Price search (attempt {attempt+1}/3) failed: {response.status}")
+                        if attempt < 2:
+                            await asyncio.sleep(0.5)
+                            continue
+                except Exception as exc:
+                    logger.error(f"Price search exception (attempt {attempt+1}/3): {exc}")
+                    if attempt < 2:
+                        await asyncio.sleep(0.5)
+                        continue
+        return None

@@ -55,45 +55,54 @@ class NormalizationService:
             ]
         }
         
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=60
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        content = result['choices'][0]['message']['content']
-                        # Clean markdown
-                        content = content.replace("```json", "").replace("```", "").strip()
-                        
-                        try:
-                            parsed = json.loads(content)
-                            normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
+        import asyncio
+        
+        # Retry logic: 3 attempts with 0.5s delay
+        for attempt in range(3):
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            content = result['choices'][0]['message']['content']
+                            # Clean markdown
+                            content = content.replace("```json", "").replace("```", "").strip()
                             
-                            # Merge back with original data (price, quantity)
-                            final_items = []
-                            for item in raw_items:
-                                raw_name = item.get('name', 'Unknown')
-                                norm_data = normalized_map.get(raw_name, {})
+                            try:
+                                parsed = json.loads(content)
+                                normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
                                 
-                                final_items.append({
-                                    "name": norm_data.get('name', raw_name), # Fallback to raw
-                                    "price": item.get('price', 0.0),
-                                    "quantity": item.get('quantity', 1.0),
-                                    "category": norm_data.get('category', 'Uncategorized'),
-                                    "calories": norm_data.get('calories', 0)
-                                })
-                            return final_items
-                            
-                        except json.JSONDecodeError:
-                            logger.error(f"Failed to parse Normalization JSON: {content}")
-                            return raw_items # Fallback
-                    else:
-                        logger.error(f"Normalization API failed: {await response.text()}")
-                        return raw_items
-            except Exception as e:
-                logger.error(f"Exception in Normalization Service: {e}")
-                return raw_items
+                                # Merge back with original data (price, quantity)
+                                final_items = []
+                                for item in raw_items:
+                                    raw_name = item.get('name', 'Unknown')
+                                    norm_data = normalized_map.get(raw_name, {})
+                                    
+                                    final_items.append({
+                                        "name": norm_data.get('name', raw_name), # Fallback to raw
+                                        "price": item.get('price', 0.0),
+                                        "quantity": item.get('quantity', 1.0),
+                                        "category": norm_data.get('category', 'Uncategorized'),
+                                        "calories": norm_data.get('calories', 0)
+                                    })
+                                return final_items
+                                
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to parse Normalization JSON: {content}")
+                                return raw_items # Fallback
+                        else:
+                            logger.warning(f"Normalization API (attempt {attempt+1}/3) failed: {response.status}")
+                            if attempt < 2:
+                                await asyncio.sleep(0.5)
+                                continue
+                except Exception as e:
+                    logger.error(f"Exception in Normalization Service (attempt {attempt+1}/3): {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(0.5)
+                        continue
+        return raw_items
