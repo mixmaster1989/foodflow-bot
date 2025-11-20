@@ -14,11 +14,11 @@ class OCRService:
     3) Дальше прежние бесплатные fallback'и.
     """
     MODELS = [
-        "qwen/qwen2.5-vl-32b-instruct:free",  # Priority 1: Free & Good
-        "google/gemini-2.0-flash-exp:free",   # Priority 2: Free & Fast
-        "google/gemma-3-27b-it:free",
-        "mistralai/mistral-small-3.2-24b-instruct:free",
-        "openai/gpt-4o-mini",                 # Fallback: Paid but reliable
+        "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
+        "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
+        "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
+        "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
+        "openai/gpt-4o-mini",                         # Paid Fallback
     ]
     
     @staticmethod
