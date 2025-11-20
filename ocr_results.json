@@ -1,0 +1,50 @@
+[
+  {
+    "model": "x-ai/grok-4.1-fast",
+    "time": 0.6346859931945801,
+    "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":403,\"metadata\":{\"raw\":\"<!doctype html>\\n<html>\\n<body>\\n<p>This service is not available in your region.</p>\\n<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML=\\\"window.__CF$cv$params={r:'9a162eef1ca2f10a',t:'MTc2MzYyMzIxMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);\\\";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>\\n</html>\",\"provider_name\":\"xAI\"}},\"user_id\":\"user_2zMGZrkZzTvjgDBeYrWTQevyqFv\"}",
+    "status": "error"
+  },
+  {
+    "model": "nvidia/nemotron-nano-12b-v2-vl:free",
+    "time": 95.90885066986084,
+    "content": "{\n  \"items\": [\n    {\n      \"name\": \"Касска 1\",\n      \"price\": 299.00,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Ком.5\",\n      \"price\": 19.48,\n      \"quantity\": 5\n    },\n    {\n      \"name\": \"Ком.6\",\n      \"price\": 12.54,\n      \"quantity\": 10\n    },\n    {\n      \"name\": \"А/СУММА НАД\",\n      \"price\": 0.627,\n      \"quantity\": 20\n    },\n    {\n      \"name\": \"Ком.2\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Ком.4\",\n      \"price\": 52.49,\n      \"quantity\": 1\n    }\n  ],\n  \"total\": 16289.00\n}\n",
+    "status": "success"
+  },
+  {
+    "model": "mistralai/mistral-small-3.2-24b-instruct:free",
+    "time": 3.4544591903686523,
+    "content": "```json\n{\n  \"items\": [\n    {\n      \"name\": \"Сок Груша 6/сах.200мл\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Напиток яблочный экстракт, розовая лип.0.2л\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Данон йог.растительный, клуб.32% 110г\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Бананы 1кг\",\n      \"price\": 49.99,\n      \"quantity\": 1\n    },\n    {\n      \"name\": \"Пакет Пятерочка 65х40см\",\n      \"price\": 5.00,\n      \"quantity\": 1\n    }\n  ],\n  \"total_amount\": 195.43\n}\n```",
+    "status": "success"
+  },
+  {
+    "model": "qwen/qwen2.5-vl-32b-instruct:free",
+    "time": 8.212064266204834,
+    "content": "```json\n{\n  \"items\": [\n    {\n      \"name\": \"Сок яблочный\",\n      \"price\": 22.99,\n      \"quantity\": 1\n    },\n    {\n      \"name\": \"Сок груша 6/ сах. 200мл\",\n      \"price\": 22.99,\n      \"quantity\": 3\n    },\n    {\n      \"name\": \"Йог. РАСТИЦЫ КЛУб.3% (110г)\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Бананы 1кг\",\n      \"price\": 49.99,\n      \"quantity\": 1\n    },\n    {\n      \"name\": \"ПАКЕТ ЛЯТЕРОЧКА 65×40см\",\n      \"price\": 5.00,\n      \"quantity\": 1\n    }\n  ],\n  \"totalAmount\": 195.43\n}\n```",
+    "status": "success"
+  },
+  {
+    "model": "mistralai/mistral-small-3.1-24b-instruct:free",
+    "time": 6.003134489059448,
+    "content": "```json\n{\n  \"items\": [\n    {\n      \"name\": \"Сок Груша 6/с/н 200мл\",\n      \"price\": 22.99,\n      \"quantity\": 3\n    },\n    {\n      \"name\": \"Напиток яблочный экстракт, розовая липа 0.2л\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Йогурт питьевой ПРАСТИНЕЛЬ Клуб.3.2% 110г\",\n      \"price\": 22.99,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Бананы 1кг\",\n      \"price\": 49.99,\n      \"quantity\": 1\n    },\n    {\n      \"name\": \"Пакет ПЯТЕРОЧКА 65х40см\",\n      \"price\": 5.00,\n      \"quantity\": 1\n    }\n  ],\n  \"total_amount\": 195.43\n}\n```",
+    "status": "success"
+  },
+  {
+    "model": "google/gemma-3-12b-it:free",
+    "time": 0.8794989585876465,
+    "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"code\\\": 400,\\n    \\\"message\\\": \\\"User location is not supported for the API use.\\\",\\n    \\\"status\\\": \\\"FAILED_PRECONDITION\\\"\\n  }\\n}\\n\",\"provider_name\":\"Google AI Studio\"}},\"user_id\":\"user_2zMGZrkZzTvjgDBeYrWTQevyqFv\"}",
+    "status": "error"
+  },
+  {
+    "model": "google/gemma-3-27b-it:free",
+    "time": 2.113814353942871,
+    "content": "",
+    "status": "success"
+  },
+  {
+    "model": "google/gemini-2.0-flash-exp:free",
+    "time": 1.1902155876159668,
+    "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Google\"}},\"user_id\":\"user_2zMGZrkZzTvjgDBeYrWTQevyqFv\"}",
+    "status": "error"
+  }
+]

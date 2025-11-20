@@ -1,0 +1,303 @@
+2025-11-20 12:07:36,670 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:07:36,670 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("users")
+2025-11-20 12:07:36,671 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:07:36,672 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("receipts")
+2025-11-20 12:07:36,672 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:07:36,673 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("products")
+2025-11-20 12:07:36,674 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:07:36,674 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("consumption_logs")
+2025-11-20 12:07:36,675 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:07:36,702 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:07:36,969 - INFO - root - 🚀 FoodFlow Bot started!
+2025-11-20 12:07:36,970 - INFO - aiogram.dispatcher - Start polling
+2025-11-20 12:07:37,276 - INFO - aiogram.dispatcher - Run polling for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:09:31,336 - INFO - aiogram.event - Update id=958086345 is handled. Duration 298 ms by bot id=8587231248
+2025-11-20 12:09:33,171 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemini-2.0-flash-exp:free
+2025-11-20 12:09:35,747 - ERROR - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed with status 429: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google"}},"user_id":"user_2zMGZrkZzTvjgDBeYrWTQevyqFv"}
+2025-11-20 12:09:35,848 - WARNING - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed. Trying next...
+2025-11-20 12:09:35,848 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemma-3-27b-it:free
+2025-11-20 12:09:37,873 - ERROR - FoodFlow.services.ocr - Exception calling google/gemma-3-27b-it:free: Expecting value: line 1 column 1 (char 0)
+2025-11-20 12:09:37,998 - WARNING - FoodFlow.services.ocr - Model google/gemma-3-27b-it:free failed. Trying next...
+2025-11-20 12:09:37,998 - INFO - FoodFlow.services.ocr - Trying OCR model: mistralai/mistral-small-3.2-24b-instruct:free
+2025-11-20 12:10:05,121 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:10:05,126 - INFO - sqlalchemy.engine.Engine - INSERT INTO receipts (user_id, raw_text, total_amount, created_at) VALUES (?, ?, ?, ?)
+2025-11-20 12:10:05,127 - INFO - sqlalchemy.engine.Engine - [generated in 0.00057s] (432823154, "{'items': [{'name': 'FRESH апельсин', 'price': 89.99, 'quantity': 1}, {'name': 'К.Ш. Насло пос.раф.0,9л', 'price': 28.99, 'quantity': 1}, {'name': 'С ... (1436 characters truncated) ... .сол.250г СЕНЕЖ', 'price': 49.49, 'quantity': 1}, {'name': 'ГОР.СТ Пел.БИГБУС С МЯС.500г МЯСНАЯ', 'price': 199.99, 'quantity': 2}], 'total': 3436.75}", 3436.75, '2025-11-20 09:10:05.126775')
+2025-11-20 12:10:05,133 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,133 - INFO - sqlalchemy.engine.Engine - [generated in 0.00015s (insertmanyvalues) 1/22 (ordered; batch not supported)] (3, 'Orange', 1.0, 89.99, 'Fruit')
+2025-11-20 12:10:05,135 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,135 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 2/22 (ordered; batch not supported)] (3, 'Sunflower Oil', 1.0, 28.99, 'Groceries')
+2025-11-20 12:10:05,136 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,137 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 3/22 (ordered; batch not supported)] (3, 'Sunflower Oil', 2.0, 73.99, 'Groceries')
+2025-11-20 12:10:05,137 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,138 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 4/22 (ordered; batch not supported)] (3, 'Mineral Water', 1.0, 109.99, 'Beverage')
+2025-11-20 12:10:05,138 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,139 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 5/22 (ordered; batch not supported)] (3, 'Kvass', 1.0, 28.99, 'Beverage')
+2025-11-20 12:10:05,139 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,140 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 6/22 (ordered; batch not supported)] (3, 'Onion', 0.795, 65.99, 'Vegetables')
+2025-11-20 12:10:05,140 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,140 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 7/22 (ordered; batch not supported)] (3, 'Pasta Shells', 2.0, 69.99, 'Groceries')
+2025-11-20 12:10:05,141 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,141 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 8/22 (ordered; batch not supported)] (3, 'Cucumbers', 1.0, 74.99, 'Vegetables')
+2025-11-20 12:10:05,142 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,142 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 9/22 (ordered; batch not supported)] (3, 'Spinach', 2.034, 259.9, 'Vegetables')
+2025-11-20 12:10:05,143 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,143 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 10/22 (ordered; batch not supported)] (3, 'Spaghetti', 1.0, 54.99, 'Groceries')
+2025-11-20 12:10:05,144 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,144 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 11/22 (ordered; batch not supported)] (3, 'Milk Chocolate', 1.0, 295.99, 'Snacks')
+2025-11-20 12:10:05,145 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,145 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 12/22 (ordered; batch not supported)] (3, 'Beef Chevapchichi', 1.0, 199.99, 'Meat')
+2025-11-20 12:10:05,146 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,146 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 13/22 (ordered; batch not supported)] (3, 'Assorted Sausages', 1.0, 219.99, 'Meat')
+2025-11-20 12:10:05,147 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,147 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 14/22 (ordered; batch not supported)] (3, 'Potato Chips', 2.0, 79.99, 'Snacks')
+2025-11-20 12:10:05,148 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,148 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 15/22 (ordered; batch not supported)] (3, 'Darichny Bread', 1.0, 37.19, 'Bread')
+2025-11-20 12:10:05,148 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,149 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 16/22 (ordered; batch not supported)] (3, 'Tomato Sauce', 1.0, 37.19, 'Groceries')
+2025-11-20 12:10:05,149 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,150 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 17/22 (ordered; batch not supported)] (3, 'Baguette', 2.0, 35.59, 'Bread')
+2025-11-20 12:10:05,151 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,151 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 18/22 (ordered; batch not supported)] (3, 'Oladka Cake', 1.0, 329.99, 'Snacks')
+2025-11-20 12:10:05,151 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,152 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 19/22 (ordered; batch not supported)] (3, 'Potato with Onion and Sour Cream', 1.0, 179.99, 'Vegetables')
+2025-11-20 12:10:05,152 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,153 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 20/22 (ordered; batch not supported)] (3, 'Caramel Apple', 1.0, 59.99, 'Snacks')
+2025-11-20 12:10:05,153 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,154 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 21/22 (ordered; batch not supported)] (3, 'Cheese', 1.0, 49.49, 'Dairy')
+2025-11-20 12:10:05,154 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:10:05,154 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 22/22 (ordered; batch not supported)] (3, 'Pelmeni with Meat', 2.0, 199.99, 'Frozen Food')
+2025-11-20 12:10:05,156 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:10:05,299 - INFO - aiogram.event - Update id=958086346 is handled. Duration 32756 ms by bot id=8587231248
+2025-11-20 12:13:05,430 - INFO - aiogram.dispatcher - Polling stopped
+2025-11-20 12:13:14,739 - ERROR - aiogram.dispatcher - Failed to fetch updates - TelegramNetworkError: HTTP Client says - ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)
+2025-11-20 12:13:14,740 - WARNING - aiogram.dispatcher - Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8587231248)
+2025-11-20 12:13:14,740 - ERROR - root - Error while closing connector: ClientConnectionError('Connection lost: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)')
+2025-11-20 12:13:15,001 - INFO - aiogram.dispatcher - Polling stopped for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:13:28,762 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:13:28,763 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("users")
+2025-11-20 12:13:28,763 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:13:28,764 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("receipts")
+2025-11-20 12:13:28,764 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:13:28,765 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("products")
+2025-11-20 12:13:28,766 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:13:28,766 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("consumption_logs")
+2025-11-20 12:13:28,767 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:13:28,767 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:13:29,055 - INFO - root - 🚀 FoodFlow Bot started!
+2025-11-20 12:13:29,055 - INFO - aiogram.dispatcher - Start polling
+2025-11-20 12:13:29,358 - INFO - aiogram.dispatcher - Run polling for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:14:27,046 - INFO - aiogram.event - Update id=958086347 is handled. Duration 293 ms by bot id=8587231248
+2025-11-20 12:14:28,805 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemini-2.0-flash-exp:free
+2025-11-20 12:14:30,499 - ERROR - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed with status 429: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google"}},"user_id":"user_2zMGZrkZzTvjgDBeYrWTQevyqFv"}
+2025-11-20 12:14:30,590 - WARNING - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed. Trying next...
+2025-11-20 12:14:30,591 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemma-3-27b-it:free
+2025-11-20 12:14:32,541 - ERROR - FoodFlow.services.ocr - Exception calling google/gemma-3-27b-it:free: Expecting value: line 1 column 1 (char 0)
+2025-11-20 12:14:32,626 - WARNING - FoodFlow.services.ocr - Model google/gemma-3-27b-it:free failed. Trying next...
+2025-11-20 12:14:32,627 - INFO - FoodFlow.services.ocr - Trying OCR model: mistralai/mistral-small-3.2-24b-instruct:free
+2025-11-20 12:15:00,271 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:15:00,276 - INFO - sqlalchemy.engine.Engine - INSERT INTO receipts (user_id, raw_text, total_amount, created_at) VALUES (?, ?, ?, ?)
+2025-11-20 12:15:00,277 - INFO - sqlalchemy.engine.Engine - [generated in 0.00055s] (432823154, "{'items': [{'name': 'FRESH апельсин', 'price': 89.99, 'quantity': 1}, {'name': 'К.Ш. Насло посон. паф. 0.9л', 'price': 28.99, 'quantity': 1}, {'name' ... (1397 characters truncated) ... ол. 250г СЕНЯ', 'price': 59.99, 'quantity': 1}, {'name': 'ГОР. СТ Пел. БИГБУС С МЯС. 500г МЯСНА', 'price': 199.99, 'quantity': 2}], 'total': 3436.75}", 3436.75, '2025-11-20 09:15:00.276753')
+2025-11-20 12:15:00,282 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,283 - INFO - sqlalchemy.engine.Engine - [generated in 0.00016s (insertmanyvalues) 1/22 (ordered; batch not supported)] (4, 'Апельсин', 1.0, 89.99, 'Фрукты')
+2025-11-20 12:15:00,284 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,285 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 2/22 (ordered; batch not supported)] (4, 'Масло подсолнечное рафинированное', 1.0, 28.99, 'Жиры')
+2025-11-20 12:15:00,286 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,286 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 3/22 (ordered; batch not supported)] (4, 'Масло подсолнечное рафинированное', 2.0, 73.99, 'Жиры')
+2025-11-20 12:15:00,287 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,287 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 4/22 (ordered; batch not supported)] (4, 'Вода минеральная газированная', 1.0, 109.99, 'Напитки')
+2025-11-20 12:15:00,288 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,288 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 5/22 (ordered; batch not supported)] (4, 'Приправа кавказская традиционная', 1.0, 28.99, 'Приправы')
+2025-11-20 12:15:00,289 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,289 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 6/22 (ordered; batch not supported)] (4, 'Лук репчатый', 1.0, 99.99, 'Овощи')
+2025-11-20 12:15:00,290 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,290 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 7/22 (ordered; batch not supported)] (4, 'Макароны ракушки', 1.0, 65.99, 'Крупы и макаронные изделия')
+2025-11-20 12:15:00,291 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,291 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 8/22 (ordered; batch not supported)] (4, 'Огурцы корнишоны', 2.0, 69.99, 'Овощи')
+2025-11-20 12:15:00,291 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,292 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 9/22 (ordered; batch not supported)] (4, 'Шашлык из свинины', 1.0, 74.99, 'Мясо')
+2025-11-20 12:15:00,292 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,293 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 10/22 (ordered; batch not supported)] (4, 'Макароны пшеничные', 1.0, 54.99, 'Крупы и макаронные изделия')
+2025-11-20 12:15:00,293 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,293 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 11/22 (ordered; batch not supported)] (4, 'Шоколад молочный', 1.0, 295.99, 'Кондитерские изделия')
+2025-11-20 12:15:00,294 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,294 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 12/22 (ordered; batch not supported)] (4, 'Конфеты шоколадные глазированные', 1.0, 199.99, 'Кондитерские изделия')
+2025-11-20 12:15:00,295 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,295 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 13/22 (ordered; batch not supported)] (4, 'Колбаса ассорти Баварская/Чоризо', 1.0, 219.99, 'Мясные изделия')
+2025-11-20 12:15:00,296 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,296 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 14/22 (ordered; batch not supported)] (4, 'Чипсы с солью', 2.0, 79.99, 'Снеки')
+2025-11-20 12:15:00,297 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,297 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 15/22 (ordered; batch not supported)] (4, 'Хлеб дарничный', 1.0, 37.19, 'Хлебобулочные изделия')
+2025-11-20 12:15:00,298 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,298 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 16/22 (ordered; batch not supported)] (4, 'Сливки с томатом 1%', 1.0, 119.99, 'Молочные продукты')
+2025-11-20 12:15:00,299 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,299 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 17/22 (ordered; batch not supported)] (4, 'Батон нарезной сдобный', 2.0, 35.59, 'Хлебобулочные изделия')
+2025-11-20 12:15:00,300 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,300 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 18/22 (ordered; batch not supported)] (4, 'Торт окрашка', 1.0, 101.99, 'Кондитерские изделия')
+2025-11-20 12:15:00,301 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,301 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 19/22 (ordered; batch not supported)] (4, 'Творог сметанный', 1.0, 329.99, 'Молочные продукты')
+2025-11-20 12:15:00,302 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,302 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 20/22 (ordered; batch not supported)] (4, 'Творожная карамель чайная', 1.0, 179.99, 'Кондитерские изделия')
+2025-11-20 12:15:00,303 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,303 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 21/22 (ordered; batch not supported)] (4, 'Сыр полутвердый малой жирности соленый', 1.0, 59.99, 'Молочные продукты')
+2025-11-20 12:15:00,304 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?) RETURNING id
+2025-11-20 12:15:00,304 - INFO - sqlalchemy.engine.Engine - [insertmanyvalues 22/22 (ordered; batch not supported)] (4, 'Пельмени с мясом', 2.0, 199.99, 'Мясные изделия')
+2025-11-20 12:15:00,306 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:15:00,454 - INFO - aiogram.event - Update id=958086348 is handled. Duration 32237 ms by bot id=8587231248
+2025-11-20 12:29:28,945 - INFO - aiogram.dispatcher - Polling stopped
+2025-11-20 12:29:38,780 - ERROR - aiogram.dispatcher - Failed to fetch updates - TelegramNetworkError: HTTP Client says - ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)
+2025-11-20 12:29:38,781 - WARNING - aiogram.dispatcher - Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8587231248)
+2025-11-20 12:29:38,781 - ERROR - root - Error while closing connector: ClientConnectionError('Connection lost: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)')
+2025-11-20 12:29:39,047 - INFO - aiogram.dispatcher - Polling stopped for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:30:41,119 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:30:41,120 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("users")
+2025-11-20 12:30:41,120 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:30:41,121 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("receipts")
+2025-11-20 12:30:41,122 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:30:41,122 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("products")
+2025-11-20 12:30:41,123 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:30:41,123 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("consumption_logs")
+2025-11-20 12:30:41,124 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:30:41,125 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:30:41,391 - INFO - root - 🚀 FoodFlow Bot started!
+2025-11-20 12:30:41,392 - INFO - aiogram.dispatcher - Start polling
+2025-11-20 12:30:41,675 - INFO - aiogram.dispatcher - Run polling for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:32:18,963 - INFO - aiogram.event - Update id=958086349 is handled. Duration 363 ms by bot id=8587231248
+2025-11-20 12:32:20,883 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemini-2.0-flash-exp:free
+2025-11-20 12:32:22,344 - ERROR - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed with status 429: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google"}},"user_id":"user_2zMGZrkZzTvjgDBeYrWTQevyqFv"}
+2025-11-20 12:32:22,426 - WARNING - FoodFlow.services.ocr - Model google/gemini-2.0-flash-exp:free failed. Trying next...
+2025-11-20 12:32:22,427 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemma-3-27b-it:free
+2025-11-20 12:33:22,644 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:33:22,648 - INFO - sqlalchemy.engine.Engine - INSERT INTO receipts (user_id, raw_text, total_amount, created_at) VALUES (?, ?, ?, ?)
+2025-11-20 12:33:22,649 - INFO - sqlalchemy.engine.Engine - [generated in 0.00089s] (432823154, "{'items': [{'name': 'Fresh Han. Orange c/ras.19T2.0', 'price': 89.99, 'quantity': 1.0}, {'name': '3925 Пилки/р.вода мин.газ.ст.ПЗТ 1.5л МЕРКУРИЙ', 'p ... (1748 characters truncated) ... 0}, {'name': 'Хлеб нарезной', 'price': 44.99, 'quantity': 1.0}, {'name': 'Вода пит.без газа 6л', 'price': 39.99, 'quantity': 1.0}], 'total': 1532.62}", 1532.62, '2025-11-20 09:33:22.648287')
+2025-11-20 12:33:22,671 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,671 - INFO - sqlalchemy.engine.Engine - [generated in 0.00069s] (5, 'Fresh Han Апельсин с костью 2.0', 1.0, 89.99, 'Плодоовощные товары')
+2025-11-20 12:33:22,673 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,674 - INFO - sqlalchemy.engine.Engine - [cached since 0.002979s ago] (5, 'Минеральная вода газированная 1.5л Меркурий', 1.0, 28.99, 'Напитки')
+2025-11-20 12:33:22,675 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,676 - INFO - sqlalchemy.engine.Engine - [cached since 0.005023s ago] (5, 'Масло подсолнечное рафинированное 0.9л', 1.0, 28.99, 'Пищевые жиры')
+2025-11-20 12:33:22,677 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,677 - INFO - sqlalchemy.engine.Engine - [cached since 0.006527s ago] (5, 'Селянское масло подсолнечное рафинированное 1л СПП', 2.0, 73.99, 'Пищевые жиры')
+2025-11-20 12:33:22,678 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,679 - INFO - sqlalchemy.engine.Engine - [cached since 0.007919s ago] (5, 'Минеральная вода газированная 1.5л Меркурий', 1.0, 28.99, 'Напитки')
+2025-11-20 12:33:22,680 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,680 - INFO - sqlalchemy.engine.Engine - [cached since 0.009095s ago] (5, 'Квас традиционный 1л Кваспром', 1.0, 99.99, 'Напитки')
+2025-11-20 12:33:22,681 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,681 - INFO - sqlalchemy.engine.Engine - [cached since 0.01032s ago] (5, 'Лук репчатый 1кг', 0.795, 65.99, 'Плодоовощные товары')
+2025-11-20 12:33:22,682 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,682 - INFO - sqlalchemy.engine.Engine - [cached since 0.01164s ago] (5, 'Макароны Ракушки 450г Накга', 2.0, 69.99, 'Бакалея')
+2025-11-20 12:33:22,683 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,683 - INFO - sqlalchemy.engine.Engine - [cached since 0.01272s ago] (5, 'Огурцы короткоплодные 450г', 1.0, 74.99, 'Плодоовощные товары')
+2025-11-20 12:33:22,684 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,684 - INFO - sqlalchemy.engine.Engine - [cached since 0.01376s ago] (5, 'Шашлык из свинины острый Останки', 2.034, 259.9, 'Мясо')
+2025-11-20 12:33:22,685 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,686 - INFO - sqlalchemy.engine.Engine - [cached since 0.0148s ago] (5, 'Макаронные изделия Слагет высший сорт 500г', 1.0, 54.99, 'Бакалея')
+2025-11-20 12:33:22,686 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,687 - INFO - sqlalchemy.engine.Engine - [cached since 0.01587s ago] (5, 'Milka Шоколад молочный 270г Mondelez', 1.0, 295.99, 'Кондитерские изделия')
+2025-11-20 12:33:22,687 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,688 - INFO - sqlalchemy.engine.Engine - [cached since 0.01694s ago] (5, 'Мират Колбаски черные небалы говяжьи 300г Еряжкин', 1.0, 199.99, 'Мясо')
+2025-11-20 12:33:22,688 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,689 - INFO - sqlalchemy.engine.Engine - [cached since 0.01799s ago] (5, 'Мират Шпротики колбасные с/в говядина 140г Еряжкин', 1.0, 119.99, 'Мясо')
+2025-11-20 12:33:22,690 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,690 - INFO - sqlalchemy.engine.Engine - [cached since 0.01903s ago] (5, 'Черкасский ассорти копченое вареное 500г Панюхин', 1.0, 219.99, 'Мясо')
+2025-11-20 12:33:22,691 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,691 - INFO - sqlalchemy.engine.Engine - [cached since 0.02003s ago] (5, 'Сыр Российский 50% жирности 400г', 2.0, 79.19, 'Молочные продукты')
+2025-11-20 12:33:22,692 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,692 - INFO - sqlalchemy.engine.Engine - [cached since 0.02103s ago] (5, 'Сметана 20% жирности 150г', 2.0, 37.49, 'Молочные продукты')
+2025-11-20 12:33:22,693 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,693 - INFO - sqlalchemy.engine.Engine - [cached since 0.02209s ago] (5, 'Творог 5% жирности 200г', 2.0, 35.49, 'Молочные продукты')
+2025-11-20 12:33:22,694 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,694 - INFO - sqlalchemy.engine.Engine - [cached since 0.02311s ago] (5, 'Яйцо куриное С1 10шт', 0.88, 159.99, 'Яйца')
+2025-11-20 12:33:22,695 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,695 - INFO - sqlalchemy.engine.Engine - [cached since 0.0241s ago] (5, 'Молоко Волков 3.2% жирности 1л', 1.0, 74.99, 'Молочные продукты')
+2025-11-20 12:33:22,696 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,696 - INFO - sqlalchemy.engine.Engine - [cached since 0.02508s ago] (5, 'Йогурт питьевой фруктовый клубничный 200г Пур', 1.0, 36.99, 'Молочные продукты')
+2025-11-20 12:33:22,697 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,697 - INFO - sqlalchemy.engine.Engine - [cached since 0.02624s ago] (5, 'Кефир Витязь 1% жирности 1л', 1.0, 73.99, 'Молочные продукты')
+2025-11-20 12:33:22,698 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,698 - INFO - sqlalchemy.engine.Engine - [cached since 0.02732s ago] (5, 'Сметана Алексеевская 20% жирности 200г', 1.0, 69.99, 'Молочные продукты')
+2025-11-20 12:33:22,699 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,699 - INFO - sqlalchemy.engine.Engine - [cached since 0.02838s ago] (5, 'Творог Алексеевский 5% жирности 200г', 1.0, 69.99, 'Молочные продукты')
+2025-11-20 12:33:22,700 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,700 - INFO - sqlalchemy.engine.Engine - [cached since 0.02945s ago] (5, 'Хлеб нарезной', 1.0, 44.99, 'Хлебобулочные изделия')
+2025-11-20 12:33:22,701 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:33:22,701 - INFO - sqlalchemy.engine.Engine - [cached since 0.03044s ago] (5, 'Вода питьевая без газа 6л', 1.0, 39.99, 'Напитки')
+2025-11-20 12:33:22,702 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:33:26,269 - INFO - aiogram.event - Update id=958086350 is handled. Duration 65985 ms by bot id=8587231248
+2025-11-20 12:34:15,558 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:34:15,560 - INFO - sqlalchemy.engine.Engine - SELECT products.id, products.receipt_id, products.name, products.quantity, products.price, products.category 
+FROM products 
+WHERE products.id = ?
+2025-11-20 12:34:15,561 - INFO - sqlalchemy.engine.Engine - [generated in 0.00089s] (72,)
+2025-11-20 12:34:15,752 - INFO - sqlalchemy.engine.Engine - ROLLBACK
+2025-11-20 12:34:15,753 - INFO - aiogram.event - Update id=958086351 is handled. Duration 199 ms by bot id=8587231248
+2025-11-20 12:36:03,657 - INFO - aiogram.dispatcher - Polling stopped
+2025-11-20 12:36:06,486 - ERROR - aiogram.dispatcher - Failed to fetch updates - TelegramNetworkError: HTTP Client says - ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)
+2025-11-20 12:36:06,488 - WARNING - aiogram.dispatcher - Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8587231248)
+2025-11-20 12:36:06,489 - ERROR - root - Error while closing connector: ClientConnectionError('Connection lost: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)')
+2025-11-20 12:36:06,750 - INFO - aiogram.dispatcher - Polling stopped for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:36:18,493 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:36:18,494 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("users")
+2025-11-20 12:36:18,494 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:36:18,495 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("receipts")
+2025-11-20 12:36:18,496 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:36:18,496 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("products")
+2025-11-20 12:36:18,497 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:36:18,497 - INFO - sqlalchemy.engine.Engine - PRAGMA main.table_info("consumption_logs")
+2025-11-20 12:36:18,498 - INFO - sqlalchemy.engine.Engine - [raw sql] ()
+2025-11-20 12:36:18,499 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:36:18,790 - INFO - root - 🚀 FoodFlow Bot started!
+2025-11-20 12:36:18,791 - INFO - aiogram.dispatcher - Start polling
+2025-11-20 12:36:19,073 - INFO - aiogram.dispatcher - Run polling for bot @llmdebat2bot id=8587231248 - 'llmbot2'
+2025-11-20 12:38:30,190 - INFO - aiogram.event - Update id=958086352 is handled. Duration 352 ms by bot id=8587231248
+2025-11-20 12:38:33,924 - INFO - FoodFlow.services.ocr - Trying OCR model: google/gemini-2.0-flash-exp:free
+2025-11-20 12:39:02,251 - INFO - sqlalchemy.engine.Engine - BEGIN (implicit)
+2025-11-20 12:39:02,252 - INFO - sqlalchemy.engine.Engine - INSERT INTO receipts (user_id, raw_text, total_amount, created_at) VALUES (?, ?, ?, ?)
+2025-11-20 12:39:02,253 - INFO - sqlalchemy.engine.Engine - [generated in 0.00050s] (432823154, "{'items': [{'name': 'FRESH Han, DRANGE', 'price': 89.99, 'quantity': 1.0}, {'name': 'ПИЛИГР. Вода', 'price': 28.99, 'quantity': 1.0}, {'name': 'Масло ... (1422 characters truncated) ... м.сол. 250г', 'price': 49.49, 'quantity': 1.0}, {'name': '*ГОР. ШТ. Пельм. БИГБУЛИ С МЯС. 900Г', 'price': 199.99, 'quantity': 2.0}], 'total': 3436.0}", 3436.0, '2025-11-20 09:39:02.252922')
+2025-11-20 12:39:02,256 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,257 - INFO - sqlalchemy.engine.Engine - [generated in 0.00048s] (6, 'FRESH Апельсиновый сок', 1.0, 89.99, 'Напитки')
+2025-11-20 12:39:02,258 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,258 - INFO - sqlalchemy.engine.Engine - [cached since 0.002363s ago] (6, 'Пилигрим Вода питьевая', 1.0, 28.99, 'Напитки')
+2025-11-20 12:39:02,259 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,260 - INFO - sqlalchemy.engine.Engine - [cached since 0.003767s ago] (6, 'Масло подсолнечное рафинированное 0.91л', 2.0, 73.99, 'Бакалея')
+2025-11-20 12:39:02,261 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,262 - INFO - sqlalchemy.engine.Engine - [cached since 0.005569s ago] (6, 'Селянское сливочное масло', 1.0, 109.99, 'Молочные продукты')
+2025-11-20 12:39:02,263 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,263 - INFO - sqlalchemy.engine.Engine - [cached since 0.007452s ago] (6, 'Пилигрим Вода питьевая', 1.0, 28.99, 'Напитки')
+2025-11-20 12:39:02,264 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,265 - INFO - sqlalchemy.engine.Engine - [cached since 0.008644s ago] (6, 'Царские припасы Квас Традиционный 1л', 1.0, 99.99, 'Напитки')
+2025-11-20 12:39:02,266 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,266 - INFO - sqlalchemy.engine.Engine - [cached since 0.009809s ago] (6, 'Лук репчатый 1кг', 0.795, 65.99, 'Овощи')
+2025-11-20 12:39:02,267 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,267 - INFO - sqlalchemy.engine.Engine - [cached since 0.01087s ago] (6, 'Makfa Макароны ракушки 450г', 2.0, 69.99, 'Бакалея')
+2025-11-20 12:39:02,268 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,268 - INFO - sqlalchemy.engine.Engine - [cached since 0.01241s ago] (6, 'ДСК Огурцы короткоплодные маринованные 450г', 1.0, 74.99, 'Овощи')
+2025-11-20 12:39:02,269 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,270 - INFO - sqlalchemy.engine.Engine - [cached since 0.0135s ago] (6, 'ОМПК Шашлык из свинины ведро 1кг', 2.034, 259.9, 'Мясо')
+2025-11-20 12:39:02,270 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,271 - INFO - sqlalchemy.engine.Engine - [cached since 0.01452s ago] (6, 'Зерница Макаронные изделия Спагетти высший сорт 500г', 1.0, 54.99, 'Бакалея')
+2025-11-20 12:39:02,271 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,272 - INFO - sqlalchemy.engine.Engine - [cached since 0.01563s ago] (6, 'Milka Шоколад молочный 270г', 1.0, 295.99, 'Кондитерские изделия')
+2025-11-20 12:39:02,273 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,273 - INFO - sqlalchemy.engine.Engine - [cached since 0.01688s ago] (6, 'Мираторг Колбаски Чевапчичи говяжьи 300г', 1.0, 199.99, 'Мясо')
+2025-11-20 12:39:02,274 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,274 - INFO - sqlalchemy.engine.Engine - [cached since 0.01792s ago] (6, 'Черкизово Ассорти колбас Баварская/Чоризо охлажденное 540г', 1.0, 219.99, 'Мясо')
+2025-11-20 12:39:02,275 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,275 - INFO - sqlalchemy.engine.Engine - [cached since 0.01896s ago] (6, 'POMS Чипсы картофельные соленые 100г', 2.0, 79.99, 'Снеки')
+2025-11-20 12:39:02,276 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,276 - INFO - sqlalchemy.engine.Engine - [cached since 0.01994s ago] (6, 'Хлеб Дарницкий 680г', 1.0, 37.19, 'Хлебобулочные изделия')
+2025-11-20 12:39:02,277 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,277 - INFO - sqlalchemy.engine.Engine - [cached since 0.02098s ago] (6, 'Томаты Фламенко', 0.38, 199.99, 'Овощи')
+2025-11-20 12:39:02,278 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,278 - INFO - sqlalchemy.engine.Engine - [cached since 0.02199s ago] (6, 'Батон Подмосковный высший сорт нарезной 380г', 2.0, 35.59, 'Хлебобулочные изделия')
+2025-11-20 12:39:02,279 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,279 - INFO - sqlalchemy.engine.Engine - [cached since 0.02313s ago] (6, 'Ама Торт Сказочка 450г', 1.0, 329.99, 'Кондитерские изделия')
+2025-11-20 12:39:02,280 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,280 - INFO - sqlalchemy.engine.Engine - [cached since 0.02411s ago] (6, 'Русский картофель Чипсы вкус лук и сметана 200г', 1.0, 179.99, 'Снеки')
+2025-11-20 12:39:02,281 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,281 - INFO - sqlalchemy.engine.Engine - [cached since 0.02523s ago] (6, 'Принцесса Ява Напиток каркаде чайные листья 80г', 1.0, 59.99, 'Чай')
+2025-11-20 12:39:02,282 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,282 - INFO - sqlalchemy.engine.Engine - [cached since 0.02646s ago] (6, 'Don Semi Семечки подсолнечные жареные соленые 250г', 1.0, 49.49, 'Снеки')
+2025-11-20 12:39:02,283 - INFO - sqlalchemy.engine.Engine - INSERT INTO products (receipt_id, name, quantity, price, category) VALUES (?, ?, ?, ?, ?)
+2025-11-20 12:39:02,284 - INFO - sqlalchemy.engine.Engine - [cached since 0.02773s ago] (6, 'Горячая штучка Пельмени БигБули с мясом 900г', 2.0, 199.99, 'Мясо')
+2025-11-20 12:39:02,284 - INFO - sqlalchemy.engine.Engine - COMMIT
+2025-11-20 12:39:05,633 - INFO - aiogram.event - Update id=958086353 is handled. Duration 32288 ms by bot id=8587231248
