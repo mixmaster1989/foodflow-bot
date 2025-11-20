@@ -137,6 +137,46 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
         
         await status_msg.edit_text(response, parse_mode="HTML")
         
+        # 🚀 Search for real-time prices using Perplexity
+        await callback.message.answer("🔍 Ищу актуальные цены в других магазинах...")
+        
+        from FoodFlow.services.price_search import PriceSearchService
+        
+        online_prices = await PriceSearchService.search_prices(price_data["product_name"])
+        
+        if online_prices and online_prices.get("prices"):
+            online_response = f"🌐 <b>Актуальные цены в магазинах:</b>\n\n"
+            
+            for store_price in online_prices["prices"][:5]:
+                store = store_price.get("store", "Неизвестно")
+                price = store_price.get("price")
+                if price:
+                    online_response += f"• {store}: {price}р\n"
+            
+            if online_prices.get("min_price"):
+                online_response += f"\n📊 Минимальная: {online_prices['min_price']}р\n"
+                online_response += f"📊 Максимальная: {online_prices['max_price']}р\n"
+                online_response += f"📊 Средняя: {online_prices['avg_price']:.2f}р\n"
+                
+                # Compare with scanned price
+                scanned_price = price_data["price"]
+                min_online = online_prices["min_price"]
+                
+                if scanned_price < min_online:
+                    diff = min_online - scanned_price
+                    online_response += f"\n🎉 <b>Отличная цена! Дешевле на {diff:.2f}р!</b>"
+                elif scanned_price > min_online:
+                    diff = scanned_price - min_online
+                    online_response += f"\n⚠️ В других магазинах дешевле на {diff:.2f}р"
+            
+            await callback.message.answer(online_response, parse_mode="HTML")
+        elif online_prices and online_prices.get("raw_response"):
+            # If Perplexity returned text instead of JSON
+            await callback.message.answer(
+                f"🌐 <b>Информация о ценах:</b>\n\n{online_prices['raw_response'][:500]}",
+                parse_mode="HTML"
+            )
+        
     except Exception as exc:
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
