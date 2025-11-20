@@ -88,3 +88,18 @@ class LabelScan(Base):
 
     session = relationship("ShoppingSession", back_populates="label_scans")
     matched_product = relationship("Product", back_populates="label_scans")
+
+
+class PriceTag(Base):
+    __tablename__ = "price_tags"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    product_name = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
+    store_name = Column(String, nullable=True)
+    location = Column(String, nullable=True)  # для будущей геолокации
+    photo_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="price_tags")

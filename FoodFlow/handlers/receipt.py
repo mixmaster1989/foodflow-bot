@@ -46,8 +46,100 @@ async def cancel_action(callback: types.CallbackQuery):
     await callback.answer("Отменено")
 
 @router.callback_query(F.data == "action_price_tag")
-async def price_tag_action(callback: types.CallbackQuery):
-    await callback.answer("Функция в разработке! (Phase 2)", show_alert=True)
+async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
+    photo_message = callback.message.reply_to_message
+    if not photo_message or not photo_message.photo:
+        await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
+        return
+    
+    status_msg = await callback.message.edit_text("⏳ Анализирую ценник...")
+    
+    try:
+        # Download photo
+        photo = photo_message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_bytes = io.BytesIO()
+        await bot.download_file(file_info.file_path, photo_bytes)
+        
+        # OCR processing
+        from FoodFlow.services.price_tag_ocr import PriceTagOCRService
+        from FoodFlow.database.models import PriceTag
+        from rapidfuzz import fuzz
+        from sqlalchemy import select
+        from datetime import datetime as dt
+        
+        price_data = await PriceTagOCRService.parse_price_tag(photo_bytes.getvalue())
+        
+        if not price_data or not price_data.get("product_name") or not price_data.get("price"):
+            await status_msg.edit_text("❌ Не удалось распознать ценник. Попробуй сфотографировать четче.")
+            return
+        
+        # Save to database
+        async for session in get_db():
+            price_tag = PriceTag(
+                user_id=photo_message.from_user.id,
+                product_name=price_data.get("product_name"),
+                price=float(price_data.get("price")),
+                store_name=price_data.get("store"),
+                photo_date=dt.fromisoformat(price_data["date"]) if price_data.get("date") else None,
+            )
+            session.add(price_tag)
+            await session.commit()
+            
+            # Find similar products for price comparison
+            stmt = select(PriceTag).where(PriceTag.user_id == photo_message.from_user.id)
+            result = await session.execute(stmt)
+            all_tags = result.scalars().all()
+            
+            similar_tags = []
+            for tag in all_tags:
+                if tag.id == price_tag.id:
+                    continue
+                score = fuzz.WRatio(price_data["product_name"].lower(), tag.product_name.lower())
+                if score >= 70:
+                    similar_tags.append((tag, score))
+            
+            similar_tags.sort(key=lambda x: x[1], reverse=True)
+            break
+        
+        # Build response
+        response = (
+            f"✅ <b>Ценник сохранен!</b>\n\n"
+            f"📦 <b>{price_data['product_name']}</b>\n"
+            f"💵 {price_data['price']}р\n"
+        )
+        
+        if price_data.get("store"):
+            response += f"🏪 {price_data['store']}\n"
+        
+        if similar_tags:
+            response += "\n📊 <b>Сравнение цен:</b>\n"
+            prices = [price_data["price"]] + [tag.price for tag, _ in similar_tags[:5]]
+            min_price = min(prices)
+            max_price = max(prices)
+            avg_price = sum(prices) / len(prices)
+            
+            response += f"• Мин: {min_price}р\n"
+            response += f"• Макс: {max_price}р\n"
+            response += f"• Средняя: {avg_price:.2f}р\n\n"
+            
+            if price_data["price"] == min_price:
+                response += "🎉 <b>Это самая низкая цена!</b>"
+            elif price_data["price"] > avg_price:
+                response += f"⚠️ Цена выше средней на {price_data['price'] - avg_price:.2f}р"
+            
+            response += "\n\n<b>Похожие товары:</b>\n"
+            for tag, score in similar_tags[:3]:
+                response += f"• {tag.product_name} - {tag.price}р"
+                if tag.store_name:
+                    response += f" ({tag.store_name})"
+                response += "\n"
+        
+        await status_msg.edit_text(response, parse_mode="HTML")
+        
+    except Exception as exc:
+        await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
+
 
 @router.callback_query(F.data == "action_log_food")
 async def log_food_action(callback: types.CallbackQuery):
