@@ -5,3 +5,4 @@ python-dotenv
 requests
 aiohttp
 pydantic-settings
+rapidfuzz

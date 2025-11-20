@@ -1,0 +1,109 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+*.key
+*.pem
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+logs/
+*.log
+bot_stderr.log
+bot_stdout.log
+foodflow-bg.log
+foodflow.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+foodflow.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# OCR Results (temporary test files)
+ocr_results.json
+gpt4o_mini_ocr_results.json
+test_web_search.py
+ocr_championship.py
+
+# PDF content extracts (temporary)
+pdf_content.txt
+pdf_content_utf8.txt
+read_pdfs.py
+
+# Test images
+receipt.jpeg
+
+# Git
+.git/

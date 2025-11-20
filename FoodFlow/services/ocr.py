@@ -7,9 +7,19 @@ from FoodFlow.config import settings
 logger = logging.getLogger(__name__)
 
 class OCRService:
-    PRIMARY_MODEL = "google/gemini-2.0-flash-exp:free"
-    FALLBACK_MODEL_1 = "google/gemma-3-27b-it:free"
-    FALLBACK_MODEL_2 = "mistralai/mistral-small-3.2-24b-instruct:free"
+    """
+    Models ordered by quality:
+    1) openai/gpt-4o-mini — лучший результат (по тесту 20.11.2025).
+    2) openai/gpt-4o-mini-2024-07-18 — тот же движок, но прошлый релиз.
+    3) Дальше прежние бесплатные fallback'и.
+    """
+    MODELS = [
+        "openai/gpt-4o-mini",
+        "openai/gpt-4o-mini-2024-07-18",
+        "google/gemini-2.0-flash-exp:free",
+        "google/gemma-3-27b-it:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free",
+    ]
     
     @staticmethod
     async def _call_openrouter(model: str, image_bytes: bytes) -> dict | None:
@@ -70,9 +80,7 @@ class OCRService:
 
     @classmethod
     async def parse_receipt(cls, image_bytes: bytes) -> dict:
-        models = [cls.PRIMARY_MODEL, cls.FALLBACK_MODEL_1, cls.FALLBACK_MODEL_2]
-        
-        for model in models:
+        for model in cls.MODELS:
             logger.info(f"Trying OCR model: {model}")
             result = await cls._call_openrouter(model, image_bytes)
             if result:

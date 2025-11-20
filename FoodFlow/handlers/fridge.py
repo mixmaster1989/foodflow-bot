@@ -1,43 +1,177 @@
+import io
+import logging
+import math
 from aiogram import Router, F, types
-from sqlalchemy.future import select
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy import func, select
 from FoodFlow.database.base import get_db
-from FoodFlow.database.models import Product
+from FoodFlow.database.models import Product, Receipt
 
 router = Router()
+logger = logging.getLogger(__name__)
+
+PAGE_SIZE = 12
+
 
 @router.message(F.text == "🧊 Холодильник")
 async def show_fridge(message: types.Message):
-    async for session in get_db():
-        # Join with Receipt to filter by user if needed, but Product doesn't have user_id directly.
-        # We need to join Product -> Receipt -> User
-        # For MVP, let's assume we just show all products for the user's receipts.
-        # Wait, Product -> Receipt. Receipt -> User.
-        
-        # Correct query: Select Product where Product.receipt.user_id == message.from_user.id
-        # But for simplicity in MVP let's just assume we fetch all products linked to receipts of this user.
-        # Actually, let's do it properly.
-        pass 
-        # (I will implement the query logic inside the loop below to be safe with imports)
+    user_id = message.from_user.id
+    logger.info("User %s requested fridge overview", user_id)
 
-    # Re-implementing with correct query
-    from FoodFlow.database.models import Receipt
-    
-    items_text = "🧊 **Твой Холодильник:**\n\n"
-    has_items = False
-    
-    async for session in get_db():
-        stmt = select(Product).join(Receipt).where(Receipt.user_id == message.from_user.id)
-        result = await session.execute(stmt)
-        products = result.scalars().all()
-        
-        if not products:
-            await message.answer("В холодильнике пусто! 🕸️\nСкинь фото чека, чтобы пополнить запасы.")
-            return
+    total_items = await _get_total_products(user_id)
+    if total_items == 0:
+        await message.answer("В холодильнике пусто! 🕸️\nСкинь фото чека, чтобы пополнить запасы.")
+        return
 
-        # Group by category (simple logic for now)
-        for product in products:
-            items_text += f"▫️ {product.name} ({product.quantity} шт)\n"
-            has_items = True
-            
-    if has_items:
-        await message.answer(items_text)
+    summary_text = await _build_summary_text(user_id, total_items)
+    await message.answer(summary_text, parse_mode="HTML")
+
+    page_message = await message.answer("Загружаю содержимое холодильника...")
+    await _update_fridge_page(page_message, user_id, page=0, forced_total=total_items)
+
+
+@router.callback_query(F.data.startswith("fridge_page:"))
+async def paginate_fridge(callback: types.CallbackQuery):
+    try:
+        page = int(callback.data.split(":")[1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректная страница", show_alert=True)
+        return
+
+    total_items = await _get_total_products(callback.from_user.id)
+    if total_items == 0:
+        await callback.message.edit_text("Холодильник пуст.")
+        await callback.answer()
+        return
+
+    await _update_fridge_page(callback.message, callback.from_user.id, page=page, forced_total=total_items)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "fridge_export")
+async def export_fridge(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    logger.info("User %s requested fridge export", user_id)
+
+    async for session in get_db():
+        stmt = (
+            select(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+            .order_by(Product.id.desc())
+        )
+        products = (await session.execute(stmt)).scalars().all()
+
+    if not products:
+        await callback.answer("Холодильник пуст.", show_alert=True)
+        return
+
+    lines = ["Название;Кол-во;Цена;Категория"]
+    for product in products:
+        lines.append(
+            f"{product.name};{product.quantity};{product.price};{product.category or '—'}"
+        )
+
+    csv_content = "\n".join(lines)
+    file_bytes = csv_content.encode("utf-8")
+    document = types.BufferedInputFile(file_bytes, filename="fridge_export.csv")
+    await callback.message.answer_document(document, caption="Экспорт холодильника (CSV)")
+    await callback.answer("Экспорт готов!")
+
+
+async def _get_total_products(user_id: int) -> int:
+    async for session in get_db():
+        total = await session.scalar(
+            select(func.count())
+            .select_from(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+        )
+        return total or 0
+    return 0
+
+
+async def _build_summary_text(user_id: int, total_items: int) -> str:
+    async for session in get_db():
+        categories_stmt = (
+            select(func.count(func.distinct(Product.category)))
+            .select_from(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+        )
+        category_count = await session.scalar(categories_stmt) or 0
+
+        latest_stmt = (
+            select(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+            .order_by(Product.id.desc())
+            .limit(3)
+        )
+        latest_products = (await session.execute(latest_stmt)).scalars().all()
+
+    latest_text = "\n".join(
+        f"▫️ {product.name} — {product.quantity} шт"
+        for product in latest_products
+    ) or "▫️ Пока без новых поступлений"
+
+    return (
+        "🧊 <b>Твой Холодильник</b>\n\n"
+        f"📦 Продуктов: <b>{total_items}</b>\n"
+        f"🏷️ Категорий: <b>{category_count}</b>\n"
+        "🆕 Последние добавления:\n"
+        f"{latest_text}"
+    )
+
+
+async def _update_fridge_page(
+    message_obj: types.Message,
+    user_id: int,
+    page: int,
+    forced_total: int | None = None
+):
+    total_items = forced_total
+    if total_items is None:
+        total_items = await _get_total_products(user_id)
+    if total_items == 0:
+        await message_obj.edit_text("Холодильник пуст.")
+        return
+
+    total_pages = math.ceil(total_items / PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+
+    async for session in get_db():
+        stmt = (
+            select(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+            .order_by(Product.id.desc())
+            .offset(page * PAGE_SIZE)
+            .limit(PAGE_SIZE)
+        )
+        products = (await session.execute(stmt)).scalars().all()
+
+    if not products:
+        await message_obj.edit_text("Не удалось загрузить продукты. Попробуй позже.")
+        return
+
+    lines = [
+        f"📄 Страница {page + 1}/{total_pages}",
+        ""
+    ]
+    for product in products:
+        lines.append(
+            f"▫️ <b>{product.name}</b>\n"
+            f"   {product.quantity} шт · {product.price}₽ · {product.category or 'Без категории'}"
+        )
+    text = "\n".join(lines)
+
+    builder = InlineKeyboardBuilder()
+    if page > 0:
+        builder.button(text="⬅️ Назад", callback_data=f"fridge_page:{page - 1}")
+    if page < total_pages - 1:
+        builder.button(text="Вперёд ➡️", callback_data=f"fridge_page:{page + 1}")
+    builder.button(text="📄 Экспорт", callback_data="fridge_export")
+    builder.adjust(2)
+
+    await message_obj.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")

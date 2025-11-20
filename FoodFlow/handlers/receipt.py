@@ -1,16 +1,24 @@
+import io
 from aiogram import Router, F, types, Bot
-from aiogram.enums import ContentType
+from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from FoodFlow.services.ocr import OCRService
-from FoodFlow.services.normalization import NormalizationService
 from FoodFlow.database.base import get_db
 from FoodFlow.database.models import Receipt, Product
-import io
+from FoodFlow.handlers.shopping import ShoppingMode
+from FoodFlow.services.matching import MatchingService
+from FoodFlow.services.normalization import NormalizationService
+from FoodFlow.services.ocr import OCRService
 
 router = Router()
 
 @router.message(F.photo)
-async def handle_photo(message: types.Message, bot: Bot):
+async def handle_photo(message: types.Message, bot: Bot, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == ShoppingMode.waiting_for_receipt.state:
+        status_msg = await message.answer("⏳ Анализирую чек (Shopping Mode)...")
+        await _process_receipt_flow(message, bot, status_msg, message, state)
+        return
+
     # Create Inline Keyboard
     builder = InlineKeyboardBuilder()
     builder.button(text="🧾 Это чек", callback_data="action_receipt")
@@ -46,87 +54,201 @@ async def log_food_action(callback: types.CallbackQuery):
     await callback.answer("Функция 'Дневник питания' скоро будет!", show_alert=True)
 
 @router.callback_query(F.data == "action_receipt")
-async def process_receipt(callback: types.CallbackQuery, bot: Bot):
+async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
     # Get the original photo message
     photo_message = callback.message.reply_to_message
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
         return
-
-    await callback.message.edit_text("⏳ Анализирую чек... (это может занять пару секунд)")
     
+    await _process_receipt_flow(photo_message, bot, callback.message, callback.message, state)
+
+
+async def _process_receipt_flow(
+    photo_message: types.Message,
+    bot: Bot,
+    status_message: types.Message,
+    reply_target: types.Message,
+    state: FSMContext | None
+):
     try:
-        # Download photo
-        photo = photo_message.photo[-1]
-        file_info = await bot.get_file(photo.file_id)
-        photo_bytes = io.BytesIO()
-        await bot.download_file(file_info.file_path, photo_bytes)
-        image_data = photo_bytes.getvalue()
-        
-        # Call OCR
-        data = await OCRService.parse_receipt(image_data)
-        
-        # Call Normalization (Perplexity)
-        status_msg_text = "⏳ Анализирую чек... (OCR завершен, нормализую названия...)"
+        await status_message.edit_text("⏳ Анализирую чек... (это может занять пару секунд)")
+    except Exception:
+        pass
+
+    try:
+        data, normalized_items = await _extract_receipt_data(photo_message, bot)
+
         try:
-            await callback.message.edit_text(status_msg_text)
-        except:
+            await status_message.edit_text("⏳ Анализирую чек... (OCR завершен, нормализую названия...)")
+        except Exception:
             pass
 
-        raw_items = data.get("items", [])
-        normalized_items = await NormalizationService.normalize_products(raw_items)
-        
-        # Save to DB
-        # Save to DB and send individual messages
-        product_ids = []
-        async for session in get_db():
-            receipt = Receipt(
-                user_id=photo_message.from_user.id,
-                raw_text=str(data),
-                total_amount=data.get("total", 0.0)
+        products, product_ids = await _save_receipt(photo_message.from_user.id, data, normalized_items)
+
+        try:
+            await status_message.delete()
+        except Exception:
+            pass
+
+        await _send_receipt_summary(reply_target, data, normalized_items, products)
+
+        if state:
+            await _handle_shopping_matching(state, reply_target, product_ids)
+
+    except Exception as exc:
+        try:
+            await status_message.edit_text(f"❌ Ошибка при обработке: {exc}")
+        except Exception:
+            await reply_target.answer(f"❌ Ошибка при обработке: {exc}")
+
+
+async def _extract_receipt_data(photo_message: types.Message, bot: Bot):
+    photo = photo_message.photo[-1]
+    file_info = await bot.get_file(photo.file_id)
+    photo_bytes = io.BytesIO()
+    await bot.download_file(file_info.file_path, photo_bytes)
+    image_data = photo_bytes.getvalue()
+
+    data = await OCRService.parse_receipt(image_data)
+    raw_items = data.get("items", [])
+    normalized_items = await NormalizationService.normalize_products(raw_items)
+    return data, normalized_items
+
+
+async def _save_receipt(user_id: int, data: dict, normalized_items: list[dict]):
+    products_payload = []
+    product_ids = []
+
+    async for session in get_db():
+        receipt = Receipt(
+            user_id=user_id,
+            raw_text=str(data),
+            total_amount=data.get("total", 0.0)
+        )
+        session.add(receipt)
+        await session.flush()
+
+        for item in normalized_items:
+            product = Product(
+                receipt_id=receipt.id,
+                name=item.get("name", "Unknown"),
+                price=item.get("price", 0.0),
+                quantity=item.get("quantity", 1.0),
+                category=item.get("category", "Uncategorized"),
+                calories=item.get("calories", 0.0),
+                protein=item.get("protein", 0.0),
+                fat=item.get("fat", 0.0),
+                carbs=item.get("carbs", 0.0),
             )
-            session.add(receipt)
-            await session.flush() # Get ID
-            
-            for item in normalized_items:
-                product = Product(
-                    receipt_id=receipt.id,
-                    name=item.get("name", "Unknown"),
-                    price=item.get("price", 0.0),
-                    quantity=item.get("quantity", 1.0),
-                    category=item.get("category", "Uncategorized")
-                )
-                session.add(product)
-                await session.flush()  # Get product ID
-                product_ids.append(product.id)
-            
-            await session.commit()
-        
-        # Delete status message
-        await callback.message.delete()
-        
-        # Send summary first
-        await callback.message.answer(
-            f"✅ <b>Чек обработан!</b>\n\n"
-            f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
-            f"📦 <b>Позиций:</b> {len(normalized_items)}\n\n"
-            f"Продукты добавлены в холодильник.",
+            session.add(product)
+            await session.flush()
+            product_ids.append(product.id)
+            products_payload.append(
+                {
+                    "id": product.id,
+                    "name": product.name,
+                    "price": product.price,
+                    "quantity": product.quantity,
+                    "category": product.category
+                }
+            )
+
+        await session.commit()
+        break
+
+    return products_payload, product_ids
+
+
+async def _send_receipt_summary(reply_target: types.Message, data: dict, normalized_items: list[dict], products: list[dict]):
+    await reply_target.answer(
+        f"✅ <b>Чек обработан!</b>\n\n"
+        f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
+        f"📦 <b>Позиций:</b> {len(normalized_items)}\n\n"
+        f"Продукты добавлены в холодильник.",
+        parse_mode="HTML"
+    )
+
+    for product in products:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✏️ Коррекция", callback_data=f"correct_{product['id']}")
+
+        await reply_target.answer(
+            f"▫️ <b>{product['name']}</b>\n"
+            f"💵 {product['price']}р × {product['quantity']} шт\n"
+            f"🏷️ {product['category']}",
+            reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
-        
-        # Send each product as separate message with correction button
-        for idx, item in enumerate(normalized_items):
-            product_id = product_ids[idx]
-            builder = InlineKeyboardBuilder()
-            builder.button(text="✏️ Коррекция", callback_data=f"correct_{product_id}")
-            
-            await callback.message.answer(
-                f"▫️ <b>{item.get('name')}</b>\n"
-                f"💵 {item.get('price')}р × {item.get('quantity')} шт\n"
-                f"🏷️ {item.get('category')}",
-                reply_markup=builder.as_markup(),
-                parse_mode="HTML"
+
+
+async def _handle_shopping_matching(state: FSMContext, reply_target: types.Message, product_ids: list[int]):
+    current_state = await state.get_state()
+    data = await state.get_data()
+    session_id = data.get("shopping_session_id")
+
+    if current_state != ShoppingMode.waiting_for_receipt.state or not session_id:
+        return
+
+    result = await MatchingService.match_products(product_ids, session_id)
+    await state.clear()
+
+    if not result:
+        await reply_target.answer("🛒 Сессия покупок завершена. Совпадения не найдены.")
+        return
+
+    await _send_matching_messages(reply_target, result)
+
+
+async def _send_matching_messages(reply_target: types.Message, matching_result: dict):
+    matched = matching_result.get("matched", [])
+    unmatched_products = matching_result.get("unmatched_products", [])
+    unmatched_labels = matching_result.get("unmatched_labels", [])
+    suggestions = matching_result.get("suggestions", {})
+
+    summary_lines = ["🛒 <b>Shopping Mode: результаты сопоставления</b>"]
+
+    if matched:
+        summary_lines.append("\n✅ <b>Сопоставленные позиции:</b>")
+        for pair in matched:
+            summary_lines.append(
+                f"• {pair['product_name']} ↔ {pair['label_name']} "
+                f"({pair.get('brand') or 'без бренда'})"
             )
-        
-    except Exception as e:
-        await callback.message.edit_text(f"❌ Ошибка при обработке: {str(e)}")
+
+    if unmatched_products:
+        summary_lines.append("\n❓ <b>Несопоставленные позиции из чека:</b>")
+        for product in unmatched_products:
+            summary_lines.append(f"• {product['name']} ({product['price']}р)")
+
+    if unmatched_labels:
+        summary_lines.append("\n❌ <b>Этикетки без совпадения:</b>")
+        for label in unmatched_labels:
+            summary_lines.append(f"• {label['name']} ({label.get('weight') or '—'})")
+
+    await reply_target.answer("\n".join(summary_lines), parse_mode="HTML")
+
+    for product in unmatched_products:
+        builder = InlineKeyboardBuilder()
+        for suggestion in suggestions.get(product["id"], []):
+            builder.button(
+                text=f"📦 {suggestion['label_name']} ({int(suggestion['score'])}%)",
+                callback_data=f"sm_link:{product['id']}:{suggestion['label_id']}"
+            )
+        builder.button(text="➕ Это новый товар", callback_data=f"sm_skip:{product['id']}")
+        builder.adjust(1)
+
+        await reply_target.answer(
+            "❓ <b>Не найдено совпадение:</b>\n\n"
+            f"📄 {product['name']}\n"
+            f"💵 {product['price']}р × {product['quantity']} шт\n\n"
+            "Выбери этикетку или оставь как новый товар.",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+
+    if unmatched_labels:
+        await reply_target.answer(
+            "ℹ️ У тебя остались несопоставленные этикетки. "
+            "Можно привязать их вручную позже через кнопки выше."
+        )

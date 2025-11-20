@@ -3,7 +3,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from FoodFlow.config import settings
 from FoodFlow.database.base import init_db
-from FoodFlow.handlers import common, receipt, fridge, recipes, stats, correction
+from FoodFlow.database import migrations
+from FoodFlow.handlers import common, receipt, fridge, recipes, stats, correction, shopping
 
 async def main():
     logging.basicConfig(
@@ -17,12 +18,14 @@ async def main():
     
     # Initialize DB
     await init_db()
+    await migrations.run_migrations()
     
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
     
     # Register routers
     dp.include_router(common.router)
+    dp.include_router(shopping.router)
     dp.include_router(receipt.router)
     dp.include_router(correction.router)
     dp.include_router(fridge.router)

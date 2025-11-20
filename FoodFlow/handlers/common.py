@@ -20,6 +20,7 @@ async def cmd_start(message: types.Message):
             
     # Create Main Menu Keyboard
     kb = [
+        [types.KeyboardButton(text="🛒 Иду в магазин")],
         [types.KeyboardButton(text="🧊 Холодильник"), types.KeyboardButton(text="👨‍🍳 Рецепты")],
         [types.KeyboardButton(text="📊 Статистика")]
     ]
