@@ -1,179 +1,227 @@
-# 🍽️ FoodFlow Bot
+# 🝴 FoodFlow Bot
 
-**Smart Homeowner Assistant** - Telegram bot для управления продуктами, рецептами и отслеживания КБЖУ
+> **Smart AI-powered Telegram bot for intelligent food management, recipe generation, and nutrition tracking**
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue.svg)](https://core.telegram.org/bots)
+<div align="center">
 
-## 📋 Описание
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot%20API-blue?style=flat-square&logo=telegram)](https://core.telegram.org/bots)
+[![Status](https://img.shields.io/badge/Status-Active%20Development-orange?style=flat-square)](#)
 
-FoodFlow - это умный Telegram-бот, который помогает управлять домашним хозяйством:
-- 📸 **Сканирование чеков** - автоматическое распознавание продуктов и цен
-- 🧊 **Виртуальный холодильник** - учет всех продуктов дома
-- 👨‍🍳 **Генерация рецептов** - AI предлагает рецепты на основе доступных продуктов
-- 📊 **Отслеживание КБЖУ** - контроль калорий, белков, жиров и углеводов
-- 🛒 **Режим покупок** - сканирование этикеток в магазине для точного учета
+[Features](#-features) • [Quick Start](#-quick-start) • [Installation](#installation) • [Usage](#usage) • [Contributing](#contributing)
 
-## ✨ Основные возможности
+</div>
 
-### 1. Обработка чеков
-- Мультимодальный OCR (Gemini 2.0 Flash)
-- Автоматическая нормализация названий продуктов (Perplexity Sonar)
-- Сохранение брендов и веса/объема
-- Интерактивная коррекция позиций
+---
 
-### 2. Виртуальный холодильник
-- Просмотр всех продуктов
-- Категоризация товаров
-- Управление количеством
+## 🌟 Overview
 
-### 3. AI-рецепты
-- Генерация рецептов на основе доступных ингредиентов
-- Ответы на русском языке
-- Использование OpenRouter API
+**FoodFlow** is an intelligent Telegram bot that transforms your food management experience. Whether you’re tracking groceries, discovering recipes, or monitoring nutrition, FoodFlow handles it all with AI-powered precision.
 
-### 4. Режим "Иду в магазин" (в разработке)
-- Сканирование этикеток товаров
-- Автоматическое извлечение КБЖУ
-- Сопоставление с чеком после покупки
+### Key Capabilities
 
-## 🚀 Быстрый старт
+- 📃 **Receipt Scanning** - Automatic product & price recognition from receipt photos
+- 🧇 **Virtual Fridge** - Smart inventory management with real-time tracking  
+- 👨‍🍳 **AI Recipe Generation** - Personalized recipes based on your available ingredients
+- 📊 **Nutrition Tracking** - KBZHU (calories, proteins, fats, carbs) monitoring
+- 🛒 **Smart Shopping Mode** - Product barcode scanning with nutritional data extraction
 
-### Требования
-- Python 3.10+
-- Telegram Bot Token ([как получить](https://core.telegram.org/bots#6-botfather))
-- OpenRouter API Key ([регистрация](https://openrouter.ai/))
+---
 
-### Установка
+## ✨ Features
 
-1. Клонировать репозиторий:
+### 1. Receipt Processing
+
+- 🤤 **Multimodal OCR** using Gemini 2.0 Flash
+- 🖥️ **Automatic Normalization** via Perplexity Sonar with web search
+- 🍻 **Brand & Quantity Preservation** - retains product details
+- ✍️ **Interactive Correction** - user-friendly error fixing
+
+### 2. Virtual Fridge
+
+- 🔍 Complete product visibility
+- 📂 Smart categorization
+- ✍️ Quantity management
+
+### 3. AI-Powered Recipes
+
+- 🧄 Generates recipes from available ingredients
+- 🇷🇺 Russian-language responses
+- ⚡ Powered by OpenRouter API
+
+### 4. Shopping Mode (In Development)
+
+- 🛍️ Barcode scanning
+- 🣋 Automatic KBZHU extraction
+- ✅ Receipt matching
+
+---
+
+## 🚀 Quick Start
+
+### Requirements
+
+- **Python** 3.10 or higher
+- **Telegram Bot Token** ([get one](https://core.telegram.org/bots#6-botfather))
+- **OpenRouter API Key** ([sign up](https://openrouter.ai/))
+
+### Installation
+
 ```bash
+# Clone the repository
 git clone https://github.com/mixmaster1989/foodflow-bot.git
 cd foodflow-bot
-```
 
-2. Установить зависимости:
-```bash
+# Install dependencies
 pip install -r FoodFlow/requirements.txt
-```
 
-3. Создать файл `.env` на основе `.env.example`:
-```bash
+# Create .env file
 cp .env.example .env
-```
 
-4. Заполнить `.env` своими ключами:
-```env
-BOT_TOKEN=your_telegram_bot_token
-OPENROUTER_API_KEY=your_openrouter_api_key
-DATABASE_URL=sqlite+aiosqlite:///./foodflow.db
-```
+# Fill in your keys
+echo "BOT_TOKEN=your_telegram_bot_token" >> .env
+echo "OPENROUTER_API_KEY=your_openrouter_key" >> .env
+echo "DATABASE_URL=sqlite+aiosqlite:///./foodflow.db" >> .env
 
-5. Запустить бота:
-```bash
+# Run the bot
 cd FoodFlow
 python main.py
 ```
 
-## 📁 Структура проекта
+---
+
+## 📁 Project Structure
 
 ```
 FoodFlow/
-├── database/           # Модели БД (SQLAlchemy)
+├── database/           ━ SQLAlchemy ORM models
 │   ├── base.py
 │   └── models.py
-├── handlers/           # Обработчики команд бота
-│   ├── common.py       # Главное меню
-│   ├── receipt.py      # Обработка чеков
-│   ├── fridge.py       # Холодильник
-│   ├── recipes.py      # Рецепты
-│   ├── stats.py        # Статистика
-│   └── correction.py   # Коррекция продуктов
-├── services/           # Бизнес-логика
-│   ├── ocr.py          # OCR для чеков
-│   ├── normalization.py # Нормализация названий
-│   └── ai.py           # AI-генерация рецептов
-├── config.py           # Конфигурация (pydantic-settings)
-├── main.py             # Точка входа
-└── requirements.txt    # Зависимости
+├── handlers/           ━ Bot command handlers
+│   ├── common.py         # Main menu
+│   ├── receipt.py        # Receipt processing
+│   ├── fridge.py         # Virtual fridge
+│   ├── recipes.py        # Recipe generation
+│   ├── stats.py          # Statistics
+│   └── correction.py     # Product correction
+├── services/           ━ Business logic
+│   ├── ocr.py            # OCR processing
+│   ├── normalization.py  # Data normalization
+│   └── ai.py             # AI integrations
+├── config.py           ━ Pydantic configuration
+├── main.py             ━ Entry point
+└── requirements.txt    ━ Dependencies
 ```
 
-## 🔧 Конфигурация
+---
 
-### Переменные окружения
+## 🔧 Configuration
 
-| Переменная | Описание | Пример |
-|------------|----------|--------|
-| `BOT_TOKEN` | Telegram Bot API токен | `123456:ABC-DEF...` |
-| `OPENROUTER_API_KEY` | API ключ OpenRouter | `sk-or-v1-...` |
-| `DATABASE_URL` | URL подключения к БД | `sqlite+aiosqlite:///./foodflow.db` |
+### Environment Variables
 
-### Используемые AI модели
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `BOT_TOKEN` | Telegram Bot API Token | `123456:ABC-DEF1234...` |
+| `OPENROUTER_API_KEY` | OpenRouter API Key | `sk-or-v1-...` |
+| `DATABASE_URL` | Database Connection | `sqlite+aiosqlite:///./foodflow.db` |
 
-- **OCR**: `google/gemini-2.0-flash-exp:free` (основная), `google/gemma-3-27b-it:free` (резервная)
-- **Нормализация**: `perplexity/sonar` (с веб-поиском)
-- **Рецепты**: `google/gemma-3-27b-it:free`
+### AI Models Used
 
-## 📖 Использование
+- **OCR**: `google/gemini-2.0-flash-exp:free` (primary) | `google/gemma-3-27b-it:free` (backup)
+- **Normalization**: `perplexity/sonar` (with web search)
+- **Recipes**: `google/gemma-3-27b-it:free`
 
-### Основные команды
+---
 
-- `/start` - Запуск бота и отображение главного меню
-- 🧊 **Холодильник** - Просмотр продуктов
-- 👨‍🍳 **Рецепты** - Генерация рецептов
-- 📊 **Статистика** - КБЖУ за день
+## 📄 Usage
 
-### Обработка чека
+### Commands
 
-1. Отправьте фото чека боту
-2. Выберите "🧾 Это чек"
-3. Дождитесь обработки (OCR + нормализация)
-4. Проверьте результаты
-5. Используйте кнопку "✏️ Коррекция" для исправления ошибок
+- `/start` - Launch bot & show main menu
+- `🧇 Fridge` - View inventory
+- `👨‍🍳 Recipes` - Generate recipes
+- `📊 Statistics` - Daily KBZHU stats
 
-## 🛠️ Разработка
+### Receipt Processing Workflow
 
-### Установка зависимостей для разработки
+1. Send receipt photo to bot
+2. Select "🦾 Processing receipt"
+3. Wait for OCR + AI normalization
+4. Review results
+5. Use "✍️ Correct" button if needed
+
+---
+
+## 🛠️ Development
+
+### Setup Dev Environment
 
 ```bash
 pip install -r FoodFlow/requirements.txt
 ```
 
-### Запуск тестов
+### Run Tests
 
 ```bash
 pytest tests/
 ```
 
-### Логи
+### Logs
 
-Все логи сохраняются в файл `foodflow.log` в корне проекта.
-
-## 🤝 Вклад в проект
-
-Приветствуются Pull Request'ы! Для крупных изменений сначала откройте Issue для обсуждения.
-
-## 📄 Лицензия
-
-[MIT](LICENSE)
-
-## 👤 Автор
-
-mixmaster1989 - [@mixmaster1989](https://github.com/mixmaster1989)
-
-## 🙏 Благодарности
-
-- [Aiogram](https://github.com/aiogram/aiogram) - Telegram Bot framework
-- [OpenRouter](https://openrouter.ai/) - AI API aggregator
-- [SQLAlchemy](https://www.sqlalchemy.org/) - ORM для Python
-
-## 📞 Поддержка
-
-Если у вас возникли вопросы или проблемы:
-- Откройте [Issue](https://github.com/mixmaster1989/foodflow-bot/issues)
-- Напишите в Telegram: [@mixmaster1989](https://t.me/mixmaster1989)
+All logs are saved to `foodflow.log` in the project root.
 
 ---
 
-⭐ Если проект вам понравился, поставьте звезду на GitHub!
+## 🤚 Contributing
+
+Contributions are welcome! For major changes, please open an Issue first to discuss your ideas.
+
+```bash
+# Fork, create your feature branch, and submit a PR
+git checkout -b feature/amazing-feature
+git commit -m 'Add amazing feature'
+git push origin feature/amazing-feature
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file for details.
+
+---
+
+## 👤 Author
+
+**mixmaster1989**
+- GitHub: [@mixmaster1989](https://github.com/mixmaster1989)
+- Telegram: [@mixmaster1989](https://t.me/mixmaster1989)
+
+---
+
+## 🙏 Acknowledgments
+
+- [Aiogram](https://github.com/aiogram/aiogram) - Telegram Bot Framework
+- [OpenRouter](https://openrouter.ai/) - AI API Aggregator
+- [SQLAlchemy](https://www.sqlalchemy.org/) - Python ORM
+- [Google Gemini](https://ai.google.dev/) - Vision & Language AI
+- [Perplexity Sonar](https://www.perplexity.ai/) - Web Search AI
+
+---
+
+## 📄 Support
+
+Have questions or issues? 
+- Open an [Issue](https://github.com/mixmaster1989/foodflow-bot/issues)
+- Message me on Telegram: [@mixmaster1989](https://t.me/mixmaster1989)
+
+---
+
+<div align="center">
+
+**⭐ If you like this project, please give it a star!**
+
+*Made with ❤️ by mixmaster1989*
+
+</div>
