@@ -125,6 +125,12 @@ async def eat_product(callback: types.CallbackQuery):
         await callback.message.edit_text("Холодильник пуст! 🕸️")
 
 
+@router.callback_query(F.data == "fridge_close")
+async def close_fridge(callback: types.CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+
+
 async def _get_total_products(user_id: int) -> int:
     async for session in get_db():
         total = await session.scalar(
@@ -225,6 +231,7 @@ async def _update_fridge_page(
     if page < total_pages - 1:
         builder.button(text="Вперёд ➡️", callback_data=f"fridge_page:{page + 1}")
     builder.button(text="📄 Экспорт", callback_data="fridge_export")
+    builder.button(text="❌ Закрыть", callback_data="fridge_close")
     builder.adjust(2)
 
     await message_obj.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")

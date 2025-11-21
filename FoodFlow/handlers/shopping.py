@@ -54,6 +54,8 @@ async def start_shopping(message: types.Message, state: FSMContext):
 
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Я закончил покупки", callback_data="shopping_finish")
+    builder.button(text="❌ Отменить покупки", callback_data="shopping_cancel_session")
+    builder.adjust(1)
 
     await message.answer(
         "🛒 Круто! Запустил режим покупок.\n\n"
@@ -102,6 +104,8 @@ async def scan_label(message: types.Message, bot: Bot, state: FSMContext):
 
         builder = InlineKeyboardBuilder()
         builder.button(text="✅ Я закончил покупки", callback_data="shopping_finish")
+        builder.button(text="🗑️ Удалить этот товар", callback_data=f"shopping_delete_scan:{scan.id}")
+        builder.adjust(1)
 
         await status_msg.edit_text(
             "✅ Добавлено в корзину:\n"
@@ -195,4 +199,43 @@ async def link_label(callback: types.CallbackQuery):
 async def skip_label(callback: types.CallbackQuery):
     await callback.answer("Ок, оставляем как новый товар.")
     await callback.message.answer("ℹ️ Позиция помечена как новый товар. Можно скорректировать позже.")
+
+
+@router.callback_query(F.data == "shopping_cancel_session")
+async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    session_id = data.get("shopping_session_id")
+
+    if session_id:
+        async for session in get_db():
+            shopping_session = await session.get(ShoppingSession, session_id)
+            if shopping_session:
+                shopping_session.is_active = False
+                await session.commit()
+            break
+
+    await state.clear()
+    await callback.message.edit_text("🚫 Поход в магазин отменен. Сессия закрыта.")
+    await callback.answer("Сессия отменена")
+
+
+@router.callback_query(F.data.startswith("shopping_delete_scan:"))
+async def delete_scan(callback: types.CallbackQuery):
+    try:
+        scan_id = int(callback.data.split(":")[1])
+    except (IndexError, ValueError):
+        await callback.answer("Ошибка данных", show_alert=True)
+        return
+
+    async for session in get_db():
+        scan = await session.get(LabelScan, scan_id)
+        if scan:
+            await session.delete(scan)
+            await session.commit()
+            await callback.message.edit_text(f"🗑️ Товар '{scan.name}' удален из списка.")
+            await callback.answer("Товар удален")
+        else:
+            await callback.message.edit_text("❌ Товар уже удален или не найден.")
+            await callback.answer("Не найдено", show_alert=True)
+        break
 
