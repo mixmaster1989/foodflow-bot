@@ -13,4 +13,5 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
-settings = Settings()
+# Force loading .env from the same directory as config.py
+settings = Settings(_env_file=Path(__file__).resolve().parent / ".env")
