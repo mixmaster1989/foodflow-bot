@@ -18,15 +18,16 @@ class ShoppingMode(StatesGroup):
     waiting_for_receipt = State()
 
 
-@router.message(F.text == "🛒 Иду в магазин")
-async def start_shopping(message: types.Message, state: FSMContext):
+@router.callback_query(F.data == "start_shopping_mode")
+async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
+    message = callback.message
     session_id = None
 
     async for session in get_db():
         stmt = (
             select(ShoppingSession)
             .where(
-                ShoppingSession.user_id == message.from_user.id,
+                ShoppingSession.user_id == callback.from_user.id,
                 ShoppingSession.is_active == True,  # noqa: E712
             )
             .order_by(ShoppingSession.started_at.desc())
@@ -37,7 +38,7 @@ async def start_shopping(message: types.Message, state: FSMContext):
         if existing_session:
             session_id = existing_session.id
         else:
-            new_session = ShoppingSession(user_id=message.from_user.id)
+            new_session = ShoppingSession(user_id=callback.from_user.id)
             session.add(new_session)
             await session.commit()
             await session.refresh(new_session)
@@ -57,13 +58,15 @@ async def start_shopping(message: types.Message, state: FSMContext):
     builder.button(text="❌ Отменить покупки", callback_data="shopping_cancel_session")
     builder.adjust(1)
 
-    await message.answer(
-        "🛒 Круто! Запустил режим покупок.\n\n"
+    await message.edit_text(
+        "🛒 <b>Режим покупок</b>\n\n"
         "1. Сфотографируй этикетку товара.\n"
         "2. Отправь фото сюда — я сохраню название и КБЖУ.\n"
         "3. Когда закончишь, нажми «Я закончил покупки».",
-        reply_markup=builder.as_markup()
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
     )
+    await callback.answer()
 
 
 @router.message(ShoppingMode.scanning_labels, F.photo)
@@ -201,6 +204,8 @@ async def skip_label(callback: types.CallbackQuery):
     await callback.message.answer("ℹ️ Позиция помечена как новый товар. Можно скорректировать позже.")
 
 
+from FoodFlow.handlers.menu import show_main_menu
+
 @router.callback_query(F.data == "shopping_cancel_session")
 async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -215,8 +220,8 @@ async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMConte
             break
 
     await state.clear()
-    await callback.message.edit_text("🚫 Поход в магазин отменен. Сессия закрыта.")
     await callback.answer("Сессия отменена")
+    await show_main_menu(callback.message, callback.from_user.first_name)
 
 
 @router.callback_query(F.data.startswith("shopping_delete_scan:"))

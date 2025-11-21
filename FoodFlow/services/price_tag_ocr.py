@@ -10,10 +10,16 @@ logger = logging.getLogger(__name__)
 
 class PriceTagOCRService:
     MODELS = [
+        # Free models (try first)
         "qwen/qwen2.5-vl-32b-instruct:free",
         "google/gemini-2.0-flash-exp:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
-        "nvidia/nemotron-nano-12b-v2-vl:free"
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+        
+        # Paid models (fallback when free models are rate-limited)
+        "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
+        "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
+        "qwen/qwen-vl-plus",                          # Paid 3: Best accuracy ($0.21/$0.63)
     ]
 
     @classmethod
@@ -30,7 +36,8 @@ class PriceTagOCRService:
         Extracts price information from a price tag photo.
         Expected JSON structure:
         {
-            "product_name": "Молоко 3.2% 1л",
+            "product_name": "Молоко 3.2%",
+            "volume": "1 л",
             "price": 89.99,
             "store": "Пятёрочка",
             "date": "2025-11-20"
@@ -48,10 +55,12 @@ class PriceTagOCRService:
         prompt = (
             "You are scanning a Russian price tag photo from a grocery store. "
             "Return ONLY JSON (no markdown) with the following keys: "
-            "{\"product_name\": \"Полное название товара (RU)\", "
+            "{\"product_name\": \"Название товара БЕЗ объема (RU)\", "
+            "\"volume\": \"Объем/вес с единицами (например: 500 мл, 1 кг, 300 г)\", "
             "\"price\": 0.0, "
             "\"store\": \"Название магазина (если указано)\", "
             "\"date\": \"YYYY-MM-DD (если указано)\"}. "
+            "IMPORTANT: Extract volume/weight as a SEPARATE field, not in product_name. "
             "If data is missing, set the value to null. "
             "Price should be a float number in rubles."
         )

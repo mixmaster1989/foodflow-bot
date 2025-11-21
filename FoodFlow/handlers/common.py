@@ -3,6 +3,7 @@ from aiogram.filters import Command
 from sqlalchemy.future import select
 from FoodFlow.database.base import get_db
 from FoodFlow.database.models import User
+from FoodFlow.handlers.menu import show_main_menu
 
 router = Router()
 
@@ -18,17 +19,5 @@ async def cmd_start(message: types.Message):
             session.add(user)
             await session.commit()
             
-    # Create Main Menu Keyboard
-    kb = [
-        [types.KeyboardButton(text="🛒 Иду в магазин")],
-        [types.KeyboardButton(text="🧊 Холодильник"), types.KeyboardButton(text="👨‍🍳 Рецепты")],
-        [types.KeyboardButton(text="📊 Статистика")]
-    ]
-    keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    await show_main_menu(message, message.from_user.first_name)
 
-    await message.answer(
-        "👋 Привет! Я FoodFlow.\n\n"
-        "📸 **Скинь мне фото чека**, и я добавлю продукты в твой виртуальный холодильник.\n"
-        "Или используй меню ниже:",
-        reply_markup=keyboard
-    )

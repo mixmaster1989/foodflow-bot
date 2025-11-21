@@ -15,20 +15,13 @@ class PriceSearchService:
         """
         Search for current prices of a product in Russian stores.
         Returns dict with prices from different stores or None if failed.
-        
-        Example return:
-        {
-            "product": "Сахар 1кг",
-            "prices": [
-                {"store": "Пятёрочка", "price": 52.99},
-                {"store": "Магнит", "price": 59.99},
-                {"store": "Лента", "price": 79.99}
-            ],
-            "min_price": 52.99,
-            "max_price": 79.99,
-            "avg_price": 64.32
-        }
         """
+        import re
+        from datetime import datetime
+        
+        # Get current month and year
+        current_date = datetime.now().strftime("%m.%Y")
+        
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -38,7 +31,7 @@ class PriceSearchService:
         
         prompt = (
             f"Найди актуальные цены на '{product_name}' в магазинах России "
-            f"(Пятёрочка, Магнит, Лента, Перекрёсток) на ноябрь 2025. "
+            f"(Пятёрочка, Магнит, Лента, Перекрёсток) на {current_date}. "
             f"Верни ТОЛЬКО JSON (без markdown) в формате: "
             f"{{\"prices\": [{{\"store\": \"Название\", \"price\": 0.0}}]}}"
         )
@@ -64,14 +57,26 @@ class PriceSearchService:
                             result = await response.json()
                             content = result["choices"][0]["message"]["content"]
                             
-                            # Try to extract JSON from response
-                            content = content.replace("```json", "").replace("```", "").strip()
+                            # Log full response for debugging
+                            logger.info(f"Perplexity price search response for '{product_name}':\n{content}")
+                            
+                            # Try to extract JSON using regex
+                            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                            if json_match:
+                                json_str = json_match.group(0)
+                            else:
+                                json_str = content.replace("```json", "").replace("```", "").strip()
                             
                             try:
-                                data = json.loads(content)
+                                data = json.loads(json_str)
                                 prices = data.get("prices", [])
                                 
                                 if not prices:
+                                    # If no prices found in JSON, maybe return raw text if it's informative?
+                                    # But better to return None so we don't spam user with raw JSON.
+                                    # Actually, if we have raw text that isn't JSON, we might want to show it.
+                                    if not json_match and len(content) > 20:
+                                         return {"raw_response": content}
                                     return None
                                 
                                 # Calculate stats

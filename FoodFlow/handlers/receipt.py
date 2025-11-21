@@ -79,6 +79,7 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
             price_tag = PriceTag(
                 user_id=photo_message.from_user.id,
                 product_name=price_data.get("product_name"),
+                volume=price_data.get("volume"),  # Save volume separately
                 price=float(price_data.get("price")),
                 store_name=price_data.get("store"),
                 photo_date=dt.fromisoformat(price_data["date"]) if price_data.get("date") else None,
@@ -105,35 +106,41 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
         # Build response
         response = (
             f"✅ <b>Ценник сохранен!</b>\n\n"
-            f"📦 <b>{price_data['product_name']}</b>\n"
-            f"💵 {price_data['price']}р\n"
+            f"📦 <b>{price_data['product_name']}</b>"
         )
+        
+        if price_data.get("volume"):
+            response += f" ({price_data['volume']})"
+        
+        response += f"\n💵 {price_data['price']}р\n"
         
         if price_data.get("store"):
             response += f"🏪 {price_data['store']}\n"
         
         if similar_tags:
-            response += "\n📊 <b>Сравнение цен:</b>\n"
-            prices = [price_data["price"]] + [tag.price for tag, _ in similar_tags[:5]]
-            min_price = min(prices)
-            max_price = max(prices)
-            avg_price = sum(prices) / len(prices)
+            # Find the most recent previous price for the same product
+            most_recent = similar_tags[0][0]  # (tag, score) tuple
+            price_diff = price_data["price"] - most_recent.price
             
-            response += f"• Мин: {min_price}р\n"
-            response += f"• Макс: {max_price}р\n"
-            response += f"• Средняя: {avg_price:.2f}р\n\n"
+            response += "\n📊 <b>История цен:</b>\n"
             
-            if price_data["price"] == min_price:
-                response += "🎉 <b>Это самая низкая цена!</b>"
-            elif price_data["price"] > avg_price:
-                response += f"⚠️ Цена выше средней на {price_data['price'] - avg_price:.2f}р"
+            if abs(price_diff) < 0.01:  # No change (accounting for float precision)
+                response += f"💚 Цена не изменилась ({most_recent.price}р)\n"
+            elif price_diff > 0:
+                response += f"📈 Подорожал на {price_diff:.2f}р (было {most_recent.price}р)\n"
+            else:
+                response += f"📉 Подешевел на {abs(price_diff):.2f}р (было {most_recent.price}р)\n"
             
-            response += "\n\n<b>Похожие товары:</b>\n"
-            for tag, score in similar_tags[:3]:
-                response += f"• {tag.product_name} - {tag.price}р"
-                if tag.store_name:
-                    response += f" ({tag.store_name})"
-                response += "\n"
+            # Show last saved date if available
+            if most_recent.created_at:
+                from datetime import datetime
+                days_ago = (datetime.utcnow() - most_recent.created_at).days
+                if days_ago == 0:
+                    response += f"🕐 Последнее сохранение: сегодня\n"
+                elif days_ago == 1:
+                    response += f"🕐 Последнее сохранение: вчера\n"
+                else:
+                    response += f"🕐 Последнее сохранение: {days_ago} дн. назад\n"
         
         await status_msg.edit_text(response, parse_mode="HTML")
         
@@ -142,38 +149,69 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
         
         from FoodFlow.services.price_search import PriceSearchService
         
-        online_prices = await PriceSearchService.search_prices(price_data["product_name"])
+        # Include volume in search query for accurate comparison
+        search_query = price_data["product_name"]
+        if price_data.get("volume"):
+            search_query += f" {price_data['volume']}"
+        
+        online_prices = await PriceSearchService.search_prices(search_query)
         
         if online_prices and online_prices.get("prices"):
-            online_response = f"🌐 <b>Актуальные цены в магазинах:</b>\n\n"
+            # Check if we actually have any non-null prices
+            valid_prices = [p for p in online_prices["prices"] if p.get("price")]
             
-            for store_price in online_prices["prices"][:5]:
-                store = store_price.get("store", "Неизвестно")
-                price = store_price.get("price")
-                if price:
-                    online_response += f"• {store}: {price}р\n"
-            
-            if online_prices.get("min_price"):
-                online_response += f"\n📊 Минимальная: {online_prices['min_price']}р\n"
-                online_response += f"📊 Максимальная: {online_prices['max_price']}р\n"
-                online_response += f"📊 Средняя: {online_prices['avg_price']:.2f}р\n"
+            if valid_prices:
+                online_response = f"🌐 <b>Актуальные цены в магазинах:</b>\n\n"
                 
-                # Compare with scanned price
-                scanned_price = price_data["price"]
-                min_online = online_prices["min_price"]
+                for store_price in online_prices["prices"][:5]:
+                    store = store_price.get("store", "Неизвестно")
+                    price = store_price.get("price")
+                    if price:
+                        online_response += f"• {store}: {price}р\n"
                 
-                if scanned_price < min_online:
-                    diff = min_online - scanned_price
-                    online_response += f"\n🎉 <b>Отличная цена! Дешевле на {diff:.2f}р!</b>"
-                elif scanned_price > min_online:
-                    diff = scanned_price - min_online
-                    online_response += f"\n⚠️ В других магазинах дешевле на {diff:.2f}р"
-            
-            await callback.message.answer(online_response, parse_mode="HTML")
+                if online_prices.get("min_price"):
+                    online_response += f"\n📊 Минимальная: {online_prices['min_price']}р\n"
+                    online_response += f"📊 Максимальная: {online_prices['max_price']}р\n"
+                    online_response += f"📊 Средняя: {online_prices['avg_price']:.2f}р\n"
+                    
+                    # Compare with scanned price
+                    scanned_price = price_data["price"]
+                    min_online = online_prices["min_price"]
+                    
+                    if scanned_price < min_online:
+                        diff = min_online - scanned_price
+                        online_response += f"\n🎉 <b>Отличная цена! Дешевле на {diff:.2f}р!</b>"
+                    elif scanned_price > min_online:
+                        diff = scanned_price - min_online
+                        online_response += f"\n⚠️ В других магазинах дешевле на {diff:.2f}р"
+                
+                await callback.message.answer(online_response, parse_mode="HTML")
+            else:
+                # Perplexity returned stores but no prices found
+                await callback.message.answer(
+                    "🔍 <b>Поиск завершен</b>\n\n"
+                    "К сожалению, актуальные цены на этот товар в интернете не найдены. "
+                    "Возможно, товар редкий или данные недоступны.",
+                    parse_mode="HTML"
+                )
         elif online_prices and online_prices.get("raw_response"):
             # If Perplexity returned text instead of JSON
+            import re
+            raw_text = online_prices['raw_response']
+            # Remove citation markers like [1], [12]
+            clean_text = re.sub(r'\[\d+\]', '', raw_text)
+            # Remove JSON blocks if they exist (to avoid showing raw JSON)
+            clean_text = re.sub(r'\{.*\}', '', clean_text, flags=re.DOTALL)
+            
             await callback.message.answer(
-                f"🌐 <b>Информация о ценах:</b>\n\n{online_prices['raw_response'][:500]}",
+                f"🌐 <b>Информация о ценах:</b>\n\n{clean_text[:800]}",
+                parse_mode="HTML"
+            )
+        else:
+            # No response from Perplexity at all
+            await callback.message.answer(
+                "⚠️ <b>Не удалось получить данные о ценах</b>\n\n"
+                "Сервис поиска цен временно недоступен. Попробуйте позже.",
                 parse_mode="HTML"
             )
         

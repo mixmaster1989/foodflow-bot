@@ -104,6 +104,14 @@ read_pdfs.py
 
 # Test images
 receipt.jpeg
+photo_*.jpg
+photo_*.jpeg
+
+# Test scripts and results
+test_*.py
+test_*.txt
+check_*.py
+add_*.py
 
 # Git
 .git/

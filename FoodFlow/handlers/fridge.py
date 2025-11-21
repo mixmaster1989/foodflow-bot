@@ -1,99 +1,179 @@
-import io
 import logging
 import math
+from datetime import datetime, timedelta
 from aiogram import Router, F, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 from FoodFlow.database.base import get_db
 from FoodFlow.database.models import Product, Receipt, ConsumptionLog
-from datetime import datetime
 
 router = Router()
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 12
+PAGE_SIZE = 10
 
+# --- Level 2.1: Summary ---
+@router.callback_query(F.data == "menu_fridge")
+async def show_fridge_summary(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    
+    async for session in get_db():
+        # Get total items
+        total_items = await session.scalar(
+            select(func.count())
+            .select_from(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+        ) or 0
+        
+        # Get expiring items (mock logic for now, assuming 7 days from receipt date if not set)
+        # In real app, we would have expiration_date column. 
+        # For now, let's just show latest items as "Fresh"
+        
+        latest_stmt = (
+            select(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+            .order_by(Product.id.desc())
+            .limit(3)
+        )
+        latest_products = (await session.execute(latest_stmt)).scalars().all()
 
-@router.message(F.text == "🧊 Холодильник")
-async def show_fridge(message: types.Message):
-    user_id = message.from_user.id
-    logger.info("User %s requested fridge overview", user_id)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📋 Список продуктов", callback_data="fridge_list:0")
+    builder.button(text="🔍 Поиск", callback_data="fridge_search") # Placeholder
+    builder.button(text="🔙 Назад", callback_data="main_menu")
+    builder.adjust(1, 2)
 
-    total_items = await _get_total_products(user_id)
-    if total_items == 0:
-        await message.answer("В холодильнике пусто! 🕸️\nСкинь фото чека, чтобы пополнить запасы.")
-        return
+    latest_text = "\n".join([f"▫️ {p.name}" for p in latest_products]) if latest_products else "Пусто"
 
-    summary_text = await _build_summary_text(user_id, total_items)
-    await message.answer(summary_text, parse_mode="HTML")
+    text = (
+        f"🧊 <b>Твой Холодильник</b>\n\n"
+        f"📦 Всего товаров: <b>{total_items}</b>\n\n"
+        f"🆕 <b>Недавно добавленные:</b>\n"
+        f"{latest_text}\n\n"
+        f"<i>Нажми «Список продуктов», чтобы управлять запасами.</i>"
+    )
+    
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
 
-    page_message = await message.answer("Загружаю содержимое холодильника...")
-    await _update_fridge_page(page_message, user_id, page=0, forced_total=total_items)
-
-
-@router.callback_query(F.data.startswith("fridge_page:"))
-async def paginate_fridge(callback: types.CallbackQuery):
+# --- Level 2.2: List ---
+@router.callback_query(F.data.startswith("fridge_list:"))
+async def show_fridge_list(callback: types.CallbackQuery):
     try:
         page = int(callback.data.split(":")[1])
     except (IndexError, ValueError):
-        await callback.answer("Некорректная страница", show_alert=True)
-        return
+        page = 0
 
-    total_items = await _get_total_products(callback.from_user.id)
-    if total_items == 0:
-        await callback.message.edit_text("Холодильник пуст.")
-        await callback.answer()
-        return
-
-    await _update_fridge_page(callback.message, callback.from_user.id, page=page, forced_total=total_items)
-    await callback.answer()
-
-
-@router.callback_query(F.data == "fridge_export")
-async def export_fridge(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    logger.info("User %s requested fridge export", user_id)
-
+    
     async for session in get_db():
+        # Get total for pagination
+        total_items = await session.scalar(
+            select(func.count())
+            .select_from(Product)
+            .join(Receipt)
+            .where(Receipt.user_id == user_id)
+        ) or 0
+        
+        if total_items == 0:
+            await callback.answer("Холодильник пуст!", show_alert=True)
+            return
+
+        total_pages = math.ceil(total_items / PAGE_SIZE)
+        page = max(0, min(page, total_pages - 1))
+        
         stmt = (
             select(Product)
             .join(Receipt)
             .where(Receipt.user_id == user_id)
             .order_by(Product.id.desc())
+            .offset(page * PAGE_SIZE)
+            .limit(PAGE_SIZE)
         )
         products = (await session.execute(stmt)).scalars().all()
 
-    if not products:
-        await callback.answer("Холодильник пуст.", show_alert=True)
-        return
-
-    lines = ["Название;Кол-во;Цена;Категория"]
+    builder = InlineKeyboardBuilder()
+    
+    # Product buttons
     for product in products:
-        lines.append(
-            f"{product.name};{product.quantity};{product.price};{product.category or '—'}"
-        )
+        # Truncate name
+        name = product.name[:25] + "..." if len(product.name) > 25 else product.name
+        builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}")
+    
+    builder.adjust(1) # 1 column for better readability of names
+    
+    # Navigation row
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(types.InlineKeyboardButton(text="⬅️", callback_data=f"fridge_list:{page-1}"))
+    
+    nav_buttons.append(types.InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop"))
+    
+    if page < total_pages - 1:
+        nav_buttons.append(types.InlineKeyboardButton(text="➡️", callback_data=f"fridge_list:{page+1}"))
+    
+    builder.row(*nav_buttons)
+    builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data="menu_fridge")) # Back to Summary
 
-    csv_content = "\n".join(lines)
-    file_bytes = csv_content.encode("utf-8")
-    document = types.BufferedInputFile(file_bytes, filename="fridge_export.csv")
-    await callback.message.answer_document(document, caption="Экспорт холодильника (CSV)")
-    await callback.answer("Экспорт готов!")
+    await callback.message.edit_text(
+        f"📋 <b>Список продуктов</b> (Стр. {page+1})",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
 
+@router.callback_query(F.data == "noop")
+async def noop_handler(callback: types.CallbackQuery):
+    await callback.answer()
 
-@router.callback_query(F.data.startswith("eat_"))
-async def eat_product(callback: types.CallbackQuery):
+# --- Level 2.3: Item Detail ---
+@router.callback_query(F.data.startswith("fridge_item:"))
+async def show_item_detail(callback: types.CallbackQuery):
     try:
-        product_id = int(callback.data.split("_")[1])
+        product_id = int(callback.data.split(":")[1])
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
+
+    async for session in get_db():
+        product = await session.get(Product, product_id)
+        if not product:
+            await callback.answer("Товар не найден", show_alert=True)
+            # Refresh list
+            await show_fridge_list(callback) 
+            return
+            
+        text = (
+            f"📦 <b>{product.name}</b>\n\n"
+            f"💰 Цена: {product.price}₽\n"
+            f"⚖️ Кол-во: {product.quantity} шт\n"
+            f"🏷️ Категория: {product.category or 'Нет'}\n\n"
+            f"📊 <b>КБЖУ (на 100г):</b>\n"
+            f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}"
+        )
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}")
+        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}")
+        builder.button(text="🔙 Назад к списку", callback_data="fridge_list:0") # TODO: Remember page?
+        builder.adjust(1)
+        
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.answer()
+
+# --- Actions ---
+@router.callback_query(F.data.startswith("fridge_eat:"))
+async def eat_product(callback: types.CallbackQuery):
+    product_id = int(callback.data.split(":")[1])
     
     async for session in get_db():
         product = await session.get(Product, product_id)
         if not product:
-            await callback.answer("Продукт не найден", show_alert=True)
+            await callback.answer("Товар не найден", show_alert=True)
             return
-        
+            
         # Log consumption
         log = ConsumptionLog(
             user_id=callback.from_user.id,
@@ -106,132 +186,43 @@ async def eat_product(callback: types.CallbackQuery):
         )
         session.add(log)
         
-        # Decrease quantity or delete
+        # Decrease quantity
         if product.quantity > 1:
             product.quantity -= 1
+            msg = f"✅ Съел 1 шт. Осталось: {product.quantity}"
         else:
             await session.delete(product)
-        
+            msg = "✅ Съел последнее! Товар удален."
+            
         await session.commit()
-        product_name = product.name
-        break
+        await callback.answer(msg, show_alert=True)
+        
+        # Return to detail or list depending on if item exists
+        if product.quantity > 0:
+             # Refresh detail
+             # Hacky way to refresh: call show_item_detail again with same ID
+             # But we are in the same handler. 
+             # Let's just update text manually or re-call
+             # Re-calling is safer
+             callback.data = f"fridge_item:{product_id}"
+             await show_item_detail(callback)
+        else:
+            # Return to list
+            callback.data = "fridge_list:0"
+            await show_fridge_list(callback)
+
+@router.callback_query(F.data.startswith("fridge_del:"))
+async def delete_product(callback: types.CallbackQuery):
+    product_id = int(callback.data.split(":")[1])
     
-    await callback.answer(f"✅ Съел {product_name}!")
-    # Refresh page
-    total = await _get_total_products(callback.from_user.id)
-    if total > 0:
-        await _update_fridge_page(callback.message, callback.from_user.id, page=0, forced_total=total)
-    else:
-        await callback.message.edit_text("Холодильник пуст! 🕸️")
-
-
-@router.callback_query(F.data == "fridge_close")
-async def close_fridge(callback: types.CallbackQuery):
-    await callback.message.delete()
-    await callback.answer()
-
-
-async def _get_total_products(user_id: int) -> int:
     async for session in get_db():
-        total = await session.scalar(
-            select(func.count())
-            .select_from(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
-        )
-        return total or 0
-    return 0
+        product = await session.get(Product, product_id)
+        if product:
+            await session.delete(product)
+            await session.commit()
+            await callback.answer("🗑️ Товар удален", show_alert=True)
+        
+    # Return to list
+    callback.data = "fridge_list:0"
+    await show_fridge_list(callback)
 
-
-async def _build_summary_text(user_id: int, total_items: int) -> str:
-    async for session in get_db():
-        categories_stmt = (
-            select(func.count(func.distinct(Product.category)))
-            .select_from(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
-        )
-        category_count = await session.scalar(categories_stmt) or 0
-
-        latest_stmt = (
-            select(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
-            .order_by(Product.id.desc())
-            .limit(3)
-        )
-        latest_products = (await session.execute(latest_stmt)).scalars().all()
-
-    latest_text = "\n".join(
-        f"▫️ {product.name} — {product.quantity} шт"
-        for product in latest_products
-    ) or "▫️ Пока без новых поступлений"
-
-    return (
-        "🧊 <b>Твой Холодильник</b>\n\n"
-        f"📦 Продуктов: <b>{total_items}</b>\n"
-        f"🏷️ Категорий: <b>{category_count}</b>\n"
-        "🆕 Последние добавления:\n"
-        f"{latest_text}"
-    )
-
-
-async def _update_fridge_page(
-    message_obj: types.Message,
-    user_id: int,
-    page: int,
-    forced_total: int | None = None
-):
-    total_items = forced_total
-    if total_items is None:
-        total_items = await _get_total_products(user_id)
-    if total_items == 0:
-        await message_obj.edit_text("Холодильник пуст.")
-        return
-
-    total_pages = math.ceil(total_items / PAGE_SIZE)
-    page = max(0, min(page, total_pages - 1))
-
-    async for session in get_db():
-        stmt = (
-            select(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
-            .order_by(Product.id.desc())
-            .offset(page * PAGE_SIZE)
-            .limit(PAGE_SIZE)
-        )
-        products = (await session.execute(stmt)).scalars().all()
-
-    if not products:
-        await message_obj.edit_text("Не удалось загрузить продукты. Попробуй позже.")
-        return
-
-    lines = [
-        f"📄 Страница {page + 1}/{total_pages}",
-        ""
-    ]
-    for product in products:
-        lines.append(
-            f"▫️ <b>{product.name}</b>\n"
-            f"   {product.quantity} шт · {product.price}₽ · {product.category or 'Без категории'}\n"
-            f"   🔥 {product.calories}ккал | 🥩 {product.protein}г | 🥑 {product.fat}г | 🍞 {product.carbs}г"
-        )
-    text = "\n".join(lines)
-
-    builder = InlineKeyboardBuilder()
-    # Add eat buttons for each product
-    for product in products:
-        builder.button(text=f"🍽️ {product.name[:15]}", callback_data=f"eat_{product.id}")
-    builder.adjust(2)  # 2 buttons per row
-    
-    # Navigation buttons
-    if page > 0:
-        builder.button(text="⬅️ Назад", callback_data=f"fridge_page:{page - 1}")
-    if page < total_pages - 1:
-        builder.button(text="Вперёд ➡️", callback_data=f"fridge_page:{page + 1}")
-    builder.button(text="📄 Экспорт", callback_data="fridge_export")
-    builder.button(text="❌ Закрыть", callback_data="fridge_close")
-    builder.adjust(2)
-
-    await message_obj.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")

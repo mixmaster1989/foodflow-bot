@@ -96,6 +96,7 @@ class PriceTag(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     product_name = Column(String, nullable=False)
+    volume = Column(String, nullable=True)  # e.g., "500 мл", "1 кг", "300 г"
     price = Column(Float, nullable=False)
     store_name = Column(String, nullable=True)
     location = Column(String, nullable=True)  # для будущей геолокации
