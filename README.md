@@ -62,10 +62,10 @@
 
 ### 5. Price Tag Processing ✅
 
-- 🏷️ **OCR Price Tags** - Extract product name, price, store
-- 📊 **Price Comparison** - Compare with your previous scans
-- 🌐 **Real-Time Search** - Find current prices via Perplexity Sonar
-- 💰 **Best Deal Alert** - "🎉 Отличная цена!" or "⚠️ Дешевле в других магазинах"
+- 🏷️ **OCR Price Tags** - Extract product name, price, store, and **volume/weight**
+- 📊 **Price History** - Track price trends (📈 increased / 📉 decreased)
+- 🌐 **Real-Time Search** - Find current prices via Perplexity Sonar (considering volume)
+- 🤖 **Multi-Model AI** - Auto-fallback to paid models (Gemini, Pixtral, Qwen) if free ones fail
 
 ### 6. Product Correction ✅
 
@@ -133,6 +133,7 @@ FoodFlow/
 │   └── ai.py             # AI integrations
 ├── config.py           ━ Pydantic configuration
 ├── main.py             ━ Entry point
+├── check_secrets.py    ━ Security pre-commit hook
 └── requirements.txt    ━ Dependencies
 ```
 
@@ -150,7 +151,8 @@ FoodFlow/
 
 ### AI Models Used
 
-- **OCR**: `google/gemini-2.0-flash-exp:free` (primary) | `google/gemma-3-27b-it:free` (backup)
+- **OCR**: `google/gemini-2.0-flash-exp:free` (primary)
+  - *Fallbacks*: `google/gemini-2.5-flash-lite`, `mistralai/pixtral-12b`, `qwen/qwen-vl-plus`
 - **Normalization**: `perplexity/sonar` (with web search)
 - **Recipes**: `google/gemma-3-27b-it:free`
 
@@ -192,6 +194,16 @@ pytest tests/
 ### Logs
 
 All logs are saved to `foodflow.log` in the project root.
+
+### Security
+
+The project includes a pre-commit hook to prevent committing secrets.
+To install it manually:
+
+```bash
+python check_secrets.py
+# Or copy to .git/hooks/pre-commit
+```
 
 ---
 
