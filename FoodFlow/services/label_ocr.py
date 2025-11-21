@@ -9,10 +9,15 @@ logger = logging.getLogger(__name__)
 
 
 class LabelOCRService:
-    MODEL = "google/gemini-2.0-flash-exp:free"
+    MODELS = [
+        "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
+        "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
+        "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
+        "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
+    ]
 
-    @staticmethod
-    async def parse_label(image_bytes: bytes) -> dict | None:
+    @classmethod
+    async def parse_label(cls, image_bytes: bytes) -> dict | None:
         """
         Extracts product information from a label photo.
         Expected JSON structure:
@@ -49,41 +54,55 @@ class LabelOCRService:
             "If data is missing, set the value to null."
         )
 
-        payload = {
-            "model": LabelOCRService.MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+        import asyncio
+
+        for model in cls.MODELS:
+            payload = {
+                "model": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
                             }
-                        }
-                    ]
-                }
-            ]
-        }
+                        ]
+                    }
+                ]
+            }
 
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=60
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        content = result["choices"][0]["message"]["content"]
-                        content = content.replace("```json", "").replace("```", "").strip()
-                        return json.loads(content)
-
-                    logger.error(f"Label OCR failed: {await response.text()}")
-                    return None
-            except Exception as exc:
-                logger.error(f"Label OCR exception: {exc}")
-                return None
+            # Retry logic: 3 attempts with 0.5s delay
+            for attempt in range(3):
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=60
+                        ) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                content = result["choices"][0]["message"]["content"]
+                                content = content.replace("```json", "").replace("```", "").strip()
+                                return json.loads(content)
+                            
+                            logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
+                            if attempt < 2:
+                                await asyncio.sleep(0.5)
+                                continue
+                    except Exception as exc:
+                        logger.error(f"Label OCR exception ({model}) attempt {attempt+1}/3: {exc}")
+                        if attempt < 2:
+                            await asyncio.sleep(0.5)
+                            continue
+            
+            # If we get here, this model failed 3 times, try next model
+            logger.warning(f"Model {model} failed all attempts, switching to next...")
+            
+        return None
 
