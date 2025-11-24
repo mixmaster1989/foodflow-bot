@@ -50,7 +50,7 @@ async def show_shopping_list(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
         
         # Image path
-        photo_path = types.FSInputFile("FoodFlow/assets/main_menu.png")
+        photo_path = types.FSInputFile("FoodFlow/assets/shopping_list.png")
         
         # Try to edit media (photo), if fails try edit_text, if fails delete and send new
         try:

@@ -65,13 +65,26 @@ async def menu_check_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
     
-    await callback.message.edit_text(
+    photo_path = types.FSInputFile("FoodFlow/assets/check_upload.png")
+    caption = (
         "📸 <b>Загрузка чека</b>\n\n"
         "Просто отправь мне фото чека, и я добавлю продукты в холодильник.\n"
-        "Я умею распознавать товары, цены и вес.",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        "Я умею распознавать товары, цены и вес."
     )
+    
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 
@@ -81,14 +94,54 @@ async def menu_help_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
     
-    await callback.message.edit_text(
+    photo_path = types.FSInputFile("FoodFlow/assets/help.png")
+    caption = (
         "ℹ️ <b>Справка</b>\n\n"
         "<b>Как это работает?</b>\n"
         "1. 📸 <b>Чек:</b> Сфоткай чек после магазина.\n"
         "2. 🧊 <b>Холодильник:</b> Я сохраню все продукты.\n"
         "3. 👨‍🍳 <b>Рецепты:</b> Предложу, что приготовить из того, что есть.\n"
-        "4. 🛒 <b>Магазин:</b> Помогу сравнить цены и найти товары.",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        "4. 🛒 <b>Магазин:</b> Помогу сравнить цены и найти товары."
     )
+    
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+    await callback.answer()
+
+@router.callback_query(F.data == "menu_settings")
+async def menu_settings_handler(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="main_menu")
+    
+    photo_path = types.FSInputFile("FoodFlow/assets/settings.png")
+    caption = (
+        "⚙️ <b>Настройки</b>\n\n"
+        "Здесь ты сможешь настроить свои предпочтения, уведомления и диету.\n"
+        "<i>(Функционал в разработке)</i>"
+    )
+    
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     await callback.answer()
