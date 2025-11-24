@@ -47,15 +47,58 @@ async def show_fridge_summary(callback: types.CallbackQuery):
 
     latest_text = "\n".join([f"▫️ {p.name}" for p in latest_products]) if latest_products else "Пусто"
 
-    text = (
-        f"🧊 <b>Твой Холодильник</b>\n\n"
-        f"📦 Всего товаров: <b>{total_items}</b>\n\n"
-        f"🆕 <b>Недавно добавленные:</b>\n"
-        f"{latest_text}\n\n"
-        f"<i>Нажми «Список продуктов», чтобы управлять запасами.</i>"
-    )
-    
-    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    # Image path for empty fridge
+    empty_photo_path = types.FSInputFile("FoodFlow/assets/empty_fridge.png")
+
+    if total_items == 0:
+        caption = (
+            f"🧊 <b>Твой Холодильник</b>\n\n"
+            f"Пока тут пусто... 🕸️\n"
+            f"Загрузи чек или добавь продукты вручную, чтобы я мог следить за сроками и предлагать рецепты."
+        )
+        # Try to edit if possible (if previous was photo), otherwise send new
+        try:
+            await callback.message.edit_media(
+                media=types.InputMediaPhoto(media=empty_photo_path, caption=caption, parse_mode="HTML"),
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            # If edit fails (e.g. previous was text), delete and send new photo
+            await callback.message.delete()
+            await callback.message.answer_photo(
+                photo=empty_photo_path,
+                caption=caption,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML"
+            )
+    else:
+        # If not empty, just show text summary (or maybe we need a "full fridge" image later?)
+        # For now, keep text for non-empty state to avoid visual clutter or use a generic fridge icon?
+        # Let's stick to text for populated fridge to focus on content, OR we could use main_menu image?
+        # User asked for "Empty Fridge" image specifically.
+        
+        text = (
+            f"🧊 <b>Твой Холодильник</b>\n\n"
+            f"📦 Всего товаров: <b>{total_items}</b>\n\n"
+            f"🆕 <b>Недавно добавленные:</b>\n"
+            f"{latest_text}\n\n"
+            f"<i>Нажми «Список продуктов», чтобы управлять запасами.</i>"
+        )
+        
+        # If we are coming from a photo message (e.g. main menu), we must delete it and send text, 
+        # OR edit it to text (which is not possible if it was a photo message, we can only edit caption).
+        # Actually, we can edit media to something else, but we don't have a "full fridge" image.
+        # So we should probably delete and send text.
+        
+        try:
+            # Try to edit text (works if previous was text)
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        except Exception:
+            # If previous was photo, we can't edit_text a photo message.
+            # We must delete and send new text message.
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
     await callback.answer()
 
 # --- Level 2.2: List ---

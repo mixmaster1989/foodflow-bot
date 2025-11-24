@@ -9,13 +9,13 @@ async def back_to_main(callback: types.CallbackQuery):
     """Returns to the main menu by editing the current message."""
     await show_main_menu(callback.message, callback.from_user.first_name)
     await callback.answer()
-
+    
 async def show_main_menu(message: types.Message, user_name: str):
     """Displays the main menu with inline buttons."""
     builder = InlineKeyboardBuilder()
     
     # Row 1: Shopping Mode (Prominent)
-    builder.button(text="🛒 Иду в магазин", callback_data="start_shopping_mode")
+    builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
     
     # Row 2: Core Features
     builder.button(text="📸 Загрузить чек", callback_data="menu_check")
@@ -25,24 +25,40 @@ async def show_main_menu(message: types.Message, user_name: str):
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
     builder.button(text="📊 Статистика", callback_data="menu_stats")
     
-    # Row 4: System
+    # Row 4: Shopping List
+    builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
+    
+    # Row 5: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
     
-    builder.adjust(1, 2, 2, 2)
+    builder.adjust(1, 2, 2, 1, 2)
     
-    text = (
+    # Image path
+    photo_path = types.FSInputFile("FoodFlow/assets/main_menu.png")
+    
+    caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
         f"Привет, {user_name}! 👋\n"
         "Я помогу тебе следить за питанием и продуктами.\n\n"
         "<b>Что будем делать?</b>"
     )
     
-    # Try to edit if possible, otherwise send new
+    # Try to edit if possible (if previous was photo), otherwise send new
     try:
-        await message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
     except Exception:
-        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        # If edit fails (e.g. previous was text), delete and send new photo
+        await message.delete()
+        await message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
 
 @router.callback_query(F.data == "menu_check")
 async def menu_check_handler(callback: types.CallbackQuery):
@@ -58,18 +74,7 @@ async def menu_check_handler(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-@router.callback_query(F.data == "menu_settings")
-async def menu_settings_handler(callback: types.CallbackQuery):
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="main_menu")
-    
-    await callback.message.edit_text(
-        "⚙️ <b>Настройки</b>\n\n"
-        "Тут пока пусто, но скоро можно будет настроить цели по КБЖУ и предпочтения.",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+
 
 @router.callback_query(F.data == "menu_help")
 async def menu_help_handler(callback: types.CallbackQuery):

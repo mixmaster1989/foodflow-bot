@@ -49,7 +49,24 @@ async def show_stats_menu(callback: types.CallbackQuery):
     builder.button(text="🔙 Назад", callback_data="main_menu")
     builder.adjust(2, 1)
     
-    await callback.message.edit_text(response, reply_markup=builder.as_markup(), parse_mode="HTML")
+    # Image path
+    photo_path = types.FSInputFile("FoodFlow/assets/stats.png")
+
+    # Try to edit if possible (if previous was photo), otherwise send new
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=response, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        # If edit fails (e.g. previous was text), delete and send new photo
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=response,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 @router.callback_query(F.data.in_({"stats_day", "stats_week"}))

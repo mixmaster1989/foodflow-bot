@@ -18,13 +18,30 @@ async def show_recipe_categories(callback: types.CallbackQuery):
     builder.button(text="🔙 Назад", callback_data="main_menu")
     builder.adjust(2, 2, 1)
     
-    await callback.message.edit_text(
+    # Image path
+    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    
+    caption = (
         "👨‍🍳 <b>Шеф-повар на связи!</b>\n\n"
         "Я посмотрю, что есть в холодильнике, и предложу рецепт.\n"
-        "Что будем готовить?",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        "Что будем готовить?"
     )
+
+    # Try to edit if possible (if previous was photo), otherwise send new
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        # If edit fails (e.g. previous was text), delete and send new photo
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 # --- Level 3.2: Generate & List ---

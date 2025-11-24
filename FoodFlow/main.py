@@ -4,7 +4,11 @@ from aiogram import Bot, Dispatcher
 from FoodFlow.config import settings
 from FoodFlow.database.base import init_db
 from FoodFlow.database import migrations
-from FoodFlow.handlers import common, receipt, fridge, recipes, stats, correction, shopping, menu
+from FoodFlow.handlers import (
+    common, receipt, fridge,
+    recipes, stats, shopping, menu,
+    user_settings, shopping_list
+)
 
 async def main():
     logging.basicConfig(
@@ -23,15 +27,16 @@ async def main():
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
     
-    # Register routers
+    # Register Routers
     dp.include_router(common.router)
     dp.include_router(menu.router)  # Central menu router
-    dp.include_router(shopping.router)
     dp.include_router(receipt.router)
-    dp.include_router(correction.router)
     dp.include_router(fridge.router)
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
+    dp.include_router(shopping.router)
+    dp.include_router(user_settings.router)
+    dp.include_router(shopping_list.router)
     
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

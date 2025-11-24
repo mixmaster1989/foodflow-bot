@@ -104,3 +104,29 @@ class PriceTag(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", backref="price_tags")
+
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), unique=True, nullable=False)
+    calorie_goal = Column(Integer, default=2000)
+    protein_goal = Column(Integer, default=150)
+    fat_goal = Column(Integer, default=70)
+    carb_goal = Column(Integer, default=250)
+    allergies = Column(String, nullable=True)  # Comma-separated list
+
+    user = relationship("User", backref="settings")
+
+
+class ShoppingListItem(Base):
+    __tablename__ = "shopping_list_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    product_name = Column(String, nullable=False)
+    is_bought = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="shopping_list")

@@ -58,14 +58,32 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
     builder.button(text="❌ Отменить покупки", callback_data="shopping_cancel_session")
     builder.adjust(1)
 
-    await message.edit_text(
+    # Image path
+    photo_path = types.FSInputFile("FoodFlow/assets/shopping_mode.png")
+    
+    caption = (
         "🛒 <b>Режим покупок</b>\n\n"
         "1. Сфотографируй этикетку товара.\n"
         "2. Отправь фото сюда — я сохраню название и КБЖУ.\n"
-        "3. Когда закончишь, нажми «Я закончил покупки».",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        "3. Когда закончишь, нажми «Я закончил покупки»."
     )
+
+    # Try to edit if possible (if previous was photo), otherwise send new
+    try:
+        await message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        # If edit fails (e.g. previous was text), delete and send new photo
+        await message.delete()
+        await message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+    
     await callback.answer()
 
 
