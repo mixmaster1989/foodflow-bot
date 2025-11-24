@@ -80,9 +80,21 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
     category = parts[1]
     refresh_requested = len(parts) > 2 and parts[2] == "refresh"
     
-    # Delete the photo message and send a new text message
-    await callback.message.delete()
-    status_msg = await callback.message.answer(f"👨‍🍳 Думаю над рецептами ({category})...")
+    # Edit photo message with status, keep the image
+    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    status_caption = f"👨‍🍳 Думаю над рецептами ({category})..."
+    
+    try:
+        status_msg = await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=status_caption, parse_mode="HTML")
+        )
+    except Exception:
+        # If edit fails, send new photo
+        status_msg = await callback.message.answer_photo(
+            photo=photo_path,
+            caption=status_caption,
+            parse_mode="HTML"
+        )
     
     # 1. Get ingredients
     ingredients = []
@@ -98,10 +110,16 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
     if not ingredients:
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Назад", callback_data="menu_recipes")
-        await status_msg.edit_text(
-            "В холодильнике пусто! 🕸️\nСкинь чек, чтобы я мог предложить рецепты.",
-            reply_markup=builder.as_markup()
-        )
+        try:
+            await status_msg.edit_media(
+                media=types.InputMediaPhoto(media=photo_path, caption="В холодильнике пусто! 🕸️\nСкинь чек, чтобы я мог предложить рецепты.", parse_mode="HTML"),
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await status_msg.edit_text(
+                "В холодильнике пусто! 🕸️\nСкинь чек, чтобы я мог предложить рецепты.",
+                reply_markup=builder.as_markup()
+            )
         return
 
     # Compute hash of ingredients for caching
@@ -136,11 +154,19 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
             builder.button(text="🔄 Другие варианты", callback_data=f"recipes_cat:{category}:refresh")
             builder.button(text="🔙 Назад", callback_data="menu_recipes")
             
-            # Send first chunk with buttons
+            # Update photo with short caption, send recipes as separate messages
+            short_caption = f"👨‍🍳 <b>Рецепты: {category}</b>\n\nНайдено {len(recent)} рецептов из кеша!"
+            try:
+                await status_msg.edit_media(
+                    media=types.InputMediaPhoto(media=photo_path, caption=short_caption, parse_mode="HTML"),
+                    reply_markup=builder.as_markup()
+                )
+            except Exception:
+                await status_msg.edit_text(short_caption, reply_markup=builder.as_markup(), parse_mode="HTML")
+            
+            # Send recipe chunks as separate messages
             if message_chunks:
-                await status_msg.edit_text(message_chunks[0], reply_markup=builder.as_markup(), parse_mode="HTML")
-                # Send remaining chunks as separate messages
-                for chunk in message_chunks[1:]:
+                for chunk in message_chunks:
                     await callback.message.answer(chunk, parse_mode="HTML")
             log_response(callback.from_user.id, {"cached": True, "count": len(recent)}, True)
             await callback.answer()
@@ -209,11 +235,19 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
         builder.button(text="🔄 Другие варианты", callback_data=f"recipes_cat:{category}:refresh")
         builder.button(text="🔙 Назад", callback_data="menu_recipes")
         
-        # Send first chunk with buttons
+        # Update photo with short caption, send recipes as separate messages
+        short_caption = f"👨‍🍳 <b>Рецепты: {category}</b>\n\nСгенерировано {len(data['recipes'])} рецептов!"
+        try:
+            await status_msg.edit_media(
+                media=types.InputMediaPhoto(media=photo_path, caption=short_caption, parse_mode="HTML"),
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await status_msg.edit_text(short_caption, reply_markup=builder.as_markup(), parse_mode="HTML")
+        
+        # Send recipe chunks as separate messages
         if message_chunks:
-            await status_msg.edit_text(message_chunks[0], reply_markup=builder.as_markup(), parse_mode="HTML")
-            # Send remaining chunks as separate messages
-            for chunk in message_chunks[1:]:
+            for chunk in message_chunks:
                 await callback.message.answer(chunk, parse_mode="HTML")
         
         log_response(callback.from_user.id, {"cached": False, "count": len(data["recipes"])}, False)
@@ -222,6 +256,13 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
         log_error(callback.from_user.id, e)
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Назад", callback_data="menu_recipes")
-        await status_msg.edit_text(f"Ошибка шеф-повара: {e}", reply_markup=builder.as_markup())
+        error_caption = f"❌ Ошибка шеф-повара: {e}"
+        try:
+            await status_msg.edit_media(
+                media=types.InputMediaPhoto(media=photo_path, caption=error_caption, parse_mode="HTML"),
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await status_msg.edit_text(error_caption, reply_markup=builder.as_markup())
     
     await callback.answer()
