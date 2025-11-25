@@ -115,3 +115,6 @@ add_*.py
 
 # Git
 .git/
+
+# Cursor IDE
+.cursor/

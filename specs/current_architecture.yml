@@ -1,0 +1,167 @@
+# Current Architecture Specification: FoodFlow Bot
+# Version: 1.0.0 | Date: 2025-11-25
+
+architecture_type: "Monolithic Telegram Bot Application"
+
+technology_stack:
+  language: "Python 3.10+"
+  framework: "aiogram 3.x"
+  orm: "SQLAlchemy 2.0 (Async)"
+  database:
+    default: "SQLite (sqlite+aiosqlite)"
+    production_target: "PostgreSQL (asyncpg)"
+  http_client: "aiohttp"
+  fuzzy_matching: "rapidfuzz"
+  configuration: "pydantic-settings"
+  process_manager: "PM2"
+
+core_modules:
+  handlers:
+    description: "Telegram Bot command and callback handlers"
+    modules:
+      - common.py
+      - receipt.py
+      - fridge.py
+      - recipes.py
+      - stats.py
+      - shopping.py
+      - correction.py
+      - menu.py
+      - user_settings.py
+      - shopping_list.py
+    pattern: "Router-based routing (aiogram Dispatcher)"
+
+  services:
+    description: "Business logic layer"
+    modules:
+      - ocr.py
+      - label_ocr.py
+      - price_tag_ocr.py
+      - price_search.py
+      - matching.py
+      - normalization.py
+      - ai.py
+      - cache.py
+      - logger.py
+    pattern: "Service layer with async/await"
+
+  database:
+    description: "Data persistence layer"
+    modules:
+      - base.py
+      - models.py
+      - migrations.py
+    pattern: "SQLAlchemy ORM with async sessions"
+
+external_integrations:
+  - name: "Telegram Bot API"
+    type: "Platform API"
+    usage: "Primary interface (polling/webhook)"
+    status: "Active"
+
+  - name: "OpenRouter API"
+    type: "AI Model Aggregator"
+    usage: "OCR (multimodal models), Recipe generation (text models)"
+    models:
+      ocr:
+        - "qwen/qwen2.5-vl-32b-instruct:free"
+        - "google/gemini-2.0-flash-exp:free"
+        - "mistralai/mistral-small-3.2-24b-instruct:free"
+        - "nvidia/nemotron-nano-12b-v2-vl:free"
+        - "openai/gpt-4o-mini (paid fallback)"
+      recipes:
+        - "openai/gpt-oss-120b:medium"
+        - "mistralai/mistral-small-3.2-24b-instruct:free"
+        - "qwen/qwen3-30b-a3b:free"
+        - "google/gemma-3-27b-it:free"
+    status: "Active"
+    fallback: "Multiple models with retry logic (3 attempts)"
+
+  - name: "Perplexity Sonar API"
+    type: "Web Search AI"
+    usage: "Product normalization, price search"
+    status: "Active"
+    fallback: "None (critical dependency)"
+
+data_models:
+  - User
+  - Receipt
+  - Product
+  - ConsumptionLog
+  - ShoppingSession
+  - LabelScan
+  - PriceTag
+  - UserSettings
+  - ShoppingListItem
+  - CachedRecipe
+
+deployment:
+  method: "PM2 process manager"
+  config: "ecosystem.config.js"
+  features:
+    - autorestart: true
+    - max_memory_restart: "200M"
+    - single instance
+  logging: "stdout/stderr to files"
+
+critical_technical_debt:
+  - item: "Missing CI/CD pipeline"
+    impact: "No automated testing, linting, or deployment checks"
+    priority: "High"
+
+  - item: "SQLite in use (not production-ready)"
+    impact: "Does not scale, no concurrent access, no replication"
+    priority: "High"
+
+  - item: "No unit tests (tests/ folder missing)"
+    impact: "High risk of regressions, no test coverage"
+    priority: "High"
+
+  - item: "Manual database migrations (SQLite only)"
+    impact: "PostgreSQL migrations require manual SQL"
+    priority: "Medium"
+
+  - item: "No structured logging"
+    impact: "Difficult debugging, no log rotation"
+    priority: "Medium"
+
+  - item: "Hardcoded model lists in code"
+    impact: "Cannot update models without code changes"
+    priority: "Low"
+
+  - item: "No API rate limiting control"
+    impact: "Risk of hitting external API limits"
+    priority: "Medium"
+
+  - item: "No caching layer (Redis planned but not implemented)"
+    impact: "Redundant API calls, slower responses"
+    priority: "Low"
+
+architecture_patterns:
+  - "Layered architecture (handlers → services → database)"
+  - "Router-based routing (aiogram)"
+  - "FSM for state management (shopping mode)"
+  - "Service layer for business logic"
+  - "Repository pattern via SQLAlchemy ORM"
+
+scalability_concerns:
+  - "Monolithic structure limits horizontal scaling"
+  - "SQLite cannot handle concurrent writes"
+  - "Single process handles all requests"
+  - "No queue system for async processing"
+  - "No load balancing capability"
+
+migration_path:
+  phase_1: "Modular Monolith"
+    - "Migrate to PostgreSQL"
+    - "Add Redis caching"
+    - "Implement structured logging"
+    - "Add CI/CD pipeline"
+  
+  phase_2: "Service Extraction (when scale demands)"
+    - "Extract OCR Service"
+    - "Extract Recipe Service"
+    - "Extract Price Service"
+    - "Add API Gateway"
+    - "Implement message queue (RabbitMQ/Redis)"
+
