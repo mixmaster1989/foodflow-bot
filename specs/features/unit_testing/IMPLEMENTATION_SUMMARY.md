@@ -151,3 +151,4 @@ pytest tests/unit/test_services.py::TestOCRService::test_parse_receipt_success -
 - [Tasks](tasks.md)
 - [Roadmap](../../../plans/roadmap_v1.md)
 
+

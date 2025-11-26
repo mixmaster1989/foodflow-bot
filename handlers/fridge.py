@@ -141,11 +141,11 @@ async def show_fridge_list(callback: types.CallbackQuery):
 
     builder = InlineKeyboardBuilder()
 
-    # Product buttons
+    # Product buttons (include page number for navigation back)
     for product in products:
         # Truncate name
         name = product.name[:25] + "..." if len(product.name) > 25 else product.name
-        builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}")
+        builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}:{page}")
 
     builder.adjust(1) # 1 column for better readability of names
 
@@ -176,8 +176,16 @@ async def noop_handler(callback: types.CallbackQuery):
 # --- Level 2.3: Item Detail ---
 @router.callback_query(F.data.startswith("fridge_item:"))
 async def show_item_detail(callback: types.CallbackQuery):
+    """
+    Show product detail view with pagination support.
+
+    Callback data format: "fridge_item:product_id" or "fridge_item:product_id:page"
+    """
     try:
-        product_id = int(callback.data.split(":")[1])
+        # Parse callback data: "fridge_item:product_id" or "fridge_item:product_id:page"
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 0
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
@@ -186,7 +194,8 @@ async def show_item_detail(callback: types.CallbackQuery):
         product = await session.get(Product, product_id)
         if not product:
             await callback.answer("Товар не найден", show_alert=True)
-            # Refresh list
+            # Refresh list with saved page
+            callback.data = f"fridge_list:{page}"
             await show_fridge_list(callback)
             return
 
@@ -200,9 +209,9 @@ async def show_item_detail(callback: types.CallbackQuery):
         )
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}")
-        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}")
-        builder.button(text="🔙 Назад к списку", callback_data="fridge_list:0") # TODO: Remember page?
+        builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
+        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
+        builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
         builder.adjust(1)
 
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -211,7 +220,18 @@ async def show_item_detail(callback: types.CallbackQuery):
 # --- Actions ---
 @router.callback_query(F.data.startswith("fridge_eat:"))
 async def eat_product(callback: types.CallbackQuery):
-    product_id = int(callback.data.split(":")[1])
+    """
+    Mark product as consumed (decrease quantity by 1) and refresh the view.
+
+    Callback data format: "fridge_eat:product_id:page"
+    """
+    try:
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except (IndexError, ValueError):
+        await callback.answer("Ошибка", show_alert=True)
+        return
 
     async for session in get_db():
         product = await session.get(Product, product_id)
@@ -235,30 +255,39 @@ async def eat_product(callback: types.CallbackQuery):
         if product.quantity > 1:
             product.quantity -= 1
             msg = f"✅ Съел 1 шт. Осталось: {product.quantity}"
+            product_still_exists = True
         else:
             await session.delete(product)
             msg = "✅ Съел последнее! Товар удален."
+            product_still_exists = False
 
         await session.commit()
         await callback.answer(msg, show_alert=True)
 
-        # Return to detail or list depending on if item exists
-        if product.quantity > 0:
-             # Refresh detail
-             # Hacky way to refresh: call show_item_detail again with same ID
-             # But we are in the same handler.
-             # Let's just update text manually or re-call
-             # Re-calling is safer
-             callback.data = f"fridge_item:{product_id}"
-             await show_item_detail(callback)
+        # Refresh view: return to detail if product still exists, otherwise return to list
+        if product_still_exists:
+            # Refresh detail view with updated quantity
+            callback.data = f"fridge_item:{product_id}:{page}"
+            await show_item_detail(callback)
         else:
-            # Return to list
-            callback.data = "fridge_list:0"
+            # Return to list on the same page
+            callback.data = f"fridge_list:{page}"
             await show_fridge_list(callback)
 
 @router.callback_query(F.data.startswith("fridge_del:"))
 async def delete_product(callback: types.CallbackQuery):
-    product_id = int(callback.data.split(":")[1])
+    """
+    Delete product completely and return to list.
+
+    Callback data format: "fridge_del:product_id:page"
+    """
+    try:
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except (IndexError, ValueError):
+        await callback.answer("Ошибка", show_alert=True)
+        return
 
     async for session in get_db():
         product = await session.get(Product, product_id)
@@ -267,7 +296,7 @@ async def delete_product(callback: types.CallbackQuery):
             await session.commit()
             await callback.answer("🗑️ Товар удален", show_alert=True)
 
-    # Return to list
-    callback.data = "fridge_list:0"
+    # Return to list on the same page
+    callback.data = f"fridge_list:{page}"
     await show_fridge_list(callback)
 

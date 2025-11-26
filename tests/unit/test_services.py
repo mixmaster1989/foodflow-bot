@@ -255,3 +255,4 @@ class TestNormalizationService:
         assert len(result) == 1
         assert result[0]["name"] == "Молоко"
 
+

@@ -176,13 +176,8 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
 
     # If we reach here, we need to call AI (no cache or refresh requested)
 
-    # 2. Call AI (Modified to accept category hint if possible, or just filter in prompt)
-    # For now, we use the generic generate_recipes but ideally we'd pass the category to the prompt.
-    # Let's assume AIService handles it or we just ask for generic recipes for now.
-    # TODO: Update AIService to accept category
-
+    # 2. Call AI with category to get appropriate recipes
     try:
-        # Call AI with category to get appropriate recipes
         data = await AIService.generate_recipes(ingredients, category)
 
         if not data or "recipes" not in data:

@@ -1,8 +1,11 @@
-aiogram>=3.0.0
-sqlalchemy>=2.0.0
-asyncpg
-python-dotenv
-requests
-aiohttp
-pydantic-settings
-rapidfuzz
+# Core dependencies with version pinning for stability
+aiogram>=3.0.0,<4.0.0
+sqlalchemy>=2.0.0,<3.0.0
+asyncpg>=0.29.0,<1.0.0
+python-dotenv>=1.0.0,<2.0.0
+aiohttp>=3.9.0,<4.0.0
+pydantic-settings>=2.0.0,<3.0.0
+rapidfuzz>=3.0.0,<4.0.0
+
+# Note: requests removed - use aiohttp for all HTTP requests
+# requests was only used in test scripts (scripts/test_gpt4o_mini_ocr.py)
