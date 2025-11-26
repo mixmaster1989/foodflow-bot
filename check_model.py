@@ -6,7 +6,7 @@ import os
 # Add project root to path to import config
 sys.path.insert(0, os.getcwd())
 try:
-    from FoodFlow.config import settings
+    from config import settings
 except ImportError:
     # Fallback if running from root
     sys.path.insert(0, os.path.join(os.getcwd(), 'FoodFlow'))

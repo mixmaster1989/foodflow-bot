@@ -337,3 +337,4 @@
 - Внедрить систему очередей для обработки OCR
 - Разделить на сервисы: OCR Service, Recipe Service, Price Service
 
+

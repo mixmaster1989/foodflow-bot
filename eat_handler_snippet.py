@@ -1,5 +1,5 @@
 # Add eat handler to fridge.py
-from FoodFlow.database.models import ConsumptionLog
+from database.models import ConsumptionLog
 from datetime import datetime
 
 @router.callback_query(F.data.startswith("eat_"))

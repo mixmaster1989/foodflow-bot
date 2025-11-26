@@ -41,3 +41,4 @@ Use these commands with your AI agent (Cursor):
 
 See [constitution.md](constitution.md) for full details.
 
+
