@@ -143,6 +143,23 @@ async def set_calories(message: types.Message, state: FSMContext) -> None:
     try:
         calories: int = int(message.text) if message.text else 0
         await state.update_data(calorie_goal=calories)
+
+        # Save calories to database (create or update settings)
+        async for session in get_db():
+            stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
+            settings = (await session.execute(stmt)).scalar_one_or_none()
+
+            if settings:
+                settings.calorie_goal = calories
+                await session.commit()
+            else:
+                settings = UserSettings(
+                    user_id=message.from_user.id,
+                    calorie_goal=calories
+                )
+                session.add(settings)
+                await session.commit()
+
         await state.set_state(SettingsStates.waiting_for_protein)
         await message.answer("Отлично! Теперь введите норму <b>белков</b> (г):", parse_mode="HTML")
     except ValueError:
