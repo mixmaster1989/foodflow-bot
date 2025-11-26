@@ -214,7 +214,7 @@ async def set_carbs(message: types.Message, state: FSMContext) -> None:
                 settings.fat_goal = data['fat_goal']
                 settings.carb_goal = carbs
                 await session.commit()
-                            else:
+            else:
                 settings = UserSettings(
                     user_id=message.from_user.id,
                     calorie_goal=data['calorie_goal'],
@@ -294,12 +294,12 @@ async def set_allergies(message: types.Message, state: FSMContext) -> None:
             settings.allergies = allergies
             await session.commit()
         else:
-                        settings = UserSettings(
-                    user_id=message.from_user.id,
-                    allergies=allergies
-                )
-                session.add(settings)
-                await session.commit()
+            settings = UserSettings(
+                user_id=message.from_user.id,
+                allergies=allergies
+            )
+            session.add(settings)
+            await session.commit()
 
     await state.clear()
 
