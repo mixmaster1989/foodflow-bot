@@ -1,5 +1,4 @@
-"""
-Module for product name normalization and categorization.
+"""Module for product name normalization and categorization.
 
 Contains:
 - NormalizationService: Normalizes OCR-extracted product names using AI models
@@ -16,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class NormalizationService:
-    """
-    Normalize and categorize product names from OCR results.
+    """Normalize and categorize product names from OCR results.
 
     Uses multiple AI models to correct OCR errors, identify real product names,
     preserve brand names and weights, categorize products, and estimate calories.
@@ -31,7 +29,9 @@ class NormalizationService:
         >>> normalized = await service.normalize_products(raw)
         >>> print(normalized[0]['name'])
         'Масло подсолнечное'
+
     """
+
     MODELS: list[str] = [
         "perplexity/sonar",
         "mistralai/mistral-small-3.2-24b-instruct:free",
@@ -40,8 +40,7 @@ class NormalizationService:
 
     @classmethod
     async def normalize_products(cls, raw_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """
-        Normalize product names and add category/calories information.
+        """Normalize product names and add category/calories information.
 
         Args:
             raw_items: List of raw items from OCR with 'name', 'price', 'quantity' keys
@@ -55,6 +54,7 @@ class NormalizationService:
             - Preserves weight/volume (e.g., '450г', '1л')
             - All names and categories in Russian
             - Tries models in order: Perplexity → Mistral → Qwen
+
         """
         if not raw_items:
             return []

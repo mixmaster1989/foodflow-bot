@@ -1,4 +1,14 @@
+"""Module for receipt processing and photo handling handlers.
+
+Contains:
+- handle_photo: Main photo handler that routes to different actions
+- process_receipt: Process receipt photo with OCR and normalization
+- price_tag_action: Process price tag photo
+- log_food_action: Log food consumption from photo
+- _process_receipt_flow: Internal receipt processing workflow
+"""
 import io
+from typing import Any
 
 from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
@@ -13,8 +23,23 @@ from services.ocr import OCRService
 
 router = Router()
 
+
 @router.message(F.photo)
-async def handle_photo(message: types.Message, bot: Bot, state: FSMContext):
+async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    """Handle incoming photo message.
+
+    Routes to shopping mode if in shopping state, otherwise shows
+    action menu (receipt, price tag, food log).
+
+    Args:
+        message: Telegram message with photo
+        bot: Telegram bot instance
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     current_state = await state.get_state()
     if current_state == ShoppingMode.waiting_for_receipt.state:
         status_msg = await message.answer("⏳ Анализирую чек (Shopping Mode)...")
@@ -43,12 +68,35 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext):
     )
 
 @router.callback_query(F.data == "action_cancel")
-async def cancel_action(callback: types.CallbackQuery):
+async def cancel_action(callback: types.CallbackQuery) -> None:
+    """Cancel current action.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     await callback.message.delete()
     await callback.answer("Отменено")
 
+
 @router.callback_query(F.data == "action_price_tag")
-async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
+async def price_tag_action(callback: types.CallbackQuery, bot: Bot) -> None:
+    """Process price tag photo.
+
+    Extracts product name, price, and volume from price tag image
+    and saves for price comparison.
+
+    Args:
+        callback: Telegram callback query
+        bot: Telegram bot instance
+
+    Returns:
+        None
+
+    """
     photo_message = callback.message.reply_to_message
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
@@ -224,7 +272,19 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
 
 
 @router.callback_query(F.data == "action_log_food")
-async def log_food_action(callback: types.CallbackQuery, bot: Bot):
+async def log_food_action(callback: types.CallbackQuery, bot: Bot) -> None:
+    """Log food consumption from photo.
+
+    Uses OCR to identify dish and logs estimated nutrition values.
+
+    Args:
+        callback: Telegram callback query
+        bot: Telegram bot instance
+
+    Returns:
+        None
+
+    """
     photo_message = callback.message.reply_to_message
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
@@ -286,7 +346,18 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot):
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
 @router.callback_query(F.data == "action_receipt")
-async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMContext) -> None:
+    """Process receipt photo from action menu.
+
+    Args:
+        callback: Telegram callback query
+        bot: Telegram bot instance
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     # Get the original photo message
     photo_message = callback.message.reply_to_message
     if not photo_message or not photo_message.photo:
@@ -302,7 +373,22 @@ async def _process_receipt_flow(
     status_message: types.Message,
     reply_target: types.Message,
     state: FSMContext | None
-):
+) -> None:
+    """Internal receipt processing workflow.
+
+    Extracts receipt data, saves products, sends summary, and handles shopping matching.
+
+    Args:
+        photo_message: Message with receipt photo
+        bot: Telegram bot instance
+        status_message: Message to update with status
+        reply_target: Message to reply to with results
+        state: FSM context (optional, for shopping mode matching)
+
+    Returns:
+        None
+
+    """
     try:
         await status_message.edit_text("⏳ Анализирую чек... (это может занять пару секунд)")
     except Exception:
@@ -335,7 +421,17 @@ async def _process_receipt_flow(
             await reply_target.answer(f"❌ Ошибка при обработке: {exc}")
 
 
-async def _extract_receipt_data(photo_message: types.Message, bot: Bot):
+async def _extract_receipt_data(photo_message: types.Message, bot: Bot) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Extract receipt data from photo using OCR and normalization.
+
+    Args:
+        photo_message: Message with receipt photo
+        bot: Telegram bot instance
+
+    Returns:
+        Tuple of (raw OCR data, normalized items list)
+
+    """
     photo = photo_message.photo[-1]
     file_info = await bot.get_file(photo.file_id)
     photo_bytes = io.BytesIO()
@@ -348,7 +444,18 @@ async def _extract_receipt_data(photo_message: types.Message, bot: Bot):
     return data, normalized_items
 
 
-async def _save_receipt(user_id: int, data: dict, normalized_items: list[dict]):
+async def _save_receipt(user_id: int, data: dict[str, Any], normalized_items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[int]]:
+    """Save receipt and products to database.
+
+    Args:
+        user_id: Telegram user ID
+        data: Raw OCR receipt data
+        normalized_items: Normalized product items
+
+    Returns:
+        Tuple of (products payload list, product IDs list)
+
+    """
     products_payload = []
     product_ids = []
 
@@ -392,7 +499,24 @@ async def _save_receipt(user_id: int, data: dict, normalized_items: list[dict]):
     return products_payload, product_ids
 
 
-async def _send_receipt_summary(reply_target: types.Message, data: dict, normalized_items: list[dict], products: list[dict]):
+async def _send_receipt_summary(
+    reply_target: types.Message,
+    data: dict[str, Any],
+    normalized_items: list[dict[str, Any]],
+    products: list[dict[str, Any]]
+) -> None:
+    """Send receipt summary message to user.
+
+    Args:
+        reply_target: Message to reply to
+        data: Raw OCR receipt data
+        normalized_items: Normalized product items
+        products: Product payload list
+
+    Returns:
+        None
+
+    """
     await reply_target.answer(
         f"✅ <b>Чек обработан!</b>\n\n"
         f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
@@ -414,7 +538,7 @@ async def _send_receipt_summary(reply_target: types.Message, data: dict, normali
         )
 
 
-async def _handle_shopping_matching(state: FSMContext, reply_target: types.Message, product_ids: list[int]):
+async def _handle_shopping_matching(state: FSMContext, reply_target: types.Message, product_ids: list[int]) -> None:
     current_state = await state.get_state()
     data = await state.get_data()
     session_id = data.get("shopping_session_id")
@@ -432,7 +556,17 @@ async def _handle_shopping_matching(state: FSMContext, reply_target: types.Messa
     await _send_matching_messages(reply_target, result)
 
 
-async def _send_matching_messages(reply_target: types.Message, matching_result: dict):
+async def _send_matching_messages(reply_target: types.Message, matching_result: dict[str, Any]) -> None:
+    """Send matching results messages to user.
+
+    Args:
+        reply_target: Message to reply to
+        matching_result: Matching result dictionary with matched/unmatched items
+
+    Returns:
+        None
+
+    """
     matched = matching_result.get("matched", [])
     unmatched_products = matching_result.get("unmatched_products", [])
     unmatched_labels = matching_result.get("unmatched_labels", [])

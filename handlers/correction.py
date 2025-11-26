@@ -1,3 +1,10 @@
+"""Module for product name correction handlers.
+
+Contains:
+- CorrectionStates: FSM states for correction flow
+- start_correction: Initiate product name correction
+- apply_correction: Apply user's correction to product
+"""
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -9,12 +16,28 @@ from database.models import Product
 
 router = Router()
 
+
 class CorrectionStates(StatesGroup):
+    """FSM states for product name correction flow."""
+
     waiting_for_correction = State()
 
+
 @router.callback_query(F.data.startswith("correct_"))
-async def start_correction(callback: types.CallbackQuery, state: FSMContext):
-    """Handle correction button click - pre-fill current name for editing"""
+async def start_correction(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle correction button click - pre-fill current name for editing.
+
+    Extracts product ID from callback data, loads product from database,
+    and prompts user to send corrected name.
+
+    Args:
+        callback: Telegram callback query with data format "correct_{product_id}"
+        state: FSM context for storing product_id
+
+    Returns:
+        None
+
+    """
     product_id = int(callback.data.split("_")[1])
 
     # Get current product name from DB
@@ -41,11 +64,23 @@ async def start_correction(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
 
 @router.message(CorrectionStates.waiting_for_correction)
-async def apply_correction(message: types.Message, state: FSMContext):
-    """Apply user's correction to the product"""
+async def apply_correction(message: types.Message, state: FSMContext) -> None:
+    """Apply user's correction to the product.
+
+    Updates product name in database with user-provided text
+    and sends confirmation message.
+
+    Args:
+        message: Telegram message with corrected product name
+        state: FSM context containing product_id
+
+    Returns:
+        None
+
+    """
     data = await state.get_data()
     product_id = data.get("product_id")
-    new_name = message.text.strip()
+    new_name = message.text.strip() if message.text else ""
 
     if not new_name:
         await message.answer("❌ Название не может быть пустым")

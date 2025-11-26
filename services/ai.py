@@ -1,5 +1,4 @@
-"""
-Module for AI-powered recipe generation.
+"""Module for AI-powered recipe generation.
 
 Contains:
 - AIService: Generates recipes based on available ingredients and category
@@ -16,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """
-    Generate recipes using AI models based on available ingredients.
+    """Generate recipes using AI models based on available ingredients.
 
     Supports multiple recipe categories (Salads, Main, Dessert, Breakfast)
     and uses fallback models for reliability.
@@ -30,7 +28,9 @@ class AIService:
         >>> recipes = await service.generate_recipes(['Молоко', 'Яйца'], 'Breakfast')
         >>> print(recipes['recipes'][0]['title'])
         'Омлет с молоком'
+
     """
+
     MODELS: list[str] = [
         "openai/gpt-oss-120b:medium",  # User‑selected higher‑capacity model
         "mistralai/mistral-small-3.2-24b-instruct:free", # Working & Smart
@@ -42,8 +42,7 @@ class AIService:
 
     @classmethod
     async def generate_recipes(cls, ingredients: list[str], category: str) -> dict[str, Any] | None:
-        """
-        Generate recipes based on available ingredients and category.
+        """Generate recipes based on available ingredients and category.
 
         Args:
             ingredients: List of available ingredient names
@@ -61,6 +60,7 @@ class AIService:
             Each recipe contains: title, description, calories, ingredients, steps
             All text in Russian language
             Tries models in order until one succeeds
+
         """
         if not ingredients:
             return None

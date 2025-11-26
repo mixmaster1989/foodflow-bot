@@ -1,6 +1,12 @@
+"""Module for product label OCR processing.
+
+Contains:
+- LabelOCRService: Extract product name, brand, weight, and nutrition info from label images
+"""
 import base64
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -10,7 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 class LabelOCRService:
-    MODELS = [
+    """Extract product information from food label photos.
+
+    Uses multiple AI models to extract product name, brand, weight,
+    and nutrition values (calories, protein, fat, carbs) from label images.
+
+    Attributes:
+        MODELS: List of fallback models ordered by quality (best first)
+
+    Example:
+        >>> service = LabelOCRService()
+        >>> data = await service.parse_label(image_bytes)
+        >>> print(data['name'])
+        'Молоко 3.2%'
+
+    """
+
+    MODELS: list[str] = [
         # Free models (try first)
         "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
         "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
@@ -24,19 +46,20 @@ class LabelOCRService:
     ]
 
     @classmethod
-    async def parse_label(cls, image_bytes: bytes) -> dict | None:
-        """
-        Extracts product information from a label photo.
-        Expected JSON structure:
-        {
-            "name": "Полное название",
-            "brand": "Бренд",
-            "weight": "500 г",
-            "calories": 250,
-            "protein": 12.5,
-            "fat": 10.2,
-            "carbs": 30.1
-        }
+    async def parse_label(cls, image_bytes: bytes) -> dict[str, Any] | None:
+        """Parse label image and extract product information.
+
+        Args:
+            image_bytes: Raw image bytes (JPEG/PNG format)
+
+        Returns:
+            Dictionary with keys: name, brand, weight, calories, protein, fat, carbs
+            Or None if all models fail
+
+        Note:
+            Tries models in order until one succeeds. Each model has 3 retry attempts.
+            Calories should be per 100g/ml if available.
+
         """
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",

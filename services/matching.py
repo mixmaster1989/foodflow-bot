@@ -1,5 +1,4 @@
-"""
-Module for matching products with scanned labels during shopping.
+"""Module for matching products with scanned labels during shopping.
 
 Contains:
 - MatchingService: Fuzzy matching algorithm for product-label pairing
@@ -15,8 +14,7 @@ from database.models import LabelScan, Product, ShoppingSession
 
 
 class MatchingService:
-    """
-    Match products with scanned labels using fuzzy string matching.
+    """Match products with scanned labels using fuzzy string matching.
 
     Uses rapidfuzz library to calculate similarity scores and automatically
     pairs products with labels based on name, brand, and weight matching.
@@ -29,13 +27,14 @@ class MatchingService:
         >>> result = await service.match_products([1, 2, 3], session_id=5)
         >>> print(result['matched'])
         [{'product_id': 1, 'label_id': 10, 'score': 85.5}, ...]
+
     """
+
     MIN_SCORE: int = 70
 
     @staticmethod
     def _similarity(product_name: str, label: LabelScan) -> float:
-        """
-        Calculate similarity score between product name and label.
+        """Calculate similarity score between product name and label.
 
         Args:
             product_name: Product name from database
@@ -43,6 +42,7 @@ class MatchingService:
 
         Returns:
             Similarity score (0-100), with bonuses for matching weight/brand
+
         """
         score = fuzz.WRatio(product_name, label.name)
 
@@ -56,8 +56,7 @@ class MatchingService:
 
     @staticmethod
     async def match_products(product_ids: list[int], session_id: int) -> dict[str, Any] | None:
-        """
-        Match products with scanned labels and return matching results.
+        """Match products with scanned labels and return matching results.
 
         Args:
             product_ids: List of product IDs to match
@@ -75,6 +74,7 @@ class MatchingService:
             - Automatically updates product nutrition data from matched labels
             - Marks shopping session as inactive after matching
             - Provides suggestions for unmatched products (score >= 40)
+
         """
         if not session_id or not product_ids:
             return None

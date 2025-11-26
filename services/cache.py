@@ -1,5 +1,4 @@
-"""
-Module for caching recipe generation results.
+"""Module for caching recipe generation results.
 
 Contains utility functions for:
 - Creating deterministic hashes from ingredient lists
@@ -17,8 +16,7 @@ from database.models import CachedRecipe
 
 
 def make_hash(ingredients: list[str]) -> str:
-    """
-    Create a deterministic SHA256 hash of a sorted ingredient list.
+    """Create a deterministic SHA256 hash of a sorted ingredient list.
 
     Args:
         ingredients: List of ingredient names
@@ -30,6 +28,7 @@ def make_hash(ingredients: list[str]) -> str:
         >>> hash1 = make_hash(['Молоко', 'Яйца'])
         >>> hash2 = make_hash(['Яйца', 'Молоко'])  # Same hash (sorted)
         >>> assert hash1 == hash2
+
     """
     sorted_ing = sorted([ing.strip().lower() for ing in ingredients])
     joined = "|".join(sorted_ing)
@@ -37,8 +36,7 @@ def make_hash(ingredients: list[str]) -> str:
 
 
 def is_recent(entry: CachedRecipe, minutes: int = 5) -> bool:
-    """
-    Check if a cached entry is younger than specified minutes.
+    """Check if a cached entry is younger than specified minutes.
 
     Args:
         entry: CachedRecipe database entry
@@ -46,13 +44,13 @@ def is_recent(entry: CachedRecipe, minutes: int = 5) -> bool:
 
     Returns:
         True if entry is younger than specified minutes, False otherwise
+
     """
     return datetime.utcnow() - entry.created_at < timedelta(minutes=minutes)
 
 
 async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str) -> list[CachedRecipe]:
-    """
-    Retrieve cached recipes for given user, ingredients hash, and category.
+    """Retrieve cached recipes for given user, ingredients hash, and category.
 
     Args:
         user_id: Telegram user ID
@@ -61,6 +59,7 @@ async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str)
 
     Returns:
         List of CachedRecipe objects matching the criteria
+
     """
     async with async_session() as session:
         stmt = select(CachedRecipe).where(
@@ -73,8 +72,7 @@ async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str)
 
 
 async def store_recipes(user_id: int, ingredients_hash: str, category: str, recipes: list[dict[str, Any]]) -> None:
-    """
-    Store generated recipes in cache for future retrieval.
+    """Store generated recipes in cache for future retrieval.
 
     Args:
         user_id: Telegram user ID
@@ -85,6 +83,7 @@ async def store_recipes(user_id: int, ingredients_hash: str, category: str, reci
 
     Returns:
         None
+
     """
     async with async_session() as session:
         for rec in recipes:

@@ -1,5 +1,4 @@
-"""
-Module for optical character recognition and receipt processing.
+"""Module for optical character recognition and receipt processing.
 
 Contains:
 - OCRService: Main OCR processing engine with multiple model fallback
@@ -16,8 +15,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 class OCRService:
-    """
-    Handle receipt image recognition using multiple AI models.
+    """Handle receipt image recognition using multiple AI models.
 
     Models are tried in order until one succeeds. Supports both free and paid
     models with automatic fallback mechanism.
@@ -30,7 +28,9 @@ class OCRService:
         >>> result = await ocr.parse_receipt(image_bytes)
         >>> print(result['items'])
         [{'name': 'Молоко', 'price': 100.0, 'quantity': 1.0}, ...]
+
     """
+
     MODELS: list[str] = [
         "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
         "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
@@ -109,8 +109,7 @@ class OCRService:
 
     @classmethod
     async def parse_receipt(cls, image_bytes: bytes) -> dict[str, Any]:
-        """
-        Parse receipt image and extract product items.
+        """Parse receipt image and extract product items.
 
         Args:
             image_bytes: Raw image bytes (JPEG/PNG format)
@@ -125,6 +124,7 @@ class OCRService:
         Note:
             Tries models in order: Qwen → Gemini → Mistral → Nemotron → GPT-4o-mini
             Each model has 3 retry attempts with 0.5s delay between retries
+
         """
         for model in cls.MODELS:
             logger.info(f"Trying OCR model: {model}")

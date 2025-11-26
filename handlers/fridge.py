@@ -1,5 +1,4 @@
-"""
-Module for fridge management handlers.
+"""Module for fridge management handlers.
 
 Contains handlers for:
 - Viewing fridge summary and product list
@@ -25,11 +24,11 @@ PAGE_SIZE: int = 10
 # --- Level 2.1: Summary ---
 @router.callback_query(F.data == "menu_fridge")
 async def show_fridge_summary(callback: types.CallbackQuery) -> None:
-    """
-    Show fridge summary with total items and recently added products.
+    """Show fridge summary with total items and recently added products.
 
     Args:
         callback: Telegram callback query
+
     """
     user_id = callback.from_user.id
 
@@ -120,11 +119,11 @@ async def show_fridge_summary(callback: types.CallbackQuery) -> None:
 # --- Level 2.2: List ---
 @router.callback_query(F.data.startswith("fridge_list:"))
 async def show_fridge_list(callback: types.CallbackQuery) -> None:
-    """
-    Show paginated list of products in fridge.
+    """Show paginated list of products in fridge.
 
     Args:
         callback: Telegram callback query with data format "fridge_list:page"
+
     """
     try:
         page = int(callback.data.split(":")[1])
@@ -191,19 +190,18 @@ async def show_fridge_list(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data == "noop")
 async def noop_handler(callback: types.CallbackQuery) -> None:
-    """
-    Handle no-op callbacks (e.g., page number display button).
+    """Handle no-op callbacks (e.g., page number display button).
 
     Args:
         callback: Telegram callback query
+
     """
     await callback.answer()
 
 # --- Level 2.3: Item Detail ---
 @router.callback_query(F.data.startswith("fridge_item:"))
-async def show_item_detail(callback: types.CallbackQuery):
-    """
-    Show product detail view with pagination support.
+async def show_item_detail(callback: types.CallbackQuery) -> None:
+    """Show product detail view with pagination support.
 
     Callback data format: "fridge_item:product_id" or "fridge_item:product_id:page"
     """
@@ -246,8 +244,7 @@ async def show_item_detail(callback: types.CallbackQuery):
 # --- Actions ---
 @router.callback_query(F.data.startswith("fridge_eat:"))
 async def eat_product(callback: types.CallbackQuery) -> None:
-    """
-    Mark product as consumed (decrease quantity by 1) and refresh the view.
+    """Mark product as consumed (decrease quantity by 1) and refresh the view.
 
     Callback data format: "fridge_eat:product_id:page"
     """
@@ -301,9 +298,8 @@ async def eat_product(callback: types.CallbackQuery) -> None:
             await show_fridge_list(callback)
 
 @router.callback_query(F.data.startswith("fridge_del:"))
-async def delete_product(callback: types.CallbackQuery):
-    """
-    Delete product completely and return to list.
+async def delete_product(callback: types.CallbackQuery) -> None:
+    """Delete product completely and return to list.
 
     Callback data format: "fridge_del:product_id:page"
     """

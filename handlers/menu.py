@@ -1,16 +1,47 @@
+"""Module for main menu handlers.
+
+Contains:
+- show_main_menu: Display main menu with all available features
+- back_to_main: Return to main menu from any screen
+- menu_check_handler: Show receipt upload instructions
+- menu_help_handler: Show help information
+- menu_settings_handler: Show settings menu
+"""
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
 
+
 @router.callback_query(F.data == "main_menu")
-async def back_to_main(callback: types.CallbackQuery):
-    """Returns to the main menu by editing the current message."""
+async def back_to_main(callback: types.CallbackQuery) -> None:
+    """Return to the main menu by editing the current message.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     await show_main_menu(callback.message, callback.from_user.first_name)
     await callback.answer()
 
-async def show_main_menu(message: types.Message, user_name: str):
-    """Displays the main menu with inline buttons."""
+
+async def show_main_menu(message: types.Message, user_name: str) -> None:
+    """Display the main menu with inline buttons.
+
+    Shows all available bot features: shopping mode, receipt upload,
+    fridge, recipes, stats, shopping list, settings, and help.
+
+    Args:
+        message: Telegram message object to edit or send menu to
+        user_name: User's first name for personalization
+
+    Returns:
+        None
+
+    """
     builder = InlineKeyboardBuilder()
 
     # Row 1: Shopping Mode (Prominent)
@@ -60,7 +91,19 @@ async def show_main_menu(message: types.Message, user_name: str):
         )
 
 @router.callback_query(F.data == "menu_check")
-async def menu_check_handler(callback: types.CallbackQuery):
+async def menu_check_handler(callback: types.CallbackQuery) -> None:
+    """Show receipt upload instructions.
+
+    Displays information about how to upload receipts
+    and what the bot can recognize.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 
@@ -89,7 +132,19 @@ async def menu_check_handler(callback: types.CallbackQuery):
 
 
 @router.callback_query(F.data == "menu_help")
-async def menu_help_handler(callback: types.CallbackQuery):
+async def menu_help_handler(callback: types.CallbackQuery) -> None:
+    """Show help information.
+
+    Displays instructions on how to use the bot's main features:
+    receipt upload, fridge management, recipes, and shopping.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 
@@ -119,7 +174,18 @@ async def menu_help_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "menu_settings")
-async def menu_settings_handler(callback: types.CallbackQuery):
+async def menu_settings_handler(callback: types.CallbackQuery) -> None:
+    """Show settings menu placeholder.
+
+    Displays settings menu (currently in development).
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 

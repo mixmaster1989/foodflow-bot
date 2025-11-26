@@ -1,3 +1,16 @@
+"""Module for user settings management handlers.
+
+Contains:
+- SettingsStates: FSM states for settings editing flow
+- show_settings: Display current user settings
+- start_edit_goals: Initiate editing nutrition goals
+- set_calories: Set calorie goal
+- set_protein: Set protein goal
+- set_fat: Set fat goal
+- set_carbs: Set carbs goal and save all goals
+- start_edit_allergies: Initiate editing allergies/exclusions
+- set_allergies: Save allergies/exclusions
+"""
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -9,16 +22,31 @@ from database.models import UserSettings
 
 router = Router()
 
+
 class SettingsStates(StatesGroup):
+    """FSM states for settings editing flow."""
+
     waiting_for_calories = State()
     waiting_for_protein = State()
     waiting_for_fat = State()
     waiting_for_carbs = State()
     waiting_for_allergies = State()
 
+
 @router.callback_query(F.data == "menu_settings")
-async def show_settings(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
+async def show_settings(callback: types.CallbackQuery) -> None:
+    """Display current user settings.
+
+    Shows nutrition goals (calories, protein, fat, carbs) and allergies/exclusions.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
+    user_id: int = callback.from_user.id
 
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -71,7 +99,19 @@ async def show_settings(callback: types.CallbackQuery):
         await callback.answer()
 
 @router.callback_query(F.data == "settings_edit_goals")
-async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext):
+async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Initiate editing nutrition goals.
+
+    Sets FSM state to wait for calorie goal input.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     await state.set_state(SettingsStates.waiting_for_calories)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_settings")
@@ -89,9 +129,19 @@ async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.message(SettingsStates.waiting_for_calories)
-async def set_calories(message: types.Message, state: FSMContext):
+async def set_calories(message: types.Message, state: FSMContext) -> None:
+    """Set calorie goal and proceed to protein goal.
+
+    Args:
+        message: Telegram message with calorie goal (integer)
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     try:
-        calories = int(message.text)
+        calories: int = int(message.text) if message.text else 0
         await state.update_data(calorie_goal=calories)
         await state.set_state(SettingsStates.waiting_for_protein)
         await message.answer("Отлично! Теперь введите норму <b>белков</b> (г):", parse_mode="HTML")
@@ -99,9 +149,19 @@ async def set_calories(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите целое число.")
 
 @router.message(SettingsStates.waiting_for_protein)
-async def set_protein(message: types.Message, state: FSMContext):
+async def set_protein(message: types.Message, state: FSMContext) -> None:
+    """Set protein goal and proceed to fat goal.
+
+    Args:
+        message: Telegram message with protein goal (integer)
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     try:
-        protein = int(message.text)
+        protein: int = int(message.text) if message.text else 0
         await state.update_data(protein_goal=protein)
         await state.set_state(SettingsStates.waiting_for_fat)
         await message.answer("Теперь введите норму <b>жиров</b> (г):", parse_mode="HTML")
@@ -109,9 +169,19 @@ async def set_protein(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите целое число.")
 
 @router.message(SettingsStates.waiting_for_fat)
-async def set_fat(message: types.Message, state: FSMContext):
+async def set_fat(message: types.Message, state: FSMContext) -> None:
+    """Set fat goal and proceed to carbs goal.
+
+    Args:
+        message: Telegram message with fat goal (integer)
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     try:
-        fat = int(message.text)
+        fat: int = int(message.text) if message.text else 0
         await state.update_data(fat_goal=fat)
         await state.set_state(SettingsStates.waiting_for_carbs)
         await message.answer("И наконец, норму <b>углеводов</b> (г):", parse_mode="HTML")
@@ -119,9 +189,19 @@ async def set_fat(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите целое число.")
 
 @router.message(SettingsStates.waiting_for_carbs)
-async def set_carbs(message: types.Message, state: FSMContext):
+async def set_carbs(message: types.Message, state: FSMContext) -> None:
+    """Set carbs goal and save all nutrition goals to database.
+
+    Args:
+        message: Telegram message with carbs goal (integer)
+        state: FSM context containing calorie_goal, protein_goal, fat_goal
+
+    Returns:
+        None
+
+    """
     try:
-        carbs = int(message.text)
+        carbs: int = int(message.text) if message.text else 0
         data = await state.get_data()
 
         async for session in get_db():
@@ -149,7 +229,19 @@ async def set_carbs(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите целое число.")
 
 @router.callback_query(F.data == "settings_edit_allergies")
-async def start_edit_allergies(callback: types.CallbackQuery, state: FSMContext):
+async def start_edit_allergies(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Initiate editing allergies/exclusions.
+
+    Sets FSM state to wait for allergies list from user.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     await state.set_state(SettingsStates.waiting_for_allergies)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_settings")
@@ -169,8 +261,18 @@ async def start_edit_allergies(callback: types.CallbackQuery, state: FSMContext)
     await callback.answer()
 
 @router.message(SettingsStates.waiting_for_allergies)
-async def set_allergies(message: types.Message, state: FSMContext):
-    allergies = message.text
+async def set_allergies(message: types.Message, state: FSMContext) -> None:
+    """Save allergies/exclusions to user settings.
+
+    Args:
+        message: Telegram message with allergies (comma-separated or "нет" to clear)
+        state: FSM context
+
+    Returns:
+        None
+
+    """
+    allergies: str | None = message.text if message.text else None
     if allergies.lower() in ['нет', 'no', '-', 'none']:
         allergies = None
 

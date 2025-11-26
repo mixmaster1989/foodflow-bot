@@ -1,3 +1,15 @@
+"""Module for shopping mode handlers (AR shopping assistance).
+
+Contains:
+- ShoppingMode: FSM states for shopping flow
+- start_shopping: Initialize shopping session
+- scan_label: Process product label photo
+- finish_shopping: Complete shopping and match products
+- link_label: Link scanned label to product
+- skip_label: Skip label matching
+- cancel_shopping_session: Cancel current shopping session
+- delete_scan: Delete scanned label
+"""
 import io
 
 from aiogram import Bot, F, Router, types
@@ -14,12 +26,27 @@ router = Router()
 
 
 class ShoppingMode(StatesGroup):
+    """FSM states for shopping mode flow."""
+
     scanning_labels = State()
     waiting_for_receipt = State()
 
 
 @router.callback_query(F.data == "start_shopping_mode")
-async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
+async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Initialize shopping session.
+
+    Creates or reuses active shopping session and sets FSM state
+    to scanning_labels.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     message = callback.message
     session_id = None
 
@@ -88,7 +115,21 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
 
 
 @router.message(ShoppingMode.scanning_labels, F.photo)
-async def scan_label(message: types.Message, bot: Bot, state: FSMContext):
+async def scan_label(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    """Process product label photo during shopping.
+
+    Extracts product name and nutrition info from label image
+    and saves as LabelScan for later matching.
+
+    Args:
+        message: Telegram message with label photo
+        bot: Telegram bot instance
+        state: FSM context containing shopping_session_id
+
+    Returns:
+        None
+
+    """
     data = await state.get_data()
     session_id = data.get("shopping_session_id")
 
@@ -144,10 +185,23 @@ async def scan_label(message: types.Message, bot: Bot, state: FSMContext):
 
 
 @router.callback_query(F.data == "shopping_finish")
-async def finish_shopping(callback: types.CallbackQuery, state: FSMContext):
+async def finish_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Finish shopping session and request receipt.
+
+    Switches to waiting_for_receipt state to match scanned labels
+    with receipt products.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context containing shopping_session_id
+
+    Returns:
+        None
+
+    """
     current_state = await state.get_state()
     data = await state.get_data()
-    session_id = data.get("shopping_session_id")
+    session_id: int | None = data.get("shopping_session_id")
 
     if current_state != ShoppingMode.scanning_labels.state or not session_id:
         await callback.answer("Нет активной сессии покупок.", show_alert=True)
@@ -163,11 +217,20 @@ async def finish_shopping(callback: types.CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("sm_link:"))
-async def link_label(callback: types.CallbackQuery):
+async def link_label(callback: types.CallbackQuery) -> None:
+    """Manually link scanned label to product.
+
+    Args:
+        callback: Telegram callback query with data format "sm_link:{product_id}:{label_id}"
+
+    Returns:
+        None
+
+    """
     try:
         _, product_id_str, label_id_str = callback.data.split(":")
-        product_id = int(product_id_str)
-        label_id = int(label_id_str)
+        product_id: int = int(product_id_str)
+        label_id: int = int(label_id_str)
     except (ValueError, AttributeError):
         await callback.answer("Некорректные данные.", show_alert=True)
         return
@@ -217,7 +280,16 @@ async def link_label(callback: types.CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("sm_skip:"))
-async def skip_label(callback: types.CallbackQuery):
+async def skip_label(callback: types.CallbackQuery) -> None:
+    """Skip label matching and mark product as new.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     await callback.answer("Ок, оставляем как новый товар.")
     await callback.message.answer("ℹ️ Позиция помечена как новый товар. Можно скорректировать позже.")
 
@@ -226,7 +298,19 @@ from handlers.menu import show_main_menu
 
 
 @router.callback_query(F.data == "shopping_cancel_session")
-async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMContext):
+async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel current shopping session.
+
+    Marks session as inactive and clears FSM state.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+
+    Returns:
+        None
+
+    """
     data = await state.get_data()
     session_id = data.get("shopping_session_id")
 
@@ -244,7 +328,16 @@ async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMConte
 
 
 @router.callback_query(F.data.startswith("shopping_delete_scan:"))
-async def delete_scan(callback: types.CallbackQuery):
+async def delete_scan(callback: types.CallbackQuery) -> None:
+    """Delete scanned label from shopping session.
+
+    Args:
+        callback: Telegram callback query with data format "shopping_delete_scan:{label_id}"
+
+    Returns:
+        None
+
+    """
     try:
         scan_id = int(callback.data.split(":")[1])
     except (IndexError, ValueError):

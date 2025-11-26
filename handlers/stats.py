@@ -1,4 +1,10 @@
-from datetime import datetime
+"""Module for statistics and consumption tracking handlers.
+
+Contains:
+- show_stats_menu: Display daily nutrition statistics
+- stats_placeholder: Placeholder for future stats features
+"""
+from datetime import date, datetime
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -9,10 +15,23 @@ from database.models import ConsumptionLog
 
 router = Router()
 
+
 @router.callback_query(F.data == "menu_stats")
-async def show_stats_menu(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    today = datetime.utcnow().date()
+async def show_stats_menu(callback: types.CallbackQuery) -> None:
+    """Display daily nutrition statistics.
+
+    Calculates and shows total calories, proteins, fats, carbs,
+    and number of meals consumed today.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
+    user_id: int = callback.from_user.id
+    today: date = datetime.utcnow().date()
 
     async for session in get_db():
         # Get today's consumption
@@ -72,6 +91,15 @@ async def show_stats_menu(callback: types.CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data.in_({"stats_day", "stats_week"}))
-async def stats_placeholder(callback: types.CallbackQuery):
+async def stats_placeholder(callback: types.CallbackQuery) -> None:
+    """Placeholder handler for future stats features.
+
+    Args:
+        callback: Telegram callback query
+
+    Returns:
+        None
+
+    """
     await callback.answer("Скоро будет доступно!", show_alert=True)
 

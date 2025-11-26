@@ -1,3 +1,8 @@
+"""Module for common handlers (start command, etc.).
+
+Contains:
+- cmd_start: Initial bot start handler that creates user if not exists
+"""
 from aiogram import Router, types
 from aiogram.filters import Command
 from sqlalchemy.future import select
@@ -8,8 +13,21 @@ from handlers.menu import show_main_menu
 
 router = Router()
 
+
 @router.message(Command("start"))
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message) -> None:
+    """Handle /start command - initialize user and show main menu.
+
+    Creates a new user in the database if they don't exist,
+    then displays the main menu.
+
+    Args:
+        message: Telegram message object with /start command
+
+    Returns:
+        None
+
+    """
     async for session in get_db():
         stmt = select(User).where(User.id == message.from_user.id)
         result = await session.execute(stmt)

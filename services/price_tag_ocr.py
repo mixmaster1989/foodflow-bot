@@ -1,6 +1,12 @@
+"""Module for price tag OCR processing.
+
+Contains:
+- PriceTagOCRService: Extract product name, price, volume, store from price tag images
+"""
 import base64
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -10,7 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 class PriceTagOCRService:
-    MODELS = [
+    """Extract price information from price tag photos.
+
+    Uses multiple AI models to extract product name, price, volume,
+    store name, and date from price tag images.
+
+    Attributes:
+        MODELS: List of fallback models ordered by quality (best first)
+
+    Example:
+        >>> service = PriceTagOCRService()
+        >>> data = await service.parse_price_tag(image_bytes)
+        >>> print(data['product_name'])
+        'Молоко 3.2%'
+
+    """
+
+    MODELS: list[str] = [
         # Free models (try first)
         "qwen/qwen2.5-vl-32b-instruct:free",
         "google/gemini-2.0-flash-exp:free",
@@ -24,7 +46,20 @@ class PriceTagOCRService:
     ]
 
     @classmethod
-    async def parse_price_tag(cls, image_bytes: bytes) -> dict | None:
+    async def parse_price_tag(cls, image_bytes: bytes) -> dict[str, Any] | None:
+        """Parse price tag image and extract product information.
+
+        Args:
+            image_bytes: Raw image bytes (JPEG/PNG format)
+
+        Returns:
+            Dictionary with keys: product_name, volume, price, store, date
+            Or None if all models fail
+
+        Note:
+            Tries models in order until one succeeds. Each model has 3 retry attempts.
+
+        """
         for model in cls.MODELS:
             result = await cls._call_model(model, image_bytes)
             if result:
@@ -32,17 +67,20 @@ class PriceTagOCRService:
         return None
 
     @staticmethod
-    async def _call_model(model: str, image_bytes: bytes) -> dict | None:
-        """
-        Extracts price information from a price tag photo.
-        Expected JSON structure:
-        {
-            "product_name": "Молоко 3.2%",
-            "volume": "1 л",
-            "price": 89.99,
-            "store": "Пятёрочка",
-            "date": "2025-11-20"
-        }
+    async def _call_model(model: str, image_bytes: bytes) -> dict[str, Any] | None:
+        """Call specific OCR model to extract price tag information.
+
+        Args:
+            model: Model identifier to use
+            image_bytes: Raw image bytes
+
+        Returns:
+            Dictionary with keys: product_name, volume, price, store, date
+            Or None if model fails
+
+        Note:
+            Retries 3 times with 0.5s delay between attempts.
+
         """
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
