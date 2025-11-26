@@ -1,13 +1,12 @@
 """
 Pytest fixtures for FoodFlow Bot tests.
 """
-import pytest
-import asyncio
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from aioresponses import aioresponses
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Set test environment variables before importing modules
 os.environ['DATABASE_URL'] = "sqlite+aiosqlite:///:memory:"
@@ -17,11 +16,10 @@ os.environ['OPENROUTER_API_KEY'] = "test-key"
 # Import all models to ensure they are registered with Base.metadata
 from database.base import Base
 from database.models import (
-    User, Receipt, Product, ConsumptionLog,
-    ShoppingSession, LabelScan, PriceTag,
-    UserSettings, ShoppingListItem, CachedRecipe
+    Product,
+    Receipt,
+    User,
 )
-
 
 # In-memory SQLite database for tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -32,19 +30,19 @@ async def db_session():
     """Create an in-memory SQLite database session for testing."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    
+
     # Create all tables - ensure all models are imported first
-    # This creates: users, receipts, products, consumption_logs, 
-    # shopping_sessions, label_scans, price_tags, user_settings, 
+    # This creates: users, receipts, products, consumption_logs,
+    # shopping_sessions, label_scans, price_tags, user_settings,
     # shopping_list_items, cached_recipes
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     # Create session
     async with async_session() as session:
         yield session
         await session.rollback()
-    
+
     # Cleanup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
