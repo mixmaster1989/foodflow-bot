@@ -107,11 +107,12 @@ receipt.jpeg
 photo_*.jpg
 photo_*.jpeg
 
-# Test scripts and results
-test_*.py
-test_*.txt
-check_*.py
-add_*.py
+# Test scripts and results (but NOT tests/ directory)
+# Ignore test scripts in root, but allow tests/ directory
+/test_*.py
+/test_*.txt
+/check_*.py
+/add_*.py
 
 # Git
 .git/
