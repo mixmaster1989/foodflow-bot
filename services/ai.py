@@ -1,5 +1,12 @@
+"""
+Module for AI-powered recipe generation.
+
+Contains:
+- AIService: Generates recipes based on available ingredients and category
+"""
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -7,9 +14,24 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class AIService:
-    # List of text models for recipes
-    MODELS = [
+    """
+    Generate recipes using AI models based on available ingredients.
+
+    Supports multiple recipe categories (Salads, Main, Dessert, Breakfast)
+    and uses fallback models for reliability.
+
+    Attributes:
+        MODELS: List of fallback models ordered by quality (best first)
+
+    Example:
+        >>> service = AIService()
+        >>> recipes = await service.generate_recipes(['Молоко', 'Яйца'], 'Breakfast')
+        >>> print(recipes['recipes'][0]['title'])
+        'Омлет с молоком'
+    """
+    MODELS: list[str] = [
         "openai/gpt-oss-120b:medium",  # User‑selected higher‑capacity model
         "mistralai/mistral-small-3.2-24b-instruct:free", # Working & Smart
         "qwen/qwen3-30b-a3b:free",                        # Working & New
@@ -19,7 +41,27 @@ class AIService:
     ]
 
     @classmethod
-    async def generate_recipes(cls, ingredients: list[str], category: str) -> dict | None:
+    async def generate_recipes(cls, ingredients: list[str], category: str) -> dict[str, Any] | None:
+        """
+        Generate recipes based on available ingredients and category.
+
+        Args:
+            ingredients: List of available ingredient names
+            category: Recipe category (Salads, Main, Dessert, Breakfast)
+
+        Returns:
+            Dictionary with 'recipes' key containing list of recipe dicts, or None if:
+            - No ingredients provided
+            - All models fail
+
+        Raises:
+            None (returns None on failure instead of raising)
+
+        Note:
+            Each recipe contains: title, description, calories, ingredients, steps
+            All text in Russian language
+            Tries models in order until one succeeds
+        """
         if not ingredients:
             return None
 
@@ -42,7 +84,7 @@ class AIService:
         return None
 
     @staticmethod
-    async def _call_model(model: str, prompt: str) -> dict | None:
+    async def _call_model(model: str, prompt: str) -> dict[str, Any] | None:
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",

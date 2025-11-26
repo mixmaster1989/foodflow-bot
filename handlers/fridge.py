@@ -1,3 +1,11 @@
+"""
+Module for fridge management handlers.
+
+Contains handlers for:
+- Viewing fridge summary and product list
+- Product detail view with pagination
+- Consuming and deleting products
+"""
 import logging
 import math
 from datetime import datetime
@@ -12,11 +20,17 @@ from database.models import ConsumptionLog, Product, Receipt
 router = Router()
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 10
+PAGE_SIZE: int = 10
 
 # --- Level 2.1: Summary ---
 @router.callback_query(F.data == "menu_fridge")
-async def show_fridge_summary(callback: types.CallbackQuery):
+async def show_fridge_summary(callback: types.CallbackQuery) -> None:
+    """
+    Show fridge summary with total items and recently added products.
+
+    Args:
+        callback: Telegram callback query
+    """
     user_id = callback.from_user.id
 
     async for session in get_db():
@@ -105,7 +119,13 @@ async def show_fridge_summary(callback: types.CallbackQuery):
 
 # --- Level 2.2: List ---
 @router.callback_query(F.data.startswith("fridge_list:"))
-async def show_fridge_list(callback: types.CallbackQuery):
+async def show_fridge_list(callback: types.CallbackQuery) -> None:
+    """
+    Show paginated list of products in fridge.
+
+    Args:
+        callback: Telegram callback query with data format "fridge_list:page"
+    """
     try:
         page = int(callback.data.split(":")[1])
     except (IndexError, ValueError):
@@ -170,7 +190,13 @@ async def show_fridge_list(callback: types.CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "noop")
-async def noop_handler(callback: types.CallbackQuery):
+async def noop_handler(callback: types.CallbackQuery) -> None:
+    """
+    Handle no-op callbacks (e.g., page number display button).
+
+    Args:
+        callback: Telegram callback query
+    """
     await callback.answer()
 
 # --- Level 2.3: Item Detail ---
@@ -219,7 +245,7 @@ async def show_item_detail(callback: types.CallbackQuery):
 
 # --- Actions ---
 @router.callback_query(F.data.startswith("fridge_eat:"))
-async def eat_product(callback: types.CallbackQuery):
+async def eat_product(callback: types.CallbackQuery) -> None:
     """
     Mark product as consumed (decrease quantity by 1) and refresh the view.
 

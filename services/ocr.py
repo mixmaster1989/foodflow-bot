@@ -1,6 +1,13 @@
+"""
+Module for optical character recognition and receipt processing.
+
+Contains:
+- OCRService: Main OCR processing engine with multiple model fallback
+"""
 import base64
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -10,12 +17,21 @@ logger = logging.getLogger(__name__)
 
 class OCRService:
     """
-    Models ordered by quality:
-    1) openai/gpt-4o-mini — лучший результат (по тесту 20.11.2025).
-    2) openai/gpt-4o-mini-2024-07-18 — тот же движок, но прошлый релиз.
-    3) Дальше прежние бесплатные fallback'и.
+    Handle receipt image recognition using multiple AI models.
+
+    Models are tried in order until one succeeds. Supports both free and paid
+    models with automatic fallback mechanism.
+
+    Attributes:
+        MODELS: List of fallback models ordered by quality (best first)
+
+    Example:
+        >>> ocr = OCRService()
+        >>> result = await ocr.parse_receipt(image_bytes)
+        >>> print(result['items'])
+        [{'name': 'Молоко', 'price': 100.0, 'quantity': 1.0}, ...]
     """
-    MODELS = [
+    MODELS: list[str] = [
         "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
         "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
         "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
@@ -24,7 +40,7 @@ class OCRService:
     ]
 
     @staticmethod
-    async def _call_openrouter(model: str, image_bytes: bytes) -> dict | None:
+    async def _call_openrouter(model: str, image_bytes: bytes) -> dict[str, Any] | None:
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -92,7 +108,24 @@ class OCRService:
         return None
 
     @classmethod
-    async def parse_receipt(cls, image_bytes: bytes) -> dict:
+    async def parse_receipt(cls, image_bytes: bytes) -> dict[str, Any]:
+        """
+        Parse receipt image and extract product items.
+
+        Args:
+            image_bytes: Raw image bytes (JPEG/PNG format)
+
+        Returns:
+            Dictionary with 'items' (list of dicts with 'name', 'price', 'quantity')
+            and 'total' (float) keys
+
+        Raises:
+            Exception: If all OCR models fail to process the image
+
+        Note:
+            Tries models in order: Qwen → Gemini → Mistral → Nemotron → GPT-4o-mini
+            Each model has 3 retry attempts with 0.5s delay between retries
+        """
         for model in cls.MODELS:
             logger.info(f"Trying OCR model: {model}")
             result = await cls._call_openrouter(model, image_bytes)

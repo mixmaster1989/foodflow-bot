@@ -36,11 +36,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff pytest pytest-asyncio pytest-mock aioresponses pytest-cov aiosqlite
+          pip install ruff pytest pytest-asyncio pytest-mock aioresponses pytest-cov aiosqlite mypy types-aiohttp bandit
 
       - name: Run Ruff linting
         run: |
           ruff check .
+
+      - name: Install type checking dependencies
+        run: |
+          pip install mypy types-aiohttp
+
+      - name: Run MyPy type checking
+        run: |
+          mypy . --ignore-missing-imports --strict-optional --warn-unused-ignores || true
+
+      - name: Run Bandit security check
+        run: |
+          bandit -r handlers/ services/ -ll -i -x tests/ || true
 
       - name: Check if tests directory exists
         id: check-tests
@@ -51,14 +63,14 @@ jobs:
             echo "tests_exist=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run pytest
+      - name: Run pytest with coverage
         if: steps.check-tests.outputs.tests_exist == 'true'
         env:
           BOT_TOKEN: "test-token-ci"
           OPENROUTER_API_KEY: "test-key-ci"
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: |
-          pytest -v --tb=short
+          pytest tests/ --cov=handlers --cov=services --cov-report=xml --cov-report=term --cov-fail-under=80 --tb=short -v
 
       - name: Skip pytest (no tests yet)
         if: steps.check-tests.outputs.tests_exist == 'false'

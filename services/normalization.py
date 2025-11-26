@@ -1,5 +1,12 @@
+"""
+Module for product name normalization and categorization.
+
+Contains:
+- NormalizationService: Normalizes OCR-extracted product names using AI models
+"""
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -7,19 +14,47 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class NormalizationService:
-    # Models: Perplexity (Best for web info) -> Mistral (Good logic) -> Qwen (Backup)
-    MODELS = [
+    """
+    Normalize and categorize product names from OCR results.
+
+    Uses multiple AI models to correct OCR errors, identify real product names,
+    preserve brand names and weights, categorize products, and estimate calories.
+
+    Attributes:
+        MODELS: List of fallback models ordered by quality (best first)
+
+    Example:
+        >>> service = NormalizationService()
+        >>> raw = [{'name': 'СЕЛЬКИ насло', 'price': 100.0, 'quantity': 1.0}]
+        >>> normalized = await service.normalize_products(raw)
+        >>> print(normalized[0]['name'])
+        'Масло подсолнечное'
+    """
+    MODELS: list[str] = [
         "perplexity/sonar",
         "mistralai/mistral-small-3.2-24b-instruct:free",
         "qwen/qwen2.5-vl-32b-instruct:free"
     ]
 
     @classmethod
-    async def normalize_products(cls, raw_items: list[dict]) -> list[dict]:
+    async def normalize_products(cls, raw_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
-        Takes a list of raw items (dict with 'name', 'price', 'quantity').
-        Returns a list of normalized items with 'name', 'category', 'calories'.
+        Normalize product names and add category/calories information.
+
+        Args:
+            raw_items: List of raw items from OCR with 'name', 'price', 'quantity' keys
+
+        Returns:
+            List of normalized items with 'name', 'price', 'quantity', 'category', 'calories'
+            Falls back to raw items if all models fail
+
+        Note:
+            - Preserves brand names (e.g., 'МИЛКА' -> 'Милка')
+            - Preserves weight/volume (e.g., '450г', '1л')
+            - All names and categories in Russian
+            - Tries models in order: Perplexity → Mistral → Qwen
         """
         if not raw_items:
             return []

@@ -1,3 +1,11 @@
+"""
+Module for recipe generation and display handlers.
+
+Contains handlers for:
+- Recipe category selection
+- Recipe generation based on available ingredients
+- Recipe caching and display
+"""
 from datetime import datetime
 
 from aiogram import F, Router, types
@@ -13,10 +21,20 @@ from services.logger import log_error, log_request, log_response
 router = Router()
 
 # Telegram message limit is 4096 characters
-MAX_MESSAGE_LENGTH = 4096
+MAX_MESSAGE_LENGTH: int = 4096
+
 
 def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
-    """Split long message into chunks that fit Telegram limit"""
+    """
+    Split long message into chunks that fit Telegram limit.
+
+    Args:
+        text: Message text to split
+        max_length: Maximum length per chunk (default: 4096)
+
+    Returns:
+        List of message chunks
+    """
     if len(text) <= max_length:
         return [text]
 
@@ -39,7 +57,13 @@ def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[
 
 # --- Level 3.1: Categories ---
 @router.callback_query(F.data == "menu_recipes")
-async def show_recipe_categories(callback: types.CallbackQuery):
+async def show_recipe_categories(callback: types.CallbackQuery) -> None:
+    """
+    Show recipe category selection menu.
+
+    Args:
+        callback: Telegram callback query
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="🥗 Салаты", callback_data="recipes_cat:Salads")
     builder.button(text="🥘 Горячее", callback_data="recipes_cat:Main")
@@ -76,7 +100,13 @@ async def show_recipe_categories(callback: types.CallbackQuery):
 
 # --- Level 3.2: Generate & List ---
 @router.callback_query(F.data.startswith("recipes_cat:"))
-async def generate_recipes_by_category(callback: types.CallbackQuery):
+async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
+    """
+    Generate recipes for selected category or show cached results.
+
+    Args:
+        callback: Telegram callback query with data format "recipes_cat:Category" or "recipes_cat:Category:refresh"
+    """
     # callback data can be 'recipes_cat:Category' or 'recipes_cat:Category:refresh'
     parts = callback.data.split(":")
     category = parts[1]

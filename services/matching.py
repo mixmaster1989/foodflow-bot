@@ -1,3 +1,9 @@
+"""
+Module for matching products with scanned labels during shopping.
+
+Contains:
+- MatchingService: Fuzzy matching algorithm for product-label pairing
+"""
 from datetime import datetime
 from typing import Any
 
@@ -9,10 +15,35 @@ from database.models import LabelScan, Product, ShoppingSession
 
 
 class MatchingService:
-    MIN_SCORE = 70
+    """
+    Match products with scanned labels using fuzzy string matching.
+
+    Uses rapidfuzz library to calculate similarity scores and automatically
+    pairs products with labels based on name, brand, and weight matching.
+
+    Attributes:
+        MIN_SCORE: Minimum similarity score (0-100) for automatic matching (default: 70)
+
+    Example:
+        >>> service = MatchingService()
+        >>> result = await service.match_products([1, 2, 3], session_id=5)
+        >>> print(result['matched'])
+        [{'product_id': 1, 'label_id': 10, 'score': 85.5}, ...]
+    """
+    MIN_SCORE: int = 70
 
     @staticmethod
     def _similarity(product_name: str, label: LabelScan) -> float:
+        """
+        Calculate similarity score between product name and label.
+
+        Args:
+            product_name: Product name from database
+            label: LabelScan object with name, brand, weight
+
+        Returns:
+            Similarity score (0-100), with bonuses for matching weight/brand
+        """
         score = fuzz.WRatio(product_name, label.name)
 
         if label.weight and label.weight.lower() in product_name.lower():
@@ -25,6 +56,26 @@ class MatchingService:
 
     @staticmethod
     async def match_products(product_ids: list[int], session_id: int) -> dict[str, Any] | None:
+        """
+        Match products with scanned labels and return matching results.
+
+        Args:
+            product_ids: List of product IDs to match
+            session_id: Shopping session ID
+
+        Returns:
+            Dictionary with keys:
+            - 'matched': List of matched pairs (product_id, label_id, score, etc.)
+            - 'unmatched_products': List of products without matching labels
+            - 'unmatched_labels': List of labels without matching products
+            - 'suggestions': Dict mapping product_id to list of suggested labels (score >= 40)
+            Returns None if session_id or product_ids are invalid/empty
+
+        Note:
+            - Automatically updates product nutrition data from matched labels
+            - Marks shopping session as inactive after matching
+            - Provides suggestions for unmatched products (score >= 40)
+        """
         if not session_id or not product_ids:
             return None
 
