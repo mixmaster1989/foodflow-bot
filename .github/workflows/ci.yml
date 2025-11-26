@@ -65,7 +65,7 @@ jobs:
           OPENROUTER_API_KEY: "test-key-ci"
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: |
-pytest tests/ --cov=handlers --cov=services --cov-report=xml --cov-report=term --tb=short -v
+            pytest tests/ --cov=handlers --cov=services --cov-report=xml --cov-report=term --tb=short -v
       - name: Skip pytest (no tests yet)
         if: steps.check-tests.outputs.tests_exist == 'false'
         run: |
