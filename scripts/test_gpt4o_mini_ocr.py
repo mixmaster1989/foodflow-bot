@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 
-from FoodFlow.config import settings
+from config import settings
 
 PROMPT = (
     "Analyze this receipt image. Return a JSON object with a list of items "
