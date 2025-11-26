@@ -1,8 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["handlers", "services", "database"]
+
 [project]
 name = "foodflow-bot"
 version = "0.1.0"
 description = "Smart AI-powered Telegram bot for intelligent food management"
 requires-python = ">=3.10"
+dependencies = [
+    # Core runtime dependencies
+    "aiogram>=3.0.0,<4.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "asyncpg>=0.29.0,<1.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    "aiohttp>=3.9.0,<4.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+    "rapidfuzz>=3.0.0,<4.0.0",
+    # Type stubs for type checking
+    "types-aiohttp>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "black>=23.0.0",
+    "bandit>=1.7.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "aioresponses>=0.7.4",
+    "pytest-cov>=4.1.0",
+    "aiosqlite>=0.19.0",
+]
 
 [tool.ruff]
 line-length = 88
@@ -46,14 +81,5 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-
-[project.optional-dependencies]
-test = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-mock>=3.10.0",
-    "aioresponses>=0.7.4",
-    "pytest-cov>=4.1.0",
-]
 
 

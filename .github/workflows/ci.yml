@@ -28,23 +28,18 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: Install project and dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff pytest pytest-asyncio pytest-mock aioresponses pytest-cov aiosqlite mypy types-aiohttp bandit
+          pip install -e ".[dev,test]"
 
       - name: Run Ruff linting
         run: |
           ruff check .
-
-      - name: Install type checking dependencies
-        run: |
-          pip install mypy types-aiohttp
 
       - name: Run MyPy type checking
         run: |
