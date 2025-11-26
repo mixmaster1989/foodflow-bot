@@ -398,10 +398,10 @@ class TestUserSettingsHandler:
         """Test showing settings when user has settings."""
         settings = UserSettings(
             user_id=sample_user.id,
-            daily_calories=2000.0,
-            daily_protein=100.0,
-            daily_fat=50.0,
-            daily_carbs=200.0
+            calorie_goal=2000.0,
+            protein_goal=100.0,
+            fat_goal=50.0,
+            carb_goal=200.0
         )
         db_session.add(settings)
         await db_session.commit()
@@ -449,7 +449,7 @@ class TestUserSettingsHandler:
             result = await db_session.execute(stmt)
             settings = result.scalar_one_or_none()
             assert settings is not None
-            assert settings.daily_calories == 2000.0
+            assert settings.calorie_goal == 2000.0
 
     @pytest.mark.asyncio
     async def test_set_allergies(self, db_session, mock_telegram_message, sample_user):
