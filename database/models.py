@@ -1,7 +1,20 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, BigInteger, Boolean, JSON
-from sqlalchemy.orm import relationship
 from datetime import datetime
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
+from sqlalchemy.orm import relationship
+
 from database.base import Base
+
 
 class User(Base):
     __tablename__ = "users"

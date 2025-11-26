@@ -1,9 +1,11 @@
 import io
-from aiogram import Router, F, types, Bot
+
+from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from FoodFlow.database.base import get_db
-from FoodFlow.database.models import Receipt, Product
+from FoodFlow.database.models import Product, Receipt
 from FoodFlow.handlers.shopping import ShoppingMode
 from FoodFlow.services.matching import MatchingService
 from FoodFlow.services.normalization import NormalizationService
@@ -26,15 +28,15 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext):
     builder.button(text="🍽️ Я это съел", callback_data="action_log_food")
     builder.button(text="❌ Отмена", callback_data="action_cancel")
     builder.adjust(1) # 1 button per row
-    
-    # Save file_id in state or just pass it? 
+
+    # Save file_id in state or just pass it?
     # For simplicity, we can't easily pass the file_id in callback_data (too long).
     # We should ask the user to reply or just assume the last photo.
-    # BETTER APPROACH: Reply to the photo with the menu. 
+    # BETTER APPROACH: Reply to the photo with the menu.
     # The callback handler will need to access the original message (which is the photo).
     # But callback_query.message is the message WITH buttons (bot's message), not the user's photo.
     # However, callback_query.message.reply_to_message might be the user's photo if we reply.
-    
+
     await message.reply(
         "📸 **Вижу фото!** Что с ним сделать?",
         reply_markup=builder.as_markup()
@@ -51,29 +53,31 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
         return
-    
+
     status_msg = await callback.message.edit_text("⏳ Анализирую ценник...")
-    
+
     try:
         # Download photo
         photo = photo_message.photo[-1]
         file_info = await bot.get_file(photo.file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
-        
+
         # OCR processing
-        from FoodFlow.services.price_tag_ocr import PriceTagOCRService
-        from FoodFlow.database.models import PriceTag
+        from datetime import datetime as dt
+
         from rapidfuzz import fuzz
         from sqlalchemy import select
-        from datetime import datetime as dt
-        
+
+        from FoodFlow.database.models import PriceTag
+        from FoodFlow.services.price_tag_ocr import PriceTagOCRService
+
         price_data = await PriceTagOCRService.parse_price_tag(photo_bytes.getvalue())
-        
+
         if not price_data or not price_data.get("product_name") or not price_data.get("price"):
             await status_msg.edit_text("❌ Не удалось распознать ценник. Попробуй сфотографировать четче.")
             return
-        
+
         # Save to database
         async for session in get_db():
             price_tag = PriceTag(
@@ -86,12 +90,12 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
             )
             session.add(price_tag)
             await session.commit()
-            
+
             # Find similar products for price comparison
             stmt = select(PriceTag).where(PriceTag.user_id == photo_message.from_user.id)
             result = await session.execute(stmt)
             all_tags = result.scalars().all()
-            
+
             similar_tags = []
             for tag in all_tags:
                 if tag.id == price_tag.id:
@@ -99,92 +103,92 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
                 score = fuzz.WRatio(price_data["product_name"].lower(), tag.product_name.lower())
                 if score >= 70:
                     similar_tags.append((tag, score))
-            
+
             similar_tags.sort(key=lambda x: x[1], reverse=True)
             break
-        
+
         # Build response
         response = (
             f"✅ <b>Ценник сохранен!</b>\n\n"
             f"📦 <b>{price_data['product_name']}</b>"
         )
-        
+
         if price_data.get("volume"):
             response += f" ({price_data['volume']})"
-        
+
         response += f"\n💵 {price_data['price']}р\n"
-        
+
         if price_data.get("store"):
             response += f"🏪 {price_data['store']}\n"
-        
+
         if similar_tags:
             # Find the most recent previous price for the same product
             most_recent = similar_tags[0][0]  # (tag, score) tuple
             price_diff = price_data["price"] - most_recent.price
-            
+
             response += "\n📊 <b>История цен:</b>\n"
-            
+
             if abs(price_diff) < 0.01:  # No change (accounting for float precision)
                 response += f"💚 Цена не изменилась ({most_recent.price}р)\n"
             elif price_diff > 0:
                 response += f"📈 Подорожал на {price_diff:.2f}р (было {most_recent.price}р)\n"
             else:
                 response += f"📉 Подешевел на {abs(price_diff):.2f}р (было {most_recent.price}р)\n"
-            
+
             # Show last saved date if available
             if most_recent.created_at:
                 from datetime import datetime
                 days_ago = (datetime.utcnow() - most_recent.created_at).days
                 if days_ago == 0:
-                    response += f"🕐 Последнее сохранение: сегодня\n"
+                    response += "🕐 Последнее сохранение: сегодня\n"
                 elif days_ago == 1:
-                    response += f"🕐 Последнее сохранение: вчера\n"
+                    response += "🕐 Последнее сохранение: вчера\n"
                 else:
                     response += f"🕐 Последнее сохранение: {days_ago} дн. назад\n"
-        
+
         await status_msg.edit_text(response, parse_mode="HTML")
-        
+
         # 🚀 Search for real-time prices using Perplexity
         await callback.message.answer("🔍 Ищу актуальные цены в других магазинах...")
-        
+
         from FoodFlow.services.price_search import PriceSearchService
-        
+
         # Include volume in search query for accurate comparison
         search_query = price_data["product_name"]
         if price_data.get("volume"):
             search_query += f" {price_data['volume']}"
-        
+
         online_prices = await PriceSearchService.search_prices(search_query)
-        
+
         if online_prices and online_prices.get("prices"):
             # Check if we actually have any non-null prices
             valid_prices = [p for p in online_prices["prices"] if p.get("price")]
-            
+
             if valid_prices:
-                online_response = f"🌐 <b>Актуальные цены в магазинах:</b>\n\n"
-                
+                online_response = "🌐 <b>Актуальные цены в магазинах:</b>\n\n"
+
                 for store_price in online_prices["prices"][:5]:
                     store = store_price.get("store", "Неизвестно")
                     price = store_price.get("price")
                     if price:
                         online_response += f"• {store}: {price}р\n"
-                
+
                 if online_prices.get("min_price"):
                     online_response += f"\n📊 Минимальная: {online_prices['min_price']}р\n"
                     online_response += f"📊 Максимальная: {online_prices['max_price']}р\n"
                     online_response += f"📊 Средняя: {online_prices['avg_price']:.2f}р\n"
-                    
+
                     # Compare with scanned price
                     scanned_price = price_data["price"]
                     min_online = online_prices["min_price"]
-                    
+
                     if scanned_price < min_online:
                         diff = min_online - scanned_price
                         online_response += f"\n🎉 <b>Отличная цена! Дешевле на {diff:.2f}р!</b>"
                     elif scanned_price > min_online:
                         diff = scanned_price - min_online
                         online_response += f"\n⚠️ В других магазинах дешевле на {diff:.2f}р"
-                
+
                 await callback.message.answer(online_response, parse_mode="HTML")
             else:
                 # Perplexity returned stores but no prices found
@@ -202,7 +206,7 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
             clean_text = re.sub(r'\[\d+\]', '', raw_text)
             # Remove JSON blocks if they exist (to avoid showing raw JSON)
             clean_text = re.sub(r'\{.*\}', '', clean_text, flags=re.DOTALL)
-            
+
             await callback.message.answer(
                 f"🌐 <b>Информация о ценах:</b>\n\n{clean_text[:800]}",
                 parse_mode="HTML"
@@ -214,7 +218,7 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot):
                 "Сервис поиска цен временно недоступен. Попробуйте позже.",
                 parse_mode="HTML"
             )
-        
+
     except Exception as exc:
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
@@ -225,35 +229,36 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot):
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
         return
-    
+
     status_msg = await callback.message.edit_text("⏳ Анализирую блюдо...")
-    
+
     try:
         # Download photo
         photo = photo_message.photo[-1]
         file_info = await bot.get_file(photo.file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
-        
+
         # OCR + AI analysis
-        from FoodFlow.services.ocr import OCRService
-        from FoodFlow.database.models import ConsumptionLog
         from datetime import datetime
-        
+
+        from FoodFlow.database.models import ConsumptionLog
+        from FoodFlow.services.ocr import OCRService
+
         # Use OCR to identify the dish
         result = await OCRService.parse_receipt(photo_bytes.getvalue())
-        
+
         # Extract dish name (use first item or full text)
         dish_name = "Блюдо"
         if result.get("items"):
             dish_name = result["items"][0].get("name", "Блюдо")
-        
+
         # Estimate KBZHU (simple estimation, can be improved with AI)
         calories = 300  # Default estimation
         protein = 15.0
         fat = 10.0
         carbs = 40.0
-        
+
         # Log consumption
         async for session in get_db():
             log = ConsumptionLog(
@@ -268,7 +273,7 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot):
             session.add(log)
             await session.commit()
             break
-        
+
         await status_msg.edit_text(
             f"✅ <b>Записано в дневник!</b>\n\n"
             f"🍽️ {dish_name}\n"
@@ -276,7 +281,7 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot):
             f"<i>Примечание: КБЖУ - примерная оценка. Для точности используй Shopping Mode!</i>",
             parse_mode="HTML"
         )
-        
+
     except Exception as exc:
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
@@ -287,7 +292,7 @@ async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMCon
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
         return
-    
+
     await _process_receipt_flow(photo_message, bot, callback.message, callback.message, state)
 
 

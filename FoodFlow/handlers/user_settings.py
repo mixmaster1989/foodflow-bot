@@ -1,8 +1,9 @@
-from aiogram import Router, F, types
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
+
 from FoodFlow.database.base import get_db
 from FoodFlow.database.models import UserSettings
 
@@ -18,18 +19,18 @@ class SettingsStates(StatesGroup):
 @router.callback_query(F.data == "menu_settings")
 async def show_settings(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if not settings:
             # Create default settings
             settings = UserSettings(user_id=user_id)
             session.add(settings)
             await session.commit()
             await session.refresh(settings)
-        
+
         text = (
             "⚙️ <b>Настройки профиля</b>\n\n"
             "🎯 <b>Цели КБЖУ:</b>\n"
@@ -40,13 +41,13 @@ async def show_settings(callback: types.CallbackQuery):
             f"🚫 <b>Аллергии/Исключения:</b>\n"
             f"{settings.allergies or 'Нет'}"
         )
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="🎯 Изменить цели КБЖУ", callback_data="settings_edit_goals")
         builder.button(text="🚫 Изменить аллергии", callback_data="settings_edit_allergies")
         builder.button(text="🔙 Назад", callback_data="main_menu")
         builder.adjust(1)
-        
+
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer()
 
@@ -55,7 +56,7 @@ async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(SettingsStates.waiting_for_calories)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_settings")
-    
+
     await callback.message.edit_text(
         "🎯 <b>Настройка целей</b>\n\n"
         "Введите вашу дневную норму <b>калорий</b> (числом, например 2000):",
@@ -99,28 +100,28 @@ async def set_carbs(message: types.Message, state: FSMContext):
     try:
         carbs = int(message.text)
         data = await state.get_data()
-        
+
         async for session in get_db():
             stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
             settings = (await session.execute(stmt)).scalar_one_or_none()
-            
+
             if settings:
                 settings.calorie_goal = data['calorie_goal']
                 settings.protein_goal = data['protein_goal']
                 settings.fat_goal = data['fat_goal']
                 settings.carb_goal = carbs
                 await session.commit()
-        
+
         await state.clear()
-        
+
         # Show updated settings
-        # We can't easily call callback handler from message handler without mocking, 
+        # We can't easily call callback handler from message handler without mocking,
         # so let's just send a message with button to go back
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
-        
+
         await message.answer("✅ Цели успешно обновлены!", reply_markup=builder.as_markup())
-        
+
     except ValueError:
         await message.answer("Пожалуйста, введите целое число.")
 
@@ -129,7 +130,7 @@ async def start_edit_allergies(callback: types.CallbackQuery, state: FSMContext)
     await state.set_state(SettingsStates.waiting_for_allergies)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_settings")
-    
+
     await callback.message.edit_text(
         "🚫 <b>Настройка аллергий</b>\n\n"
         "Напишите продукты, которые нужно исключить (через запятую).\n"
@@ -145,18 +146,18 @@ async def set_allergies(message: types.Message, state: FSMContext):
     allergies = message.text
     if allergies.lower() in ['нет', 'no', '-', 'none']:
         allergies = None
-        
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if settings:
             settings.allergies = allergies
             await session.commit()
-            
+
     await state.clear()
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
-    
+
     await message.answer("✅ Список исключений обновлен!", reply_markup=builder.as_markup())

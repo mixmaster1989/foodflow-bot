@@ -1,5 +1,6 @@
 import io
-from aiogram import Router, F, types, Bot
+
+from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -8,7 +9,6 @@ from sqlalchemy import select
 from database.base import get_db
 from database.models import LabelScan, Product, ShoppingSession
 from services.label_ocr import LabelOCRService
-
 
 router = Router()
 
@@ -60,7 +60,7 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
 
     # Image path
     photo_path = types.FSInputFile("FoodFlow/assets/shopping_mode.png")
-    
+
     caption = (
         "🛒 <b>Режим покупок</b>\n\n"
         "1. Сфотографируй этикетку товара.\n"
@@ -83,7 +83,7 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
-    
+
     await callback.answer()
 
 
@@ -223,6 +223,7 @@ async def skip_label(callback: types.CallbackQuery):
 
 
 from handlers.menu import show_main_menu
+
 
 @router.callback_query(F.data == "shopping_cancel_session")
 async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMContext):

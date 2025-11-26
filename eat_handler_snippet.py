@@ -1,6 +1,8 @@
 # Add eat handler to fridge.py
-from database.models import ConsumptionLog
 from datetime import datetime
+
+from database.models import ConsumptionLog
+
 
 @router.callback_query(F.data.startswith("eat_"))
 async def eat_product(callback: types.CallbackQuery):
@@ -9,13 +11,13 @@ async def eat_product(callback: types.CallbackQuery):
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
-    
+
     async for session in get_db():
         product = await session.get(Product, product_id)
         if not product:
             await callback.answer("Продукт не найден", show_alert=True)
             return
-        
+
         # Log consumption
         log = ConsumptionLog(
             user_id=callback.from_user.id,
@@ -27,16 +29,16 @@ async def eat_product(callback: types.CallbackQuery):
             date=datetime.utcnow()
         )
         session.add(log)
-        
+
         # Decrease quantity or delete
         if product.quantity > 1:
             product.quantity -= 1
         else:
             await session.delete(product)
-        
+
         await session.commit()
         break
-    
+
     await callback.answer(f"✅ Съел {product.name}!")
     # Refresh page
     total = await _get_total_products(callback.from_user.id)

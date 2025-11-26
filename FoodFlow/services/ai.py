@@ -1,6 +1,8 @@
-import aiohttp
 import json
 import logging
+
+import aiohttp
+
 from FoodFlow.config import settings
 
 logger = logging.getLogger(__name__)
@@ -14,14 +16,14 @@ class AIService:
         "deepseek/deepseek-chat-v3-0324:free",            # Good but unstable
         "openai/gpt-oss-20b:free"                         # Working fallback
     ]
-    
+
     @classmethod
     async def generate_recipes(cls, ingredients: list[str]) -> dict | None:
         if not ingredients:
             return None
-            
+
         ingredients_str = ", ".join(ingredients)
-        
+
         prompt = (
             f"I have these ingredients: {ingredients_str}. "
             "Suggest 3 simple recipes I can cook using mostly these ingredients. "
@@ -35,7 +37,7 @@ class AIService:
             result = await cls._call_model(model, prompt)
             if result:
                 return result
-        
+
         return None
 
     @staticmethod
@@ -46,7 +48,7 @@ class AIService:
             "HTTP-Referer": "https://foodflow.app",
             "X-Title": "FoodFlow Bot"
         }
-        
+
         payload = {
             "model": model,
             "messages": [
@@ -56,9 +58,9 @@ class AIService:
                 }
             ]
         }
-        
+
         import asyncio
-        
+
         # Retry logic: 3 attempts with 0.5s delay
         for attempt in range(3):
             async with aiohttp.ClientSession() as session:

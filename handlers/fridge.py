@@ -1,11 +1,13 @@
 import logging
 import math
-from datetime import datetime, timedelta
-from aiogram import Router, F, types
+from datetime import datetime
+
+from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
+
 from database.base import get_db
-from database.models import Product, Receipt, ConsumptionLog
+from database.models import ConsumptionLog, Product, Receipt
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -16,7 +18,7 @@ PAGE_SIZE = 10
 @router.callback_query(F.data == "menu_fridge")
 async def show_fridge_summary(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         # Get total items
         total_items = await session.scalar(
@@ -25,11 +27,11 @@ async def show_fridge_summary(callback: types.CallbackQuery):
             .join(Receipt)
             .where(Receipt.user_id == user_id)
         ) or 0
-        
+
         # Get expiring items (mock logic for now, assuming 7 days from receipt date if not set)
-        # In real app, we would have expiration_date column. 
+        # In real app, we would have expiration_date column.
         # For now, let's just show latest items as "Fresh"
-        
+
         latest_stmt = (
             select(Product)
             .join(Receipt)
@@ -52,9 +54,9 @@ async def show_fridge_summary(callback: types.CallbackQuery):
 
     if total_items == 0:
         caption = (
-            f"🧊 <b>Твой Холодильник</b>\n\n"
-            f"Пока тут пусто... 🕸️\n"
-            f"Загрузи чек или добавь продукты вручную, чтобы я мог следить за сроками и предлагать рецепты."
+            "🧊 <b>Твой Холодильник</b>\n\n"
+            "Пока тут пусто... 🕸️\n"
+            "Загрузи чек или добавь продукты вручную, чтобы я мог следить за сроками и предлагать рецепты."
         )
         # Try to edit if possible (if previous was photo), otherwise send new
         try:
@@ -76,7 +78,7 @@ async def show_fridge_summary(callback: types.CallbackQuery):
         # For now, keep text for non-empty state to avoid visual clutter or use a generic fridge icon?
         # Let's stick to text for populated fridge to focus on content, OR we could use main_menu image?
         # User asked for "Empty Fridge" image specifically.
-        
+
         text = (
             f"🧊 <b>Твой Холодильник</b>\n\n"
             f"📦 Всего товаров: <b>{total_items}</b>\n\n"
@@ -84,12 +86,12 @@ async def show_fridge_summary(callback: types.CallbackQuery):
             f"{latest_text}\n\n"
             f"<i>Нажми «Список продуктов», чтобы управлять запасами.</i>"
         )
-        
-        # If we are coming from a photo message (e.g. main menu), we must delete it and send text, 
+
+        # If we are coming from a photo message (e.g. main menu), we must delete it and send text,
         # OR edit it to text (which is not possible if it was a photo message, we can only edit caption).
         # Actually, we can edit media to something else, but we don't have a "full fridge" image.
         # So we should probably delete and send text.
-        
+
         try:
             # Try to edit text (works if previous was text)
             await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -110,7 +112,7 @@ async def show_fridge_list(callback: types.CallbackQuery):
         page = 0
 
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         # Get total for pagination
         total_items = await session.scalar(
@@ -119,14 +121,14 @@ async def show_fridge_list(callback: types.CallbackQuery):
             .join(Receipt)
             .where(Receipt.user_id == user_id)
         ) or 0
-        
+
         if total_items == 0:
             await callback.answer("Холодильник пуст!", show_alert=True)
             return
 
         total_pages = math.ceil(total_items / PAGE_SIZE)
         page = max(0, min(page, total_pages - 1))
-        
+
         stmt = (
             select(Product)
             .join(Receipt)
@@ -138,25 +140,25 @@ async def show_fridge_list(callback: types.CallbackQuery):
         products = (await session.execute(stmt)).scalars().all()
 
     builder = InlineKeyboardBuilder()
-    
+
     # Product buttons
     for product in products:
         # Truncate name
         name = product.name[:25] + "..." if len(product.name) > 25 else product.name
         builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}")
-    
+
     builder.adjust(1) # 1 column for better readability of names
-    
+
     # Navigation row
     nav_buttons = []
     if page > 0:
         nav_buttons.append(types.InlineKeyboardButton(text="⬅️", callback_data=f"fridge_list:{page-1}"))
-    
+
     nav_buttons.append(types.InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop"))
-    
+
     if page < total_pages - 1:
         nav_buttons.append(types.InlineKeyboardButton(text="➡️", callback_data=f"fridge_list:{page+1}"))
-    
+
     builder.row(*nav_buttons)
     builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data="menu_fridge")) # Back to Summary
 
@@ -185,9 +187,9 @@ async def show_item_detail(callback: types.CallbackQuery):
         if not product:
             await callback.answer("Товар не найден", show_alert=True)
             # Refresh list
-            await show_fridge_list(callback) 
+            await show_fridge_list(callback)
             return
-            
+
         text = (
             f"📦 <b>{product.name}</b>\n\n"
             f"💰 Цена: {product.price}₽\n"
@@ -196,13 +198,13 @@ async def show_item_detail(callback: types.CallbackQuery):
             f"📊 <b>КБЖУ (на 100г):</b>\n"
             f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}"
         )
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}")
         builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}")
         builder.button(text="🔙 Назад к списку", callback_data="fridge_list:0") # TODO: Remember page?
         builder.adjust(1)
-        
+
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer()
 
@@ -210,13 +212,13 @@ async def show_item_detail(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("fridge_eat:"))
 async def eat_product(callback: types.CallbackQuery):
     product_id = int(callback.data.split(":")[1])
-    
+
     async for session in get_db():
         product = await session.get(Product, product_id)
         if not product:
             await callback.answer("Товар не найден", show_alert=True)
             return
-            
+
         # Log consumption
         log = ConsumptionLog(
             user_id=callback.from_user.id,
@@ -228,7 +230,7 @@ async def eat_product(callback: types.CallbackQuery):
             date=datetime.utcnow()
         )
         session.add(log)
-        
+
         # Decrease quantity
         if product.quantity > 1:
             product.quantity -= 1
@@ -236,15 +238,15 @@ async def eat_product(callback: types.CallbackQuery):
         else:
             await session.delete(product)
             msg = "✅ Съел последнее! Товар удален."
-            
+
         await session.commit()
         await callback.answer(msg, show_alert=True)
-        
+
         # Return to detail or list depending on if item exists
         if product.quantity > 0:
              # Refresh detail
              # Hacky way to refresh: call show_item_detail again with same ID
-             # But we are in the same handler. 
+             # But we are in the same handler.
              # Let's just update text manually or re-call
              # Re-calling is safer
              callback.data = f"fridge_item:{product_id}"
@@ -257,14 +259,14 @@ async def eat_product(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("fridge_del:"))
 async def delete_product(callback: types.CallbackQuery):
     product_id = int(callback.data.split(":")[1])
-    
+
     async for session in get_db():
         product = await session.get(Product, product_id)
         if product:
             await session.delete(product)
             await session.commit()
             await callback.answer("🗑️ Товар удален", show_alert=True)
-        
+
     # Return to list
     callback.data = "fridge_list:0"
     await show_fridge_list(callback)

@@ -1,9 +1,10 @@
 import base64
 import json
 import logging
-import aiohttp
-from FoodFlow.config import settings
 
+import aiohttp
+
+from FoodFlow.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class PriceTagOCRService:
         "google/gemini-2.0-flash-exp:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
         "nvidia/nemotron-nano-12b-v2-vl:free",
-        
+
         # Paid models (fallback when free models are rate-limited)
         "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
         "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
@@ -84,7 +85,7 @@ class PriceTagOCRService:
         }
 
         import asyncio
-        
+
         # Retry logic: 3 attempts with 0.5s delay
         for attempt in range(3):
             async with aiohttp.ClientSession() as session:
@@ -100,12 +101,12 @@ class PriceTagOCRService:
                             content = result["choices"][0]["message"]["content"]
                             content = content.replace("```json", "").replace("```", "").strip()
                             return json.loads(content)
-                        
+
                         logger.warning(f"Price Tag OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
                         if attempt < 2:
                             await asyncio.sleep(0.5)
                             continue
-                            
+
                 except Exception as exc:
                     logger.error(f"Price Tag OCR exception ({model}) attempt {attempt+1}/3: {exc}")
                     if attempt < 2:

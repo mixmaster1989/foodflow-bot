@@ -1,9 +1,10 @@
 import base64
 import json
 import logging
-import aiohttp
-from config import settings
 
+import aiohttp
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class LabelOCRService:
         "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
         "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
         "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
-        
+
         # Paid models (fallback when free models are rate-limited)
         "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
         "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
@@ -96,7 +97,7 @@ class LabelOCRService:
                                 content = result["choices"][0]["message"]["content"]
                                 content = content.replace("```json", "").replace("```", "").strip()
                                 return json.loads(content)
-                            
+
                             logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
                             if attempt < 2:
                                 await asyncio.sleep(0.5)
@@ -106,10 +107,10 @@ class LabelOCRService:
                         if attempt < 2:
                             await asyncio.sleep(0.5)
                             continue
-            
+
             # If we get here, this model failed 3 times, try next model
             logger.warning(f"Model {model} failed all attempts, switching to next...")
-            
+
         return None
 
 

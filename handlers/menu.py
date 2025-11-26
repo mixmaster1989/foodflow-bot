@@ -1,6 +1,5 @@
-from aiogram import Router, F, types
+from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import Command
 
 router = Router()
 
@@ -9,41 +8,41 @@ async def back_to_main(callback: types.CallbackQuery):
     """Returns to the main menu by editing the current message."""
     await show_main_menu(callback.message, callback.from_user.first_name)
     await callback.answer()
-    
+
 async def show_main_menu(message: types.Message, user_name: str):
     """Displays the main menu with inline buttons."""
     builder = InlineKeyboardBuilder()
-    
+
     # Row 1: Shopping Mode (Prominent)
     builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
-    
+
     # Row 2: Core Features
     builder.button(text="📸 Загрузить чек", callback_data="menu_check")
     builder.button(text="🧊 Холодильник", callback_data="menu_fridge")
-    
+
     # Row 3: AI Features
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
     builder.button(text="📊 Статистика", callback_data="menu_stats")
-    
+
     # Row 4: Shopping List
     builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
-    
+
     # Row 5: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
-    
+
     builder.adjust(1, 2, 2, 1, 2)
-    
+
     # Image path
     photo_path = types.FSInputFile("FoodFlow/assets/main_menu.png")
-    
+
     caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
         f"Привет, {user_name}! 👋\n"
         "Я помогу тебе следить за питанием и продуктами.\n\n"
         "<b>Что будем делать?</b>"
     )
-    
+
     # Try to edit if possible (if previous was photo), otherwise send new
     try:
         await message.edit_media(
@@ -64,14 +63,14 @@ async def show_main_menu(message: types.Message, user_name: str):
 async def menu_check_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    
+
     photo_path = types.FSInputFile("FoodFlow/assets/check_upload.png")
     caption = (
         "📸 <b>Загрузка чека</b>\n\n"
         "Просто отправь мне фото чека, и я добавлю продукты в холодильник.\n"
         "Я умею распознавать товары, цены и вес."
     )
-    
+
     try:
         await callback.message.edit_media(
             media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
@@ -93,7 +92,7 @@ async def menu_check_handler(callback: types.CallbackQuery):
 async def menu_help_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    
+
     photo_path = types.FSInputFile("FoodFlow/assets/help.png")
     caption = (
         "ℹ️ <b>Справка</b>\n\n"
@@ -103,7 +102,7 @@ async def menu_help_handler(callback: types.CallbackQuery):
         "3. 👨‍🍳 <b>Рецепты:</b> Предложу, что приготовить из того, что есть.\n"
         "4. 🛒 <b>Магазин:</b> Помогу сравнить цены и найти товары."
     )
-    
+
     try:
         await callback.message.edit_media(
             media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
@@ -123,14 +122,14 @@ async def menu_help_handler(callback: types.CallbackQuery):
 async def menu_settings_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    
+
     photo_path = types.FSInputFile("FoodFlow/assets/settings.png")
     caption = (
         "⚙️ <b>Настройки</b>\n\n"
         "Здесь ты сможешь настроить свои предпочтения, уведомления и диету.\n"
         "<i>(Функционал в разработке)</i>"
     )
-    
+
     try:
         await callback.message.edit_media(
             media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),

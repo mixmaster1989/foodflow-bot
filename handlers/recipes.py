@@ -1,12 +1,14 @@
 from datetime import datetime
-from aiogram import Router, F, types
+
+from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.future import select
+
 from database.base import get_db
 from database.models import Product, Receipt
 from services.ai import AIService
-from services.cache import make_hash, get_cached_recipes, store_recipes
-from services.logger import log_request, log_response, log_error
+from services.cache import get_cached_recipes, make_hash, store_recipes
+from services.logger import log_error, log_request, log_response
 
 router = Router()
 
@@ -17,10 +19,10 @@ def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[
     """Split long message into chunks that fit Telegram limit"""
     if len(text) <= max_length:
         return [text]
-    
+
     chunks = []
     current_chunk = ""
-    
+
     for line in text.split('\n'):
         # If adding this line would exceed limit, save current chunk and start new
         if len(current_chunk) + len(line) + 1 > max_length:
@@ -29,10 +31,10 @@ def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[
             current_chunk = line + '\n'
         else:
             current_chunk += line + '\n'
-    
+
     if current_chunk:
         chunks.append(current_chunk.strip())
-    
+
     return chunks
 
 # --- Level 3.1: Categories ---
@@ -45,10 +47,10 @@ async def show_recipe_categories(callback: types.CallbackQuery):
     builder.button(text="🍳 Завтраки", callback_data="recipes_cat:Breakfast")
     builder.button(text="🔙 Назад", callback_data="main_menu")
     builder.adjust(2, 2, 1)
-    
+
     # Image path
     photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
-    
+
     caption = (
         "👨‍🍳 <b>Шеф-повар на связи!</b>\n\n"
         "Я посмотрю, что есть в холодильнике, и предложу рецепт.\n"
@@ -79,11 +81,11 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
     parts = callback.data.split(":")
     category = parts[1]
     refresh_requested = len(parts) > 2 and parts[2] == "refresh"
-    
+
     # Edit photo message with status, keep the image
     photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
     status_caption = f"👨‍🍳 Думаю над рецептами ({category})..."
-    
+
     try:
         status_msg = await callback.message.edit_media(
             media=types.InputMediaPhoto(media=photo_path, caption=status_caption, parse_mode="HTML")
@@ -95,7 +97,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
             caption=status_caption,
             parse_mode="HTML"
         )
-    
+
     # 1. Get ingredients
     ingredients = []
     async for session in get_db():
@@ -145,15 +147,15 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
                     for idx, step in enumerate(rec.steps, 1):
                         response_text += f"     {idx}. {step}\n"
                 response_text += "\n"
-            
+
             # Split message if too long
             message_chunks = split_long_message(response_text)
-            
+
             # Add refresh and back buttons
             builder = InlineKeyboardBuilder()
             builder.button(text="🔄 Другие варианты", callback_data=f"recipes_cat:{category}:refresh")
             builder.button(text="🔙 Назад", callback_data="menu_recipes")
-            
+
             # Update photo with short caption, send recipes as separate messages
             short_caption = f"👨‍🍳 <b>Рецепты: {category}</b>\n\nНайдено {len(recent)} рецептов из кеша!"
             try:
@@ -163,7 +165,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
                 )
             except Exception:
                 await status_msg.edit_text(short_caption, reply_markup=builder.as_markup(), parse_mode="HTML")
-            
+
             # Send recipe chunks as separate messages
             if message_chunks:
                 for chunk in message_chunks:
@@ -178,33 +180,33 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
     # For now, we use the generic generate_recipes but ideally we'd pass the category to the prompt.
     # Let's assume AIService handles it or we just ask for generic recipes for now.
     # TODO: Update AIService to accept category
-    
+
     try:
         # Call AI with category to get appropriate recipes
         data = await AIService.generate_recipes(ingredients, category)
-        
+
         if not data or "recipes" not in data:
             raise ValueError("No recipes generated")
-            
-        # Show first recipe or list? 
+
+        # Show first recipe or list?
         # Guidelines say "List of recipes".
         # Let's show a list of buttons.
-        
+
         builder = InlineKeyboardBuilder()
         for i, recipe in enumerate(data["recipes"]):
             # Store recipe index in callback
             builder.button(text=f"{i+1}. {recipe['title'][:20]}...", callback_data=f"recipe_view:{i}")
-            
+
         builder.button(text="🔙 Назад", callback_data="menu_recipes")
         builder.adjust(1)
-        
-        # Save recipes to state or cache? 
+
+        # Save recipes to state or cache?
         # For simplicity in this refactor without Redis, we might need to re-generate or store in a temporary way.
-        # BUT, since we can't easily store large state without FSM/Redis in this simple bot, 
-        # let's just display the text of ALL recipes for now, as the previous implementation did, 
+        # BUT, since we can't easily store large state without FSM/Redis in this simple bot,
+        # let's just display the text of ALL recipes for now, as the previous implementation did,
         # but formatted nicely with a Back button.
         # OR better: Just show the text as before but with the new navigation.
-        
+
         response_text = f"👨‍🍳 <b>Рецепты: {category}</b>\n\n"
         for i, recipe in enumerate(data["recipes"], 1):
             response_text += f"{i}. <b>{recipe['title']}</b> (~{recipe.get('calories', '?')} ккал)\n"
@@ -224,17 +226,17 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
                 for idx, step in enumerate(steps, 1):
                     response_text += f"     {idx}. {step}\n"
             response_text += "\n"
-            
+
         # Save recipes to cache
         await store_recipes(callback.from_user.id, ingredients_hash, category, data["recipes"])
-        
+
         # Split message if too long
         message_chunks = split_long_message(response_text)
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="🔄 Другие варианты", callback_data=f"recipes_cat:{category}:refresh")
         builder.button(text="🔙 Назад", callback_data="menu_recipes")
-        
+
         # Update photo with short caption, send recipes as separate messages
         short_caption = f"👨‍🍳 <b>Рецепты: {category}</b>\n\nСгенерировано {len(data['recipes'])} рецептов!"
         try:
@@ -244,14 +246,14 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
             )
         except Exception:
             await status_msg.edit_text(short_caption, reply_markup=builder.as_markup(), parse_mode="HTML")
-        
+
         # Send recipe chunks as separate messages
         if message_chunks:
             for chunk in message_chunks:
                 await callback.message.answer(chunk, parse_mode="HTML")
-        
+
         log_response(callback.from_user.id, {"cached": False, "count": len(data["recipes"])}, False)
-        
+
     except Exception as e:
         log_error(callback.from_user.id, e)
         builder = InlineKeyboardBuilder()
@@ -264,5 +266,5 @@ async def generate_recipes_by_category(callback: types.CallbackQuery):
             )
         except Exception:
             await status_msg.edit_text(error_caption, reply_markup=builder.as_markup())
-    
+
     await callback.answer()

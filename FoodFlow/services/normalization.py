@@ -1,6 +1,8 @@
-import aiohttp
 import json
 import logging
+
+import aiohttp
+
 from FoodFlow.config import settings
 
 logger = logging.getLogger(__name__)
@@ -12,7 +14,7 @@ class NormalizationService:
         "mistralai/mistral-small-3.2-24b-instruct:free",
         "qwen/qwen2.5-vl-32b-instruct:free"
     ]
-    
+
     @classmethod
     async def normalize_products(cls, raw_items: list[dict]) -> list[dict]:
         """
@@ -21,17 +23,17 @@ class NormalizationService:
         """
         if not raw_items:
             return []
-            
+
         # Prepare the list for the prompt
         items_str = "\n".join([f"- {item.get('name', 'Unknown')}" for item in raw_items])
-        
+
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://foodflow.app",
             "X-Title": "FoodFlow Bot"
         }
-        
+
         prompt = (
             "You are a smart receipt assistant. I have a list of raw product names from a Russian grocery receipt. "
             "Many names are abbreviated or contain OCR errors (e.g., 'СЕЛЬКИ насло' -> 'Масло подсолнечное', 'Шинка ВЕЛОСИПЕД' -> 'Ветчина'). "
@@ -48,9 +50,9 @@ class NormalizationService:
             "Output Format (JSON ONLY):\n"
             "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 123}]}"
         )
-        
+
         import asyncio
-        
+
         for model in cls.MODELS:
             payload = {
                 "model": model,
@@ -61,7 +63,7 @@ class NormalizationService:
                     }
                 ]
             }
-            
+
             # Retry logic: 3 attempts with 0.5s delay
             for attempt in range(3):
                 async with aiohttp.ClientSession() as session:
@@ -77,17 +79,17 @@ class NormalizationService:
                                 content = result['choices'][0]['message']['content']
                                 # Clean markdown
                                 content = content.replace("```json", "").replace("```", "").strip()
-                                
+
                                 try:
                                     parsed = json.loads(content)
                                     normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
-                                    
+
                                     # Merge back with original data (price, quantity)
                                     final_items = []
                                     for item in raw_items:
                                         raw_name = item.get('name', 'Unknown')
                                         norm_data = normalized_map.get(raw_name, {})
-                                        
+
                                         final_items.append({
                                             "name": norm_data.get('name', raw_name), # Fallback to raw
                                             "price": item.get('price', 0.0),
@@ -96,12 +98,12 @@ class NormalizationService:
                                             "calories": norm_data.get('calories', 0)
                                         })
                                     return final_items
-                                    
+
                                 except json.JSONDecodeError:
                                     logger.error(f"Failed to parse Normalization JSON ({model}): {content}")
-                                    # Don't return here, try next model if parsing fails? 
+                                    # Don't return here, try next model if parsing fails?
                                     # Actually if parsing fails, it might be model specific. Let's continue to next model.
-                                    break 
+                                    break
                             else:
                                 logger.warning(f"Normalization API ({model}) attempt {attempt+1}/3 failed: {response.status}")
                                 if attempt < 2:
@@ -112,8 +114,8 @@ class NormalizationService:
                         if attempt < 2:
                             await asyncio.sleep(0.5)
                             continue
-            
+
             # If we get here, this model failed (network or parsing), try next
             logger.warning(f"Model {model} failed, switching to next...")
-            
+
         return raw_items

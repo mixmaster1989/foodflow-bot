@@ -1,7 +1,9 @@
 import base64
-import aiohttp
 import json
 import logging
+
+import aiohttp
+
 from FoodFlow.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ class OCRService:
         "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
         "openai/gpt-4o-mini",                         # Paid Fallback
     ]
-    
+
     @staticmethod
     async def _call_openrouter(model: str, image_bytes: bytes) -> dict | None:
         headers = {
@@ -29,9 +31,9 @@ class OCRService:
             "HTTP-Referer": "https://foodflow.app",
             "X-Title": "FoodFlow Bot"
         }
-        
+
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        
+
         payload = {
             "model": model,
             "messages": [
@@ -52,9 +54,9 @@ class OCRService:
                 }
             ]
         }
-        
+
         import asyncio
-        
+
         # Retry logic: 3 attempts with 0.5s delay
         for attempt in range(3):
             async with aiohttp.ClientSession() as session:
@@ -70,7 +72,7 @@ class OCRService:
                             if 'error' in result:
                                  logger.error(f"Model {model} returned API error: {result['error']}")
                                  return None
-                                 
+
                             content = result['choices'][0]['message']['content']
                             # Clean markdown if present
                             content = content.replace("```json", "").replace("```", "").strip()
@@ -97,5 +99,5 @@ class OCRService:
             if result:
                 return result
             logger.warning(f"Model {model} failed. Trying next...")
-            
+
         raise Exception("All OCR models failed. Please try again later or check the logs.")

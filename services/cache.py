@@ -1,13 +1,13 @@
 import hashlib
-import json
 from datetime import datetime, timedelta
-from typing import List, Dict
+
 from sqlalchemy.future import select
+
 from database.base import async_session
 from database.models import CachedRecipe
 
 
-def make_hash(ingredients: List[str]) -> str:
+def make_hash(ingredients: list[str]) -> str:
     """Create a deterministic SHA256 hash of a sorted ingredient list."""
     sorted_ing = sorted([ing.strip().lower() for ing in ingredients])
     joined = "|".join(sorted_ing)
@@ -19,7 +19,7 @@ def is_recent(entry: CachedRecipe, minutes: int = 5) -> bool:
     return datetime.utcnow() - entry.created_at < timedelta(minutes=minutes)
 
 
-async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str) -> List[CachedRecipe]:
+async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str) -> list[CachedRecipe]:
     async with async_session() as session:
         stmt = select(CachedRecipe).where(
             CachedRecipe.user_id == user_id,
@@ -30,7 +30,7 @@ async def get_cached_recipes(user_id: int, ingredients_hash: str, category: str)
         return result.scalars().all()
 
 
-async def store_recipes(user_id: int, ingredients_hash: str, category: str, recipes: List[Dict]):
+async def store_recipes(user_id: int, ingredients_hash: str, category: str, recipes: list[dict]):
     async with async_session() as session:
         for rec in recipes:
             cached = CachedRecipe(

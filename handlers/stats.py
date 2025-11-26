@@ -1,7 +1,9 @@
-from aiogram import Router, F, types
+from datetime import datetime
+
+from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, func
-from datetime import datetime, timedelta
+from sqlalchemy import func, select
+
 from database.base import get_db
 from database.models import ConsumptionLog
 
@@ -11,7 +13,7 @@ router = Router()
 async def show_stats_menu(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     today = datetime.utcnow().date()
-    
+
     async for session in get_db():
         # Get today's consumption
         stmt = select(ConsumptionLog).where(
@@ -19,13 +21,13 @@ async def show_stats_menu(callback: types.CallbackQuery):
             func.date(ConsumptionLog.date) == today
         )
         logs = (await session.execute(stmt)).scalars().all()
-        
+
         # Calculate totals
         total_calories = sum(log.calories for log in logs) if logs else 0
         total_protein = sum(log.protein for log in logs) if logs else 0
         total_fat = sum(log.fat for log in logs) if logs else 0
         total_carbs = sum(log.carbs for log in logs) if logs else 0
-        
+
         # Build response
         if not logs:
             response = (
@@ -48,7 +50,7 @@ async def show_stats_menu(callback: types.CallbackQuery):
     builder.button(text="🗓️ Неделя", callback_data="stats_week") # Placeholder
     builder.button(text="🔙 Назад", callback_data="main_menu")
     builder.adjust(2, 1)
-    
+
     # Image path
     photo_path = types.FSInputFile("FoodFlow/assets/stats.png")
 

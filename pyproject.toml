@@ -16,6 +16,7 @@ exclude = [
     "*.egg-info",
     "dist",
     "build",
+    "eat_handler_snippet.py",  # Snippet file, not main code
 ]
 
 [tool.ruff.lint]
