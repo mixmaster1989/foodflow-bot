@@ -189,7 +189,7 @@ async def set_fat(message: types.Message, state: FSMContext) -> None:
         await message.answer("Пожалуйста, введите целое число.")
 
 @router.message(SettingsStates.waiting_for_carbs)
-290(message: types.Message, state: FSMContext) -> None:
+async def set_carbs(message: types.Message, state: FSMContext) -> None:
     """Set carbs goal and save all nutrition goals to database.
 
     Args:
