@@ -293,7 +293,8 @@ async def set_allergies(message: types.Message, state: FSMContext) -> None:
         if settings:
             settings.allergies = allergies
             await session.commit()
-                                    else:      settings = UserSettings(
+        else:
+                        settings = UserSettings(
                     user_id=message.from_user.id,
                     allergies=allergies
                 )
