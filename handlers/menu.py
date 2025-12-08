@@ -65,7 +65,7 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     builder.adjust(1, 2, 2, 1, 2)
 
     # Image path
-    photo_path = types.FSInputFile("FoodFlow/assets/main_menu.png")
+    photo_path = types.FSInputFile("assets/main_menu.png")
 
     caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
@@ -107,7 +107,7 @@ async def menu_check_handler(callback: types.CallbackQuery) -> None:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 
-    photo_path = types.FSInputFile("FoodFlow/assets/check_upload.png")
+    photo_path = types.FSInputFile("assets/check_upload.png")
     caption = (
         "📸 <b>Загрузка чека</b>\n\n"
         "Просто отправь мне фото чека, и я добавлю продукты в холодильник.\n"
@@ -148,7 +148,7 @@ async def menu_help_handler(callback: types.CallbackQuery) -> None:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 
-    photo_path = types.FSInputFile("FoodFlow/assets/help.png")
+    photo_path = types.FSInputFile("assets/help.png")
     caption = (
         "ℹ️ <b>Справка</b>\n\n"
         "<b>Как это работает?</b>\n"
@@ -189,7 +189,7 @@ async def menu_settings_handler(callback: types.CallbackQuery) -> None:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 
-    photo_path = types.FSInputFile("FoodFlow/assets/settings.png")
+    photo_path = types.FSInputFile("assets/settings.png")
     caption = (
         "⚙️ <b>Настройки</b>\n\n"
         "Здесь ты сможешь настроить свои предпочтения, уведомления и диету.\n"

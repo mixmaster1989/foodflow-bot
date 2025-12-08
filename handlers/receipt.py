@@ -8,6 +8,7 @@ Contains:
 - _process_receipt_flow: Internal receipt processing workflow
 """
 import io
+import logging
 from typing import Any
 
 from aiogram import Bot, F, Router, types
@@ -15,13 +16,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database.base import get_db
-from database.models import Product, Receipt
+from database.models import Product, Receipt, UserSettings
 from handlers.shopping import ShoppingMode
+from services.consultant import ConsultantService
 from services.matching import MatchingService
 from services.normalization import NormalizationService
 from services.ocr import OCRService
+from sqlalchemy import select
+from utils.message_cleanup import schedule_message_deletion
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 @router.message(F.photo)
@@ -41,9 +46,16 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> N
 
     """
     current_state = await state.get_state()
+    
+    # Если в режиме ожидания чека - обрабатываем чек
     if current_state == ShoppingMode.waiting_for_receipt.state:
         status_msg = await message.answer("⏳ Анализирую чек (Shopping Mode)...")
         await _process_receipt_flow(message, bot, status_msg, message, state)
+        return
+    
+    # Если в режиме сканирования этикеток или ожидания фото этикетки - не обрабатываем здесь
+    # (должен обработать shopping.router, который регистрируется раньше)
+    if current_state in (ShoppingMode.scanning_labels.state, ShoppingMode.waiting_for_label_photo.state):
         return
 
     # Create Inline Keyboard
@@ -409,7 +421,7 @@ async def _process_receipt_flow(
         except Exception:
             pass
 
-        await _send_receipt_summary(reply_target, data, normalized_items, products)
+        await _send_receipt_summary(reply_target, bot, data, normalized_items, products)
 
         if state:
             await _handle_shopping_matching(state, reply_target, product_ids)
@@ -501,6 +513,7 @@ async def _save_receipt(user_id: int, data: dict[str, Any], normalized_items: li
 
 async def _send_receipt_summary(
     reply_target: types.Message,
+    bot: Bot,
     data: dict[str, Any],
     normalized_items: list[dict[str, Any]],
     products: list[dict[str, Any]]
@@ -509,6 +522,7 @@ async def _send_receipt_summary(
 
     Args:
         reply_target: Message to reply to
+        bot: Telegram bot instance
         data: Raw OCR receipt data
         normalized_items: Normalized product items
         products: Product payload list
@@ -517,25 +531,144 @@ async def _send_receipt_summary(
         None
 
     """
-    await reply_target.answer(
-        f"✅ <b>Чек обработан!</b>\n\n"
-        f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
-        f"📦 <b>Позиций:</b> {len(normalized_items)}\n\n"
-        f"Продукты добавлены в холодильник.",
+    # Проверяем, есть ли продукты
+    products_count = len(products)
+    normalized_count = len(normalized_items)
+    
+    user_name = reply_target.from_user.first_name or "Пользователь"
+    
+    # Сначала отправляем товары с кнопками коррекции (если есть)
+    if products_count > 0:
+        for product in products:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✏️ Коррекция", callback_data=f"correct_{product['id']}")
+
+            product_msg = await reply_target.answer(
+                f"▫️ <b>{product['name']}</b>\n"
+                f"💵 {product['price']}р × {product['quantity']} шт\n"
+                f"🏷️ {product['category']}",
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML"
+            )
+            # Schedule deletion after 10 minutes
+            schedule_message_deletion(product_msg, bot, user_name)
+
+    # Затем итоговая плашка с кнопкой "Назад"
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад в меню", callback_data="main_menu")
+
+    # Формируем сообщение в зависимости от результата
+    if products_count == 0:
+        # Не удалось распознать товары
+        message = (
+            f"⚠️ <b>Чек обработан, но товары не распознаны</b>\n\n"
+            f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
+            f"📦 <b>Позиций распознано:</b> {normalized_count}\n\n"
+            f"❌ <b>Не удалось распознать товары на чеке.</b>\n\n"
+            f"Попробуй:\n"
+            f"• Отправить более четкое фото чека\n"
+            f"• Убедиться, что текст хорошо виден\n"
+            f"• Повторить попытку через несколько секунд"
+        )
+    elif products_count == 1:
+        message = (
+            f"✅ <b>Чек обработан!</b>\n\n"
+            f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
+            f"📦 <b>Позиций:</b> {products_count}\n\n"
+            f"✅ Продукт добавлен в холодильник."
+        )
+    else:
+        message = (
+            f"✅ <b>Чек обработан!</b>\n\n"
+            f"💰 <b>Итого:</b> {data.get('total', 0.0)}р\n"
+            f"📦 <b>Позиций:</b> {products_count}\n\n"
+            f"✅ Продукты добавлены в холодильник."
+        )
+
+    summary_msg = await reply_target.answer(
+        message,
+        reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
+    # Schedule deletion after 10 minutes
+    schedule_message_deletion(summary_msg, bot, user_name)
 
-    for product in products:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✏️ Коррекция", callback_data=f"correct_{product['id']}")
+    # Add consultant recommendations if products were recognized
+    if products_count > 0:
+        await _send_consultant_recommendations(reply_target, bot, products, user_name)
 
-        await reply_target.answer(
-            f"▫️ <b>{product['name']}</b>\n"
-            f"💵 {product['price']}р × {product['quantity']} шт\n"
-            f"🏷️ {product['category']}",
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML"
-        )
+
+async def _send_consultant_recommendations(
+    reply_target: types.Message,
+    bot: Bot,
+    products: list[dict[str, Any]],
+    user_name: str
+) -> None:
+    """Send consultant recommendations for products from receipt.
+
+    Args:
+        reply_target: Message to reply to
+        bot: Telegram bot instance
+        products: List of product dictionaries
+        user_name: User name for message deletion
+
+    Returns:
+        None
+
+    """
+    try:
+        user_id = reply_target.from_user.id
+
+        # Get user settings
+        async for session in get_db():
+            stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+            settings = (await session.execute(stmt)).scalar_one_or_none()
+            if not settings or not settings.is_initialized:
+                return  # User hasn't completed onboarding
+
+            # Get Product objects from database
+            product_objects = []
+            for product_dict in products:
+                product_stmt = select(Product).where(Product.id == product_dict["id"])
+                product_result = await session.execute(product_stmt)
+                product_obj = product_result.scalar_one_or_none()
+                if product_obj:
+                    product_objects.append(product_obj)
+
+            if not product_objects:
+                return
+
+            # Get recommendations
+            recommendations = await ConsultantService.analyze_products(
+                product_objects, settings, context="receipt"
+            )
+
+            # Build recommendation message
+            warnings = recommendations.get("warnings", [])
+            recs = recommendations.get("recommendations", [])
+            missing = recommendations.get("missing", [])
+
+            if not warnings and not recs and not missing:
+                return  # No recommendations
+
+            recommendation_text = "💡 <b>Рекомендации консультанта:</b>\n\n"
+
+            if warnings:
+                recommendation_text += "\n".join(warnings) + "\n\n"
+            if recs:
+                recommendation_text += "\n".join(recs) + "\n\n"
+            if missing:
+                recommendation_text += "\n".join(missing)
+
+            rec_msg = await reply_target.answer(
+                recommendation_text,
+                parse_mode="HTML"
+            )
+            # Schedule deletion after 10 minutes
+            schedule_message_deletion(rec_msg, bot, user_name)
+
+    except Exception as e:
+        logger.error(f"Error sending consultant recommendations: {e}")
 
 
 async def _handle_shopping_matching(state: FSMContext, reply_target: types.Message, product_ids: list[int]) -> None:
@@ -596,19 +729,21 @@ async def _send_matching_messages(reply_target: types.Message, matching_result: 
 
     for product in unmatched_products:
         builder = InlineKeyboardBuilder()
-        for suggestion in suggestions.get(product["id"], []):
-            builder.button(
-                text=f"📦 {suggestion['label_name']} ({int(suggestion['score'])}%)",
-                callback_data=f"sm_link:{product['id']}:{suggestion['label_id']}"
-            )
-        builder.button(text="➕ Это новый товар", callback_data=f"sm_skip:{product['id']}")
+        builder.button(
+            text="📸 Фото этикетки",
+            callback_data=f"sm_request_label:{product['id']}"
+        )
+        builder.button(
+            text="🗑️ Убрать товар",
+            callback_data=f"sm_remove_product:{product['id']}"
+        )
         builder.adjust(1)
 
         await reply_target.answer(
             "❓ <b>Не найдено совпадение:</b>\n\n"
             f"📄 {product['name']}\n"
             f"💵 {product['price']}р × {product['quantity']} шт\n\n"
-            "Выбери этикетку или оставь как новый товар.",
+            "Отправь фото этикетки или убери товар из списка.",
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )

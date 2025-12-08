@@ -37,7 +37,6 @@ class LabelOCRService:
         "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
         "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
         "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
-        "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
 
         # Paid models (fallback when free models are rate-limited)
         "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
@@ -119,7 +118,9 @@ class LabelOCRService:
                                 result = await response.json()
                                 content = result["choices"][0]["message"]["content"]
                                 content = content.replace("```json", "").replace("```", "").strip()
-                                return json.loads(content)
+                                parsed_data = json.loads(content)
+                                logger.info(f"Label OCR ({model}) successfully parsed label: {parsed_data.get('name', 'Unknown')}")
+                                return parsed_data
 
                             logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
                             if attempt < 2:

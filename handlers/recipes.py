@@ -72,7 +72,7 @@ async def show_recipe_categories(callback: types.CallbackQuery) -> None:
     builder.adjust(2, 2, 1)
 
     # Image path
-    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    photo_path = types.FSInputFile("assets/recipes.png")
 
     caption = (
         "👨‍🍳 <b>Шеф-повар на связи!</b>\n\n"
@@ -112,7 +112,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
     refresh_requested = len(parts) > 2 and parts[2] == "refresh"
 
     # Edit photo message with status, keep the image
-    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    photo_path = types.FSInputFile("assets/recipes.png")
     status_caption = f"👨‍🍳 Думаю над рецептами ({category})..."
 
     try:

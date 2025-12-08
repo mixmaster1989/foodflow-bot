@@ -16,7 +16,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 
 from database.base import get_db
-from database.models import ShoppingListItem
+from database.models import Product, ShoppingListItem, UserSettings
+from services.consultant import ConsultantService
+from sqlalchemy import select
 
 router = Router()
 
@@ -78,7 +80,7 @@ async def show_shopping_list(callback: types.CallbackQuery) -> None:
         builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
 
         # Image path
-        photo_path = types.FSInputFile("FoodFlow/assets/shopping_list.png")
+        photo_path = types.FSInputFile("assets/shopping_list.png")
 
         # Try to edit media (photo), if fails try edit_text, if fails delete and send new
         try:
@@ -155,6 +157,47 @@ async def add_item(message: types.Message, state: FSMContext) -> None:
             )
             session.add(new_item)
         await session.commit()
+
+        # Get user settings for consultant
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
+        settings_result = await session.execute(settings_stmt)
+        settings = settings_result.scalar_one_or_none()
+
+        # Show recommendations for each added item
+        if settings and settings.is_initialized and items:
+            recommendation_texts = []
+            for item_name in items:
+                # Create temporary Product object for analysis
+                temp_product = Product(
+                    name=item_name,
+                    calories=0.0,
+                    protein=0.0,
+                    fat=0.0,
+                    carbs=0.0,
+                    category=None,
+                    price=0.0,
+                    quantity=1.0
+                )
+                recommendations = await ConsultantService.analyze_product(
+                    temp_product, settings, context="shopping_list"
+                )
+                warnings = recommendations.get("warnings", [])
+                recs = recommendations.get("recommendations", [])
+                missing = recommendations.get("missing", [])
+
+                if warnings or recs or missing:
+                    item_rec = f"<b>{item_name}:</b>\n"
+                    if warnings:
+                        item_rec += "\n".join(warnings) + "\n"
+                    if recs:
+                        item_rec += "\n".join(recs) + "\n"
+                    if missing:
+                        item_rec += "\n".join(missing)
+                    recommendation_texts.append(item_rec)
+
+            if recommendation_texts:
+                full_text = "💡 <b>Рекомендации консультанта:</b>\n\n" + "\n\n".join(recommendation_texts)
+                await message.answer(full_text, parse_mode="HTML")
 
     await state.clear()
 

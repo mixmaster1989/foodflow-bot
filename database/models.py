@@ -110,6 +110,11 @@ class UserSettings(Base):
     fat_goal = Column(Integer, default=70)
     carb_goal = Column(Integer, default=250)
     allergies = Column(String, nullable=True)  # Comma-separated list
+    gender = Column(String, nullable=True)  # "male" or "female"
+    height = Column(Integer, nullable=True)  # height in cm
+    weight = Column(Float, nullable=True)  # weight in kg
+    goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
+    is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
     user = relationship("User", backref="settings")
 
 class ShoppingListItem(Base):

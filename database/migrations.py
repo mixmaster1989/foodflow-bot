@@ -93,6 +93,20 @@ def _run_sqlite_migrations():
 
         _create_shopping_tables(cursor)
 
+        # Add onboarding fields to user_settings
+        if _table_exists(cursor, "user_settings"):
+            _ensure_columns(
+                cursor,
+                "user_settings",
+                [
+                    ("gender", "TEXT"),
+                    ("height", "INTEGER"),
+                    ("weight", "REAL"),
+                    ("goal", "TEXT"),
+                    ("is_initialized", "BOOLEAN DEFAULT 0"),
+                ]
+            )
+
         conn.commit()
     finally:
         conn.close()

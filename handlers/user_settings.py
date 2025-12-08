@@ -61,6 +61,27 @@ async def show_settings(callback: types.CallbackQuery) -> None:
 
         text = (
             "⚙️ <b>Настройки профиля</b>\n\n"
+        )
+
+        # Add profile info if initialized
+        if settings.is_initialized:
+            gender_text = "👨 Мужской" if settings.gender == "male" else "👩 Женский"
+            goal_text = {
+                "lose_weight": "📉 Похудеть",
+                "maintain": "⚖️ Не толстеть",
+                "healthy": "🥗 Здоровое питание",
+                "gain_mass": "💪 Набрать массу",
+            }.get(settings.goal, "🥗 Здоровое питание")
+
+            text += (
+                "👤 <b>Профиль:</b>\n"
+                f"{gender_text}\n"
+                f"📏 Рост: <b>{settings.height}</b> см\n"
+                f"⚖️ Вес: <b>{settings.weight}</b> кг\n"
+                f"{goal_text}\n\n"
+            )
+
+        text += (
             "🎯 <b>Цели КБЖУ:</b>\n"
             f"🔥 Калории: <b>{settings.calorie_goal}</b> ккал\n"
             f"🥩 Белки: <b>{settings.protein_goal}</b> г\n"
@@ -71,13 +92,15 @@ async def show_settings(callback: types.CallbackQuery) -> None:
         )
 
         builder = InlineKeyboardBuilder()
+        if settings.is_initialized:
+            builder.button(text="✏️ Изменить профиль", callback_data="settings_edit_profile")
         builder.button(text="🎯 Изменить цели КБЖУ", callback_data="settings_edit_goals")
         builder.button(text="🚫 Изменить аллергии", callback_data="settings_edit_allergies")
         builder.button(text="🔙 Назад", callback_data="main_menu")
         builder.adjust(1)
 
         # Image path
-        photo_path = types.FSInputFile("FoodFlow/assets/main_menu.png")
+        photo_path = types.FSInputFile("assets/main_menu.png")
 
         # Try to edit media (photo), if fails try edit_text, if fails delete and send new
         try:
@@ -324,3 +347,32 @@ async def set_allergies(message: types.Message, state: FSMContext) -> None:
     builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
 
     await message.answer("✅ Список исключений обновлен!", reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data == "settings_edit_profile")
+async def edit_profile(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start profile editing (onboarding flow).
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+
+    Returns:
+        None
+
+    """
+    from handlers.onboarding import start_onboarding
+
+    # Reset is_initialized to trigger onboarding
+    user_id: int = callback.from_user.id
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(stmt)).scalar_one_or_none()
+        if settings:
+            settings.is_initialized = False
+            await session.commit()
+        break
+
+    # Start onboarding
+    await start_onboarding(callback.message, state)
+    await callback.answer()

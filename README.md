@@ -21,6 +21,8 @@
 
 ### Key Capabilities
 
+- 👤 **User Onboarding** - Personalized profile setup (gender, height, weight, goals)
+- 💡 **AI Consultant** - Smart product recommendations based on your profile and goals
 - 📃 **Receipt Scanning** - Automatic product & price recognition from receipt photos
 - 🧇 **Virtual Fridge** - Smart inventory management with real-time tracking  
 - 👨‍🍳 **AI Recipe Generation** - Personalized recipes based on your available ingredients
@@ -73,6 +75,20 @@
 - 💾 **Instant Updates** - Changes saved immediately
 - 📝 **Pre-filled Forms** - Current name shown for easy editing
 
+### 7. User Onboarding ✅
+
+- 👤 **Profile Setup** - Collect gender, height, weight, and goals on first launch
+- 🎯 **Goal Selection** - Choose from: lose weight, maintain, healthy eating, gain mass
+- ✏️ **Profile Editing** - Update your profile anytime from settings
+
+### 8. AI Consultant ✅
+
+- 💡 **Smart Recommendations** - AI-powered product analysis based on your profile
+- ⚠️ **Warnings** - Get alerts about high-calorie foods when trying to lose weight
+- ✅ **Positive Feedback** - Receive praise for healthy choices
+- 🔍 **Context-Aware** - Different recommendations for receipts, fridge, shopping list, and shopping mode
+- 🧠 **Personalized** - Considers your goals, allergies, and nutrition targets
+
 ---
 
 ## 🚀 Quick Start
@@ -91,9 +107,9 @@ git clone https://github.com/mixmaster1989/foodflow-bot.git
 cd foodflow-bot
 
 # Install dependencies
-pip install -r FoodFlow/requirements.txt
+pip install -r requirements.txt
 
-# Create .env file
+# Create .env file in repo root
 cp .env.example .env
 
 # Fill in your keys
@@ -101,8 +117,7 @@ echo "BOT_TOKEN=your_telegram_bot_token" >> .env
 echo "OPENROUTER_API_KEY=your_openrouter_key" >> .env
 echo "DATABASE_URL=sqlite+aiosqlite:///./foodflow.db" >> .env
 
-# Run the bot
-cd FoodFlow
+# Run the bot from repo root
 python main.py
 ```
 
@@ -111,30 +126,13 @@ python main.py
 ## 📁 Project Structure
 
 ```
-FoodFlow/
-├── database/           ━ SQLAlchemy ORM models
-│   ├── base.py
-│   └── models.py
-├── handlers/           ━ Bot command handlers
-│   ├── common.py         # Main menu
-│   ├── receipt.py        # Receipt processing
-│   ├── fridge.py         # Virtual fridge
-│   ├── recipes.py        # Recipe generation
-│   ├── shopping.py       # Shopping mode
-│   ├── stats.py          # Statistics
-│   └── correction.py     # Product correction
-├── services/           ━ Business logic
-│   ├── ocr.py            # OCR processing
-│   ├── label_ocr.py      # Label scanning
-│   ├── price_tag_ocr.py  # Price tag OCR
-│   ├── price_search.py   # Real-time price search
-│   ├── matching.py       # Fuzzy matching
-│   ├── normalization.py  # Data normalization
-│   └── ai.py             # AI integrations
-├── config.py           ━ Pydantic configuration
-├── main.py             ━ Entry point
-├── check_secrets.py    ━ Security pre-commit hook
-└── requirements.txt    ━ Dependencies
+├── database/           ━ SQLAlchemy ORM models, migrations
+├── handlers/           ━ Bot command handlers (menu, onboarding, receipt, fridge, etc.)
+├── services/           ━ OCR, normalization, AI consultant, price search, matching
+├── config.py           ━ Pydantic configuration (uses .env in repo root)
+├── main.py             ━ Entry point (run from repo root)
+├── requirements.txt    ━ Dependencies
+└── ecosystem.config.js ━ PM2 config (optional)
 ```
 
 ---
@@ -162,10 +160,11 @@ FoodFlow/
 
 ### Commands
 
-- `/start` - Launch bot & show main menu
+- `/start` - Launch bot & show main menu (triggers onboarding for new users)
 - `🧇 Fridge` - View inventory
 - `👨‍🍳 Recipes` - Generate recipes
 - `📊 Statistics` - Daily KBZHU stats
+- `⚙️ Settings` - Manage profile and nutrition goals
 
 ### Receipt Processing Workflow
 

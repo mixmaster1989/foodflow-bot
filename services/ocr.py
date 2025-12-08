@@ -32,11 +32,12 @@ class OCRService:
     """
 
     MODELS: list[str] = [
-        "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
-        "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
-        "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
-        "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
-        "openai/gpt-4o-mini",                         # Paid Fallback
+        "qwen/qwen2.5-vl-32b-instruct:free",          # Free 1: Best quality
+        "google/gemini-2.0-flash-exp:free",           # Free 2: Fast & Smart
+        "mistralai/mistral-small-3.2-24b-instruct:free", # Free 3: Working & Multimodal
+        "google/gemini-2.5-flash-lite-preview-09-2025", # Paid 1: Cheapest ($0.00016), 7 items
+        "openai/gpt-4.1-mini",                        # Paid 2: Fastest (471ms), 7 items
+        "openai/gpt-4o-mini",                         # Paid 3: Legacy Fallback
     ]
 
     @staticmethod
@@ -81,7 +82,7 @@ class OCRService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
-                        timeout=60
+                        timeout=20
                     ) as response:
                         if response.status == 200:
                             result = await response.json()
@@ -122,8 +123,9 @@ class OCRService:
             Exception: If all OCR models fail to process the image
 
         Note:
-            Tries models in order: Qwen → Gemini → Mistral → Nemotron → GPT-4o-mini
+            Tries models in order: Qwen → Gemini → Mistral → Gemini-2.5 → GPT-4.1-mini → GPT-4o-mini
             Each model has 3 retry attempts with 0.5s delay between retries
+            Timeout per request: 20 seconds
 
         """
         for model in cls.MODELS:

@@ -71,7 +71,7 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
     builder.adjust(2, 1)
 
     # Image path
-    photo_path = types.FSInputFile("FoodFlow/assets/stats.png")
+    photo_path = types.FSInputFile("assets/stats.png")
 
     # Try to edit if possible (if previous was photo), otherwise send new
     try:

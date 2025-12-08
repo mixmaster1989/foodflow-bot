@@ -8,8 +8,10 @@ from database import migrations
 from database.base import init_db
 from handlers import (
     common,
+    correction,
     fridge,
     menu,
+    onboarding,
     receipt,
     recipes,
     shopping,
@@ -37,15 +39,19 @@ async def main():
     dp = Dispatcher()
 
     # Register Routers
+    # IMPORTANT: shopping.router must be before receipt.router
+    # to handle photos in scanning_labels state first
     dp.include_router(common.router)
+    dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(menu.router)  # Central menu router
+    dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)
     dp.include_router(fridge.router)
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
-    dp.include_router(shopping.router)
     dp.include_router(user_settings.router)
     dp.include_router(shopping_list.router)
+    dp.include_router(correction.router)
 
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

@@ -5,6 +5,7 @@ Contains:
 """
 import json
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -33,9 +34,11 @@ class NormalizationService:
     """
 
     MODELS: list[str] = [
-        "perplexity/sonar",
-        "mistralai/mistral-small-3.2-24b-instruct:free",
-        "qwen/qwen2.5-vl-32b-instruct:free"
+        "perplexity/sonar",                                    # Free 1: Best quality with web search
+        "mistralai/mistral-small-3.2-24b-instruct:free",      # Free 2: Fast & Smart
+        "qwen/qwen2.5-vl-32b-instruct:free",                 # Free 3: Working Fallback
+        "google/gemini-2.5-flash-lite-preview-09-2025",       # Paid 1: Cheapest ($0.00016)
+        "openai/gpt-4.1-mini",                                 # Paid 2: Fastest (471ms)
     ]
 
     @classmethod
@@ -82,7 +85,14 @@ class NormalizationService:
             "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n\n"
             "Input List:\n"
             f"{items_str}\n\n"
-            "Output Format (JSON ONLY):\n"
+            "CRITICAL OUTPUT REQUIREMENTS:\n"
+            "- Return ONLY the JSON object. Nothing before it, nothing after it.\n"
+            "- Do NOT include markdown formatting (no ```json or ```).\n"
+            "- Do NOT add explanations, comments, or any text after the JSON.\n"
+            "- Your response must start with { and end with }.\n"
+            "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 123}]}\n"
+            "- Example of WRONG response: {\"normalized\": [...]}\n**Пояснения:** ...\n\n"
+            "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
             "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 123}]}"
         )
 
@@ -112,8 +122,46 @@ class NormalizationService:
                             if response.status == 200:
                                 result = await response.json()
                                 content = result['choices'][0]['message']['content']
-                                # Clean markdown
-                                content = content.replace("```json", "").replace("```", "").strip()
+                                
+                                # Robust JSON extraction - handle all edge cases
+                                # Step 1: Try to find JSON in markdown code blocks
+                                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                                if json_match:
+                                    content = json_match.group(1)
+                                else:
+                                    # Step 2: Find JSON object that contains "normalized" key
+                                    # Use non-greedy match to get the first complete JSON object
+                                    json_match = re.search(r'\{[^{}]*"normalized"[^{}]*\}(?:\s*\{[^{}]*\})*', content, re.DOTALL)
+                                    if json_match:
+                                        # Try to find the complete JSON object by matching braces
+                                        start_pos = json_match.start()
+                                        brace_count = 0
+                                        end_pos = start_pos
+                                        for i, char in enumerate(content[start_pos:], start_pos):
+                                            if char == '{':
+                                                brace_count += 1
+                                            elif char == '}':
+                                                brace_count -= 1
+                                                if brace_count == 0:
+                                                    end_pos = i + 1
+                                                    break
+                                        content = content[start_pos:end_pos]
+                                    else:
+                                        # Step 3: Fallback - clean markdown and extract first JSON object
+                                        content = content.replace("```json", "").replace("```", "").strip()
+                                        # Find first { and last } to extract JSON
+                                        first_brace = content.find('{')
+                                        if first_brace >= 0:
+                                            # Count braces to find matching closing brace
+                                            brace_count = 0
+                                            for i in range(first_brace, len(content)):
+                                                if content[i] == '{':
+                                                    brace_count += 1
+                                                elif content[i] == '}':
+                                                    brace_count -= 1
+                                                    if brace_count == 0:
+                                                        content = content[first_brace:i + 1]
+                                                        break
 
                                 try:
                                     parsed = json.loads(content)

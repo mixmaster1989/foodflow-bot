@@ -14,7 +14,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 
 from database.base import get_db
-from database.models import ConsumptionLog, Product, Receipt
+from database.models import ConsumptionLog, Product, Receipt, UserSettings
+from services.consultant import ConsultantService
+from sqlalchemy import select
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -63,7 +65,7 @@ async def show_fridge_summary(callback: types.CallbackQuery) -> None:
     latest_text = "\n".join([f"▫️ {p.name}" for p in latest_products]) if latest_products else "Пусто"
 
     # Image path for empty fridge
-    empty_photo_path = types.FSInputFile("FoodFlow/assets/empty_fridge.png")
+    empty_photo_path = types.FSInputFile("assets/empty_fridge.png")
 
     if total_items == 0:
         caption = (
@@ -219,8 +221,13 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
         if not product:
             await callback.answer("Товар не найден", show_alert=True)
             # Refresh list with saved page
-            callback.data = f"fridge_list:{page}"
-            await show_fridge_list(callback)
+            from types import SimpleNamespace
+            new_callback = SimpleNamespace()
+            new_callback.data = f"fridge_list:{page}"
+            new_callback.from_user = callback.from_user
+            new_callback.message = callback.message
+            new_callback.answer = callback.answer
+            await show_fridge_list(new_callback)
             return
 
         text = (
@@ -231,6 +238,28 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
             f"📊 <b>КБЖУ (на 100г):</b>\n"
             f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}"
         )
+
+        # Get consultant recommendations
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings_result = await session.execute(settings_stmt)
+        settings = settings_result.scalar_one_or_none()
+
+        if settings and settings.is_initialized:
+            recommendations = await ConsultantService.analyze_product(
+                product, settings, context="fridge"
+            )
+            warnings = recommendations.get("warnings", [])
+            recs = recommendations.get("recommendations", [])
+            missing = recommendations.get("missing", [])
+
+            if warnings or recs or missing:
+                text += "\n\n💡 <b>Рекомендации:</b>\n"
+                if warnings:
+                    text += "\n".join(warnings) + "\n"
+                if recs:
+                    text += "\n".join(recs) + "\n"
+                if missing:
+                    text += "\n".join(missing)
 
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
@@ -290,12 +319,24 @@ async def eat_product(callback: types.CallbackQuery) -> None:
         # Refresh view: return to detail if product still exists, otherwise return to list
         if product_still_exists:
             # Refresh detail view with updated quantity
-            callback.data = f"fridge_item:{product_id}:{page}"
-            await show_item_detail(callback)
+            # Create a new callback query with updated data
+            from types import SimpleNamespace
+            new_callback = SimpleNamespace()
+            new_callback.data = f"fridge_item:{product_id}:{page}"
+            new_callback.from_user = callback.from_user
+            new_callback.message = callback.message
+            new_callback.answer = callback.answer
+            await show_item_detail(new_callback)
         else:
             # Return to list on the same page
-            callback.data = f"fridge_list:{page}"
-            await show_fridge_list(callback)
+            # Create a new callback query with updated data
+            from types import SimpleNamespace
+            new_callback = SimpleNamespace()
+            new_callback.data = f"fridge_list:{page}"
+            new_callback.from_user = callback.from_user
+            new_callback.message = callback.message
+            new_callback.answer = callback.answer
+            await show_fridge_list(new_callback)
 
 @router.callback_query(F.data.startswith("fridge_del:"))
 async def delete_product(callback: types.CallbackQuery) -> None:
@@ -319,6 +360,12 @@ async def delete_product(callback: types.CallbackQuery) -> None:
             await callback.answer("🗑️ Товар удален", show_alert=True)
 
     # Return to list on the same page
-    callback.data = f"fridge_list:{page}"
-    await show_fridge_list(callback)
+    # Create a new callback query with updated data
+    from types import SimpleNamespace
+    new_callback = SimpleNamespace()
+    new_callback.data = f"fridge_list:{page}"
+    new_callback.from_user = callback.from_user
+    new_callback.message = callback.message
+    new_callback.answer = callback.answer
+    await show_fridge_list(new_callback)
 
