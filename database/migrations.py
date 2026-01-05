@@ -109,6 +109,16 @@ def _run_sqlite_migrations():
                 ]
             )
 
+        # Add auth field to users
+        if _table_exists(cursor, "users"):
+            _ensure_columns(
+                cursor,
+                "users",
+                [
+                    ("is_verified", "BOOLEAN DEFAULT 0"),
+                ]
+            )
+
         conn.commit()
     finally:
         conn.close()

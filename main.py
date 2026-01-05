@@ -39,6 +39,10 @@ async def main():
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
 
+    # Register Middleware
+    from handlers.auth import AuthMiddleware
+    dp.update.middleware(AuthMiddleware())
+
     # Register Routers
     # IMPORTANT: shopping.router must be before receipt.router
     # to handle photos in scanning_labels state first

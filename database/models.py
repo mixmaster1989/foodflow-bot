@@ -21,6 +21,7 @@ class User(Base):
     id = Column(BigInteger, primary_key=True)  # Telegram ID
     username = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_verified = Column(Boolean, default=False)  # User auth status
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
