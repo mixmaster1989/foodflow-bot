@@ -9,7 +9,10 @@ import logging
 import math
 from datetime import datetime
 
-from aiogram import F, Router, types
+
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram import Bot, Router, F, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select, or_
 from sqlalchemy.orm import selectinload
@@ -17,7 +20,7 @@ from sqlalchemy.orm import selectinload
 from database.base import get_db
 from database.models import ConsumptionLog, Product, Receipt, UserSettings
 from services.consultant import ConsultantService
-from sqlalchemy import select
+import io
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -26,13 +29,16 @@ PAGE_SIZE: int = 10
 
 # --- Level 2.1: Summary ---
 @router.callback_query(F.data == "menu_fridge")
-async def show_fridge_summary(callback: types.CallbackQuery) -> None:
+async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext = None) -> None:
     """Show fridge summary with total items and recently added products.
 
     Args:
         callback: Telegram callback query
 
     """
+    if state:
+        await state.clear() # Clear any pending states when entering main view logic
+        
     user_id = callback.from_user.id
 
     async for session in get_db():
@@ -58,10 +64,11 @@ async def show_fridge_summary(callback: types.CallbackQuery) -> None:
         latest_products = (await session.execute(latest_stmt)).scalars().all()
 
     builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Добавить еду", callback_data="fridge_add_choice")
     builder.button(text="📋 Список продуктов", callback_data="fridge_list:0")
     builder.button(text="🔍 Поиск", callback_data="fridge_search") # Placeholder
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    builder.adjust(1, 2)
+    builder.adjust(1, 2, 1)
 
     latest_text = "\n".join([f"▫️ {p.name}" for p in latest_products]) if latest_products else "Пусто"
 
@@ -249,7 +256,7 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
         builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
-        builder.button(text="🤖 Совет AI", callback_data=f"fridge_advice:{product.id}:{page}")
+        # builder.button(text="🤖 Совет AI", callback_data=f"fridge_advice:{product.id}:{page}")
         builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
         builder.adjust(1)
 
@@ -479,8 +486,175 @@ async def fridge_advice_handler(callback: types.CallbackQuery, state: types.Mess
         builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
         builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
         # Remove AI button to prevent spam or keep it to refresh? Keep it.
-        builder.button(text="🔄 Обновить совет", callback_data=f"fridge_advice:{product.id}:{page}")
+        # builder.button(text="🔄 Обновить совет", callback_data=f"fridge_advice:{product.id}:{page}")
         builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
         builder.adjust(1)
         
+
         await callback.message.edit_text(original_text + advice_text, parse_mode="HTML", reply_markup=builder.as_markup())
+
+
+# --- Level 2.4: Add Food Logic ---
+
+class FridgeStates(StatesGroup):
+    waiting_for_add_choice = State() # Not strictly needed if using callback modes
+    waiting_for_receipt_scan = State()
+    waiting_for_label_photo = State()
+    waiting_for_dish_photo = State()
+
+
+@router.callback_query(F.data == "fridge_add_choice")
+async def fridge_add_choice(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show options for adding food."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📄 Чек", callback_data="fridge_add:receipt")
+    builder.button(text="🏷️ Этикетка/Продукт", callback_data="fridge_add:label")
+    builder.button(text="🥘 Готовое блюдо", callback_data="fridge_add:dish")
+    builder.button(text="🔙 Назад", callback_data="menu_fridge")
+    builder.adjust(1)
+    
+    await callback.message.edit_text(
+        "➕ <b>Добавить еду в холодильник</b>\n\n"
+        "Выбери способ добавления:",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("fridge_add:"))
+async def fridge_add_mode_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+    mode = callback.data.split(":")[1]
+    
+    if mode == "receipt":
+        await state.set_state(FridgeStates.waiting_for_receipt_scan)
+        text = "📄 <b>Сканирование чека</b>\n\nПришли фото чека, и я добавлю все продукты."
+    elif mode == "label":
+        await state.set_state(FridgeStates.waiting_for_label_photo)
+        text = "🏷️ <b>Добавление продукта</b>\n\nСфотографируй этикетку или сам продукт (яблоко, молоко и т.д.)."
+    elif mode == "dish":
+        await state.set_state(FridgeStates.waiting_for_dish_photo)
+        text = "🥘 <b>Готовое блюдо</b>\n\nСфотографируй блюдо, которое хочешь сохранить."
+        
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="fridge_add_choice")
+    
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+# --- Handlers for Photo Inputs ---
+
+@router.message(FridgeStates.waiting_for_receipt_scan, F.photo)
+async def process_fridge_receipt(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    """Delegate to existing receipt processing logic."""
+    from handlers.receipt import _process_receipt_flow
+    await state.clear() # Clear state before processing to avoid conflicts
+    status_msg = await message.answer("⏳ Анализирую чек...")
+    await _process_receipt_flow(message, bot, status_msg, message, None)
+
+
+@router.message(FridgeStates.waiting_for_label_photo, F.photo)
+async def process_fridge_label(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    status_msg = await message.answer("⏳ Распознаю продукт...")
+    
+    try:
+        photo = message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_bytes = io.BytesIO()
+        await bot.download_file(file_info.file_path, photo_bytes)
+
+        from services.ai import AIService
+        product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
+        
+        if not product_data or not product_data.get("name"):
+            raise ValueError("Не удалось распознать. Попробуй еще раз.")
+
+        user_id = message.from_user.id
+        
+        # Save Product
+        async for session in get_db():
+            product = Product(
+                user_id=user_id,
+                source="manual_label",
+                name=product_data.get("name"),
+                category="Manual",
+                calories=float(product_data.get("calories", 0)),
+                protein=float(product_data.get("protein", 0)),
+                fat=float(product_data.get("fat", 0)),
+                carbs=float(product_data.get("carbs", 0)),
+                price=0.0,
+                quantity=1.0
+            )
+            session.add(product)
+            await session.commit()
+            
+        await state.clear()
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="➕ Добавить еще", callback_data="fridge_add:label")
+        builder.button(text="🔙 В холодильник", callback_data="menu_fridge")
+        builder.adjust(1)
+
+        await status_msg.edit_text(
+            f"✅ <b>Добавлено:</b> {product_data['name']}\n"
+            f"🔥 {product_data.get('calories')} ккал",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Ошибка: {e}")
+
+
+@router.message(FridgeStates.waiting_for_dish_photo, F.photo)
+async def process_fridge_dish(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    status_msg = await message.answer("⏳ Анализирую блюдо...")
+
+    try:
+        photo = message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_bytes = io.BytesIO()
+        await bot.download_file(file_info.file_path, photo_bytes)
+
+        from services.ocr import OCRService # Or use shared AI service if needed
+        # Use simpler AI recognition or reused logic
+        from services.ai import AIService
+        
+        # Using recognize_product_from_image as it fits "Dish" too (it asks for name and macros)
+        product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
+        
+        if not product_data or not product_data.get("name"):
+            raise ValueError("Не удалось распознать блюдо.")
+
+        user_id = message.from_user.id
+        
+        # Save as Product (Dish)
+        async for session in get_db():
+            product = Product(
+                user_id=user_id,
+                source="manual_dish",
+                name=product_data.get("name"),
+                category="Dish",
+                calories=float(product_data.get("calories", 0)),
+                protein=float(product_data.get("protein", 0)),
+                fat=float(product_data.get("fat", 0)),
+                carbs=float(product_data.get("carbs", 0)),
+                price=0.0,
+                quantity=1.0 # One serving
+            )
+            session.add(product)
+            await session.commit()
+
+        await state.clear()
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="➕ Добавить еще", callback_data="fridge_add:dish")
+        builder.button(text="🔙 В холодильник", callback_data="menu_fridge")
+        builder.adjust(1)
+        
+        await status_msg.edit_text(
+            f"✅ <b>Готовое блюдо добавлено:</b>\n{product_data['name']}\n"
+            f"🔥 {product_data.get('calories')} ккал",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Ошибка: {e}")

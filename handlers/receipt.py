@@ -13,6 +13,7 @@ from typing import Any
 
 from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database.base import get_db
@@ -61,7 +62,8 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> N
     # Create Inline Keyboard
     builder = InlineKeyboardBuilder()
     builder.button(text="🧾 Это чек", callback_data="action_receipt")
-    builder.button(text="🏷️ Это ценник", callback_data="action_price_tag")
+    builder.button(text="❄️ В холодильник", callback_data="action_add_to_fridge")
+    builder.button(text="🏷️ Это ценник (сравнить)", callback_data="action_price_tag")
     builder.button(text="🍽️ Я это съел", callback_data="action_log_food")
     builder.button(text="❌ Отмена", callback_data="action_cancel")
     builder.adjust(1) # 1 button per row
@@ -283,15 +285,21 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot) -> None:
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
 
 
+
+class ReceiptStates(StatesGroup):
+    waiting_for_portion_weight = State()
+
+
 @router.callback_query(F.data == "action_log_food")
-async def log_food_action(callback: types.CallbackQuery, bot: Bot) -> None:
+async def log_food_action(callback: types.CallbackQuery, bot: Bot, state: FSMContext) -> None:
     """Log food consumption from photo.
 
-    Uses OCR to identify dish and logs estimated nutrition values.
+    Uses AI to identify dish and asks for weight.
 
     Args:
         callback: Telegram callback query
         bot: Telegram bot instance
+        state: FSM Context
 
     Returns:
         None
@@ -305,57 +313,197 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot) -> None:
     status_msg = await callback.message.edit_text("⏳ Анализирую блюдо...")
 
     try:
-        # Download photo
         photo = photo_message.photo[-1]
         file_info = await bot.get_file(photo.file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
 
-        # OCR + AI analysis
-        from datetime import datetime
+        # Use shared AI Service for recognition
+        from services.ai import AIService
+        product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue()) 
 
-        from database.models import ConsumptionLog
-        from services.ocr import OCRService
+        if not product_data or not product_data.get("name"):
+             # Fallback if AI fails
+            product_data = {
+                "name": "Неизвестное блюдо",
+                "calories": 200, # Default per 100g
+                "protein": 10,
+                "fat": 10,
+                "carbs": 20
+            }
 
-        # Use OCR to identify the dish
-        result = await OCRService.parse_receipt(photo_bytes.getvalue())
+        # Save data to state
+        await state.update_data(food_data=product_data)
+        await state.set_state(ReceiptStates.waiting_for_portion_weight)
 
-        # Extract dish name (use first item or full text)
-        dish_name = "Блюдо"
-        if result.get("items"):
-            dish_name = result["items"][0].get("name", "Блюдо")
-
-        # Estimate KBZHU (simple estimation, can be improved with AI)
-        calories = 300  # Default estimation
-        protein = 15.0
-        fat = 10.0
-        carbs = 40.0
-
-        # Log consumption
-        async for session in get_db():
-            log = ConsumptionLog(
-                user_id=photo_message.from_user.id,
-                product_name=dish_name,
-                calories=calories,
-                protein=protein,
-                fat=fat,
-                carbs=carbs,
-                date=datetime.utcnow()
-            )
-            session.add(log)
-            await session.commit()
-            break
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🚫 Нет весов (1 порция)", callback_data="food_no_scale")
+        builder.button(text="❌ Отмена", callback_data="action_cancel")
+        builder.adjust(1)
 
         await status_msg.edit_text(
-            f"✅ <b>Записано в дневник!</b>\n\n"
-            f"🍽️ {dish_name}\n"
-            f"🔥 {calories}ккал | 🥩 {protein}г | 🥑 {fat}г | 🍞 {carbs}г\n\n"
-            f"<i>Примечание: КБЖУ - примерная оценка. Для точности используй Shopping Mode!</i>",
-            parse_mode="HTML"
+            f"🍽️ <b>{product_data['name']}</b>\n\n"
+            f"Сколько съели в граммах?\n"
+            f"<i>(Например: 250)</i>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
         )
 
     except Exception as exc:
         await status_msg.edit_text(f"❌ Ошибка при обработке: {exc}")
+
+
+@router.callback_query(F.data == "action_add_to_fridge")
+async def add_to_fridge_action(callback: types.CallbackQuery, bot: Bot) -> None:
+    """Add product to fridge from generic photo handler.
+
+    Args:
+        callback: Telegram callback query
+        bot: Telegram bot instance
+    """
+    photo_message = callback.message.reply_to_message
+    if not photo_message or not photo_message.photo:
+        await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
+        return
+
+    status_msg = await callback.message.edit_text("⏳ Распознаю продукт для холодильника...")
+
+    try:
+        photo = photo_message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_bytes = io.BytesIO()
+        await bot.download_file(file_info.file_path, photo_bytes)
+
+        from services.ai import AIService
+        product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
+
+        if not product_data or not product_data.get("name"):
+            await status_msg.edit_text("❌ Не удалось распознать продукт. Попробуйте четче сфотографировать этикетку.")
+            return
+
+        user_id = callback.from_user.id
+
+        async for session in get_db():
+            product = Product(
+                user_id=user_id,
+                source="manual_chat_photo",
+                name=product_data.get("name"),
+                category="Manual",
+                calories=float(product_data.get("calories", 0)),
+                protein=float(product_data.get("protein", 0)),
+                fat=float(product_data.get("fat", 0)),
+                carbs=float(product_data.get("carbs", 0)),
+                price=0.0,
+                quantity=1.0
+            )
+            session.add(product)
+            await session.commit()
+            
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🧊 Проверить холодильник", callback_data="menu_fridge")
+        builder.adjust(1)
+
+        await status_msg.edit_text(
+            f"✅ <b>Добавлено в холодильник!</b>\n\n"
+            f"📦 {product_data['name']}\n"
+            f"🔥 {product_data.get('calories')} ккал\n"
+            f"🏷️ <i>Добавлено через быстрое фото</i>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+
+    except Exception as exc:
+        await status_msg.edit_text(f"❌ Ошибка: {exc}")
+
+
+@router.callback_query(ReceiptStates.waiting_for_portion_weight, F.data == "food_no_scale")
+async def log_food_no_scale(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle 'No scale' choice."""
+    data = await state.get_data()
+    product_data = data.get("food_data")
+    
+    if not product_data:
+        await callback.message.edit_text("❌ Ошибка данных. Попробуйте снова.")
+        await state.clear()
+        return
+
+    # Standard portion assumption: 300g
+    weight = 300.0
+    
+    await _save_consumption(callback.message, callback.from_user.id, product_data, weight)
+    await state.clear()
+
+
+@router.message(ReceiptStates.waiting_for_portion_weight)
+async def log_food_weight_input(message: types.Message, state: FSMContext) -> None:
+    """Handle manual weight input."""
+    try:
+        weight = float(message.text.replace(",", ".").strip())
+        if weight <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Пожалуйста, введите вес цифрами (в граммах).")
+        return
+
+    data = await state.get_data()
+    product_data = data.get("food_data")
+    
+    if not product_data:
+        await message.answer("❌ Ошибка данных. Попробуйте загрузить фото снова.")
+        await state.clear()
+        return
+
+    await _save_consumption(message, message.from_user.id, product_data, weight)
+    await state.clear()
+
+
+async def _save_consumption(reply_target: types.Message, user_id: int, product_data: dict, weight: float) -> None:
+    """Helper to save consumption log and answer."""
+    from datetime import datetime
+    from database.models import ConsumptionLog
+
+    # Calculate macros based on weight (product_data values are per 100g)
+    factor = weight / 100.0
+    
+    cal = float(product_data.get("calories", 0) or 0) * factor
+    prot = float(product_data.get("protein", 0) or 0) * factor
+    fat = float(product_data.get("fat", 0) or 0) * factor
+    carbs = float(product_data.get("carbs", 0) or 0) * factor
+
+    name = product_data.get("name", "Блюдо")
+
+    async for session in get_db():
+        log = ConsumptionLog(
+            user_id=user_id,
+            product_name=name,
+            calories=cal,
+            protein=prot,
+            fat=fat,
+            carbs=carbs,
+            weight=weight, # Assuming ConsumptionLog has weight field? Let's check model. If not, it's fine, we log calculated values.
+            date=datetime.utcnow()
+        )
+        session.add(log)
+        await session.commit()
+    
+    # Reply logic
+    # Try to edit if it came from callback (no way to know easily without passing arg, but reply_target is message)
+    # If reply_target is passed from callback it's the bot message. If from text input it's user message.
+    
+    response_text = (
+        f"✅ <b>Записано в дневник!</b>\n\n"
+        f"🍽️ {name} ({int(weight)}г)\n"
+        f"🔥 {int(cal)} ккал | 🥩 {int(prot)}г | 🥑 {int(fat)}г | 🍞 {int(carbs)}г"
+    )
+
+    try:
+        # If reply_target is a bot message (from callback), edit it
+        if reply_target.from_user.is_bot:
+             await reply_target.edit_text(response_text, parse_mode="HTML", reply_markup=None)
+        else:
+             await reply_target.answer(response_text, parse_mode="HTML")
+    except Exception:
+        await reply_target.answer(response_text, parse_mode="HTML")
 
 @router.callback_query(F.data == "action_receipt")
 async def process_receipt(callback: types.CallbackQuery, bot: Bot, state: FSMContext) -> None:

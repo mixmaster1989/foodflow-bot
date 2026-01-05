@@ -371,157 +371,6 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-async def _recognize_product_from_photo(image_bytes: bytes) -> dict[str, Any] | None:
-    """Recognize product from photo and get average KBZHU.
-
-    First tries to parse as label, if fails - recognizes as product photo
-    and gets average nutrition values.
-
-    Args:
-        image_bytes: Raw image bytes
-
-    Returns:
-        Dictionary with product info: name, brand, weight, calories, protein, fat, carbs
-        Or None if recognition fails
-
-    """
-    import base64
-    import json
-    import re
-
-    import aiohttp
-
-    from config import settings
-
-    # First try: parse as label (has KBZHU on it)
-    label_data = await LabelOCRService.parse_label(image_bytes)
-    if label_data and label_data.get("name") and label_data.get("calories"):
-        return label_data
-
-    # Second try: recognize product and get average KBZHU
-    base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
-    prompt = (
-        "Ты видишь фото продукта питания. Определи что это за продукт и верни усредненные значения КБЖУ.\n\n"
-        "Верни ТОЛЬКО JSON объект (без markdown) в формате:\n"
-        '{"name": "Название продукта на русском", '
-        '"brand": null, '
-        '"weight": null, '
-        '"calories": 0, '
-        '"protein": 0.0, '
-        '"fat": 0.0, '
-        '"carbs": 0.0}\n\n'
-        "calories, protein, fat, carbs - это усредненные значения на 100г для этого типа продукта.\n"
-        "Например, для яблока: calories=52, protein=0.3, fat=0.2, carbs=14.\n"
-        "Для молока 3.2%: calories=64, protein=3.0, fat=3.2, carbs=4.7.\n"
-        "Если не можешь определить - верни null для всех полей."
-    )
-
-    models = [
-        "qwen/qwen2.5-vl-32b-instruct:free",
-        "google/gemini-2.5-flash-lite-preview-09-2025",  # paid earlier to avoid long stalls
-        "google/gemini-2.0-flash-exp:free",
-        "openai/gpt-4.1-mini",
-    ]
-
-    headers = {
-        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://foodflow.app",
-        "X-Title": "FoodFlow Bot",
-    }
-
-    import asyncio
-
-    RETRY_ATTEMPTS = 3
-    RETRY_DELAY = 1.0  # seconds
-
-    for model in models:
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                        },
-                    ],
-                }
-            ],
-        }
-
-        for attempt in range(RETRY_ATTEMPTS):
-            async with aiohttp.ClientSession() as session:
-                try:
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=20,
-                    ) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            content = result["choices"][0]["message"]["content"]
-                            # Clean markdown
-                            content = content.replace("```json", "").replace("```", "").strip()
-                            # Extract JSON
-                            json_match = re.search(r"\{.*\}", content, re.DOTALL)
-                            if json_match:
-                                content = json_match.group(0)
-                            data = json.loads(content)
-                            if data.get("name"):
-                                return data
-                        else:
-                            if attempt < RETRY_ATTEMPTS - 1:
-                                await asyncio.sleep(RETRY_DELAY)
-                                continue
-                except Exception as e:
-                    logger.error(f"Error recognizing product ({model}) attempt {attempt+1}/3: {e}")
-                    if attempt < RETRY_ATTEMPTS - 1:
-                        await asyncio.sleep(RETRY_DELAY)
-                        continue
-
-    return None
-
-
-@router.callback_query(F.data == "onboarding_start_fridge")
-async def start_fridge_initialization(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start fridge initialization by scanning product labels.
-
-    Args:
-        callback: Telegram callback query
-        state: FSM context
-
-    Returns:
-        None
-
-    """
-    await state.set_state(OnboardingStates.initializing_fridge)
-
-    text = (
-        "📦 <b>Инициализация холодильника</b>\n\n"
-        "Отсканируй этикетки продуктов или просто сфотографируй продукты, которые есть у тебя дома.\n"
-        "Я распознаю название и добавлю усредненные КБЖУ.\n\n"
-        "Можешь отсканировать несколько продуктов подряд.\n"
-        "Когда закончишь - нажми «✅ Готово»."
-    )
-
-    builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Готово", callback_data="onboarding_finish_fridge")
-    builder.button(text="⏭️ Пропустить", callback_data="onboarding_skip_fridge")
-    builder.adjust(1)
-
-    try:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    except Exception:
-        await callback.message.delete()
-        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer()
-
-
 @router.message(OnboardingStates.initializing_fridge, F.photo)
 async def process_fridge_product_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
     """Process product photo during fridge initialization.
@@ -545,8 +394,10 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
 
-        # Try to recognize product (label or photo)
-        product_data = await _recognize_product_from_photo(photo_bytes.getvalue())
+        # Try to recognize product (label or photo) using Shared AI Service
+        from services.ai import AIService
+        product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
+        
         if not product_data or not product_data.get("name"):
             raise ValueError("Не удалось распознать продукт. Попробуй сфотографировать этикетку или продукт более четко.")
 

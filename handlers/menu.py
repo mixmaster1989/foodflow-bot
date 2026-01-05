@@ -65,7 +65,7 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
 
     # Row 4: Tracking
     builder.button(text="⚖️ Вес", callback_data="menu_weight")
-    builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
+    # builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
 
     # Row 5: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
