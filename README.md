@@ -62,12 +62,14 @@
 - 🤝 **Receipt Matching** - Fuzzy matching with receipt items
 - ✏️ **Manual Correction** - UI for mismatched items
 
-### 5. Price Tag Processing ✅
-
-- 🏷️ **OCR Price Tags** - Extract product name, price, store, and **volume/weight**
-- 📊 **Price History** - Track price trends (📈 increased / 📉 decreased)
-- 🌐 **Real-Time Search** - Find current prices via Perplexity Sonar (considering volume)
-- 🤖 **Multi-Model AI** - Auto-fallback to paid models (Gemini, Pixtral, Qwen) if free ones fail
+### 5. Price Tag Processing (🚧 Experimental)
+ 
+ > **Note:** This feature is currently in active development and not available in the main menu yet.
+ 
+ - 🏷️ **OCR Price Tags** - Extract product name, price, store, and **volume/weight**
+ - 📊 **Price History** - Track price trends (📈 increased / 📉 decreased)
+ - 🌐 **Real-Time Search** - Find current prices via Perplexity Sonar (considering volume)
+ - 🤖 **Multi-Model AI** - Auto-fallback to paid models (Gemini, Pixtral, Qwen) if free ones fail
 
 ### 6. Product Correction ✅
 
@@ -88,6 +90,13 @@
 - ✅ **Positive Feedback** - Receive praise for healthy choices
 - 🔍 **Context-Aware** - Different recommendations for receipts, fridge, shopping list, and shopping mode
 - 🧠 **Personalized** - Considers your goals, allergies, and nutrition targets
+
+### 9. Weight Tracking ✅
+
+- ⚖️ **Daily Logging** - Easy weight input via menu or daily reminders
+- 📅 **Smart Scheduler** - Flexible daily reminders (default 9:00 AM) to keep you on track
+- 📈 **History & Progress** - View your last 5 weight entries and track progress towards your goal
+- 🎯 **Goal Integration** - Weight data syncs with your nutritional goals (Lose Weight/Gain Mass)
 
 ---
 

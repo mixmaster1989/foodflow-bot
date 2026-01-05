@@ -6,6 +6,7 @@ Contains:
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from sqlalchemy.future import select
 
 from database.base import get_db
@@ -14,6 +15,18 @@ from handlers.menu import show_main_menu
 from handlers.onboarding import start_onboarding
 
 router = Router()
+
+
+
+def get_main_keyboard() -> ReplyKeyboardMarkup:
+    """Create persistent main menu keyboard."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🏠 Главное меню")]
+        ],
+        resize_keyboard=True,
+        persistent=True
+    )
 
 
 @router.message(Command("start"))
@@ -52,5 +65,12 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             await start_onboarding(message, state)
             return
 
+    # Send a separate message to force the ReplyKeyboard to appear
+    await message.answer(
+        "Загружаю меню...", 
+        reply_markup=get_main_keyboard()
+    )
+    # Then show the visual menu (which will edit/send the photo)
     await show_main_menu(message, message.from_user.first_name)
+
 

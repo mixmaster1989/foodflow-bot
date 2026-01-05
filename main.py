@@ -18,6 +18,7 @@ from handlers import (
     shopping_list,
     stats,
     user_settings,
+    weight,
 )
 
 
@@ -51,7 +52,12 @@ async def main():
     dp.include_router(stats.router)
     dp.include_router(user_settings.router)
     dp.include_router(shopping_list.router)
+    dp.include_router(weight.router)
     dp.include_router(correction.router)
+
+    # Start reminder scheduler
+    from services.scheduler import start_scheduler
+    start_scheduler(bot)
 
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

@@ -11,7 +11,8 @@ from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
+from sqlalchemy.orm import selectinload
 
 from database.base import get_db
 from database.models import ConsumptionLog, Product, Receipt, UserSettings
@@ -39,8 +40,8 @@ async def show_fridge_summary(callback: types.CallbackQuery) -> None:
         total_items = await session.scalar(
             select(func.count())
             .select_from(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
+            .outerjoin(Receipt)
+            .where(or_(Receipt.user_id == user_id, Product.user_id == user_id))
         ) or 0
 
         # Get expiring items (mock logic for now, assuming 7 days from receipt date if not set)
@@ -49,8 +50,8 @@ async def show_fridge_summary(callback: types.CallbackQuery) -> None:
 
         latest_stmt = (
             select(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
+            .outerjoin(Receipt)
+            .where(or_(Receipt.user_id == user_id, Product.user_id == user_id))
             .order_by(Product.id.desc())
             .limit(3)
         )
@@ -139,8 +140,8 @@ async def show_fridge_list(callback: types.CallbackQuery) -> None:
         total_items = await session.scalar(
             select(func.count())
             .select_from(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
+            .outerjoin(Receipt)
+            .where(or_(Receipt.user_id == user_id, Product.user_id == user_id))
         ) or 0
 
         if total_items == 0:
@@ -152,8 +153,8 @@ async def show_fridge_list(callback: types.CallbackQuery) -> None:
 
         stmt = (
             select(Product)
-            .join(Receipt)
-            .where(Receipt.user_id == user_id)
+            .outerjoin(Receipt)
+            .where(or_(Receipt.user_id == user_id, Product.user_id == user_id))
             .order_by(Product.id.desc())
             .offset(page * PAGE_SIZE)
             .limit(PAGE_SIZE)
@@ -217,8 +218,14 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
         return
 
     async for session in get_db():
-        product = await session.get(Product, product_id)
-        if not product:
+        from sqlalchemy.orm import selectinload
+        product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
+        
+        # Safe access to relation
+        owner_id = product.user_id
+        if product.receipt:
+             owner_id = product.receipt.user_id
+        if not product or owner_id != callback.from_user.id:
             await callback.answer("Товар не найден", show_alert=True)
             # Refresh list with saved page
             from types import SimpleNamespace
@@ -239,31 +246,10 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
             f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}"
         )
 
-        # Get consultant recommendations
-        settings_stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
-        settings_result = await session.execute(settings_stmt)
-        settings = settings_result.scalar_one_or_none()
-
-        if settings and settings.is_initialized:
-            recommendations = await ConsultantService.analyze_product(
-                product, settings, context="fridge"
-            )
-            warnings = recommendations.get("warnings", [])
-            recs = recommendations.get("recommendations", [])
-            missing = recommendations.get("missing", [])
-
-            if warnings or recs or missing:
-                text += "\n\n💡 <b>Рекомендации:</b>\n"
-                if warnings:
-                    text += "\n".join(warnings) + "\n"
-                if recs:
-                    text += "\n".join(recs) + "\n"
-                if missing:
-                    text += "\n".join(missing)
-
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
         builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
+        builder.button(text="🤖 Совет AI", callback_data=f"fridge_advice:{product.id}:{page}")
         builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
         builder.adjust(1)
 
@@ -286,8 +272,13 @@ async def eat_product(callback: types.CallbackQuery) -> None:
         return
 
     async for session in get_db():
-        product = await session.get(Product, product_id)
-        if not product:
+        product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
+        
+        owner_id = product.user_id
+        if product and product.receipt:
+             owner_id = product.receipt.user_id
+
+        if not product or owner_id != callback.from_user.id:
             await callback.answer("Товар не найден", show_alert=True)
             return
 
@@ -353,11 +344,18 @@ async def delete_product(callback: types.CallbackQuery) -> None:
         return
 
     async for session in get_db():
-        product = await session.get(Product, product_id)
-        if product:
+        product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
+        
+        owner_id = product.user_id
+        if product and product.receipt:
+             owner_id = product.receipt.user_id
+
+        if product and owner_id == callback.from_user.id:
             await session.delete(product)
             await session.commit()
             await callback.answer("🗑️ Товар удален", show_alert=True)
+        else:
+            await callback.answer("Товар не найден", show_alert=True)
 
     # Return to list on the same page
     # Create a new callback query with updated data
@@ -369,3 +367,120 @@ async def delete_product(callback: types.CallbackQuery) -> None:
     new_callback.answer = callback.answer
     await show_fridge_list(new_callback)
 
+
+@router.callback_query(F.data.startswith("fridge_advice:"))
+async def fridge_advice_handler(callback: types.CallbackQuery, state: types.Message = None) -> None:
+    """Generate and show AI advice for a specific product.
+    
+    Callback data: "fridge_advice:product_id:page"
+    """
+    try:
+        parts = callback.data.split(":")
+        product_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except (IndexError, ValueError):
+        await callback.answer("Ошибка данных", show_alert=True)
+        return
+
+    # Notify user we are thinking
+    await callback.answer("🤖 Думаю... (3-5 сек)", show_alert=True) # Alert to show interaction immediately
+    
+    # Or edit text to show loading state? 
+    # Better to keep the current view and just append advice or send a new message?
+    # User expects advice *for this item*. 
+    # Let's send a temporary "Typing..." action or just edit the message text with "Loading..."
+    
+    async for session in get_db():
+        from sqlalchemy.orm import selectinload
+        product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
+        
+        # Safe access
+        owner_id = product.user_id
+        if product and product.receipt:
+             owner_id = product.receipt.user_id
+
+        if not product or owner_id != callback.from_user.id:
+            await callback.answer("Товар не найден", show_alert=True)
+            return
+
+        # Prepare context (User Settings + Snapshot)
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings_result = await session.execute(settings_stmt)
+        settings = settings_result.scalar_one_or_none()
+        
+        if not settings or not settings.is_initialized:
+            await callback.answer("Сначала пройди онбординг (Настройки)", show_alert=True)
+            return
+
+        # Snapshot Logic (same as before)
+        totals_row = await session.execute(
+            select(
+                func.sum(Product.calories),
+                func.sum(Product.protein),
+                func.sum(Product.fat),
+                func.sum(Product.carbs),
+            ).where(or_(Product.user_id == callback.from_user.id, Receipt.user_id == callback.from_user.id))
+        )
+        totals = totals_row.fetchone() or (0, 0, 0, 0)
+        names_row = await session.execute(
+            select(Product.name)
+            .outerjoin(Receipt)
+            .where(or_(Product.user_id == callback.from_user.id, Receipt.user_id == callback.from_user.id))
+            .order_by(Product.id.desc())
+            .limit(10) # More items for context
+        )
+        fridge_snapshot = {
+            "totals": {
+                "calories": totals[0] or 0,
+                "protein": totals[1] or 0,
+                "fat": totals[2] or 0,
+                "carbs": totals[3] or 0,
+            },
+            "items": names_row.scalars().all(),
+        }
+
+        # Call AI
+        # We can edit the message to say "Thinking..."
+        # But since we want to KEEP the product view and just SHOW advice, maybe an alert is enough?
+        # NO, user wants to read it. Alert is too small.
+        # Let's OPEN A NEW MESSAGE or EDIT current text?
+        # Editing current text is best practice.
+        
+        original_text = (
+            f"📦 <b>{product.name}</b>\n\n"
+            f"💰 Цена: {product.price}₽\n"
+            f"⚖️ Кол-во: {product.quantity} шт\n"
+            f"🏷️ Категория: {product.category or 'Нет'}\n\n"
+            f"📊 <b>КБЖУ (на 100г):</b>\n"
+            f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}"
+        )
+        
+        await callback.message.edit_text(original_text + "\n\n⏳ <i>Консультант анализирует...</i>", parse_mode="HTML", reply_markup=callback.message.reply_markup)
+        
+        recommendations = await ConsultantService.analyze_product(
+            product, settings, context="fridge", fridge_snapshot=fridge_snapshot
+        )
+        
+        # Format Advice
+        advice_text = ""
+        warnings = recommendations.get("warnings", [])
+        recs = recommendations.get("recommendations", [])
+        
+        if warnings:
+            advice_text += "\n\n⚠️ <b>Важно:</b>\n" + "\n".join([f"• {w}" for w in warnings[:2]]) # Limit to 2
+        if recs:
+            advice_text += "\n\n💡 <b>Совет:</b>\n" + "\n".join([f"• {r}" for r in recs[:2]]) # Limit to 2
+            
+        if not advice_text:
+            advice_text = "\n\n✅ Отличный продукт, вписывается в рацион."
+
+        # Final Update
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🍽️ Съесть (1 шт)", callback_data=f"fridge_eat:{product.id}:{page}")
+        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
+        # Remove AI button to prevent spam or keep it to refresh? Keep it.
+        builder.button(text="🔄 Обновить совет", callback_data=f"fridge_advice:{product.id}:{page}")
+        builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
+        builder.adjust(1)
+        
+        await callback.message.edit_text(original_text + advice_text, parse_mode="HTML", reply_markup=builder.as_markup())

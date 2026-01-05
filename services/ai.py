@@ -41,25 +41,16 @@ class AIService:
     ]
 
     @classmethod
-    async def generate_recipes(cls, ingredients: list[str], category: str) -> dict[str, Any] | None:
+    async def generate_recipes(cls, ingredients: list[str], category: str, user_settings: Any = None) -> dict[str, Any] | None:
         """Generate recipes based on available ingredients and category.
 
         Args:
             ingredients: List of available ingredient names
             category: Recipe category (Salads, Main, Dessert, Breakfast)
+            user_settings: User settings model (optional)
 
         Returns:
-            Dictionary with 'recipes' key containing list of recipe dicts, or None if:
-            - No ingredients provided
-            - All models fail
-
-        Raises:
-            None (returns None on failure instead of raising)
-
-        Note:
-            Each recipe contains: title, description, calories, ingredients, steps
-            All text in Russian language
-            Tries models in order until one succeeds
+            Dictionary with 'recipes' key containing list of recipe dicts, or None.
 
         """
         if not ingredients:
@@ -67,9 +58,28 @@ class AIService:
 
         ingredients_str = ", ".join(ingredients)
 
+        context_str = ""
+        if user_settings:
+            goal_map = {
+                "lose_weight": "похудение (низкокалорийные)",
+                "maintain": "поддержание веса (сбалансированные)",
+                "gain_mass": "набор массы (высокобелковые)",
+                "healthy": "здоровое питание"
+            }
+            goal_text = goal_map.get(user_settings.goal, "здоровое питание")
+            allergies = user_settings.allergies if user_settings.allergies else "нет"
+            
+            context_str = (
+                f"USER PROFILE:\n"
+                f"- Goal: {goal_text}\n"
+                f"- Allergies/Restrictions: {allergies}\n"
+                f"IMPORTANT: Adjust recipes to fit this goal. If goal is weight loss, minimize fat/sugar. If allergies exist, EXCLUDE those ingredients.\n"
+            )
+
         prompt = (
             f"I have these ingredients: {ingredients_str}. "
-            f"Suggest 3 simple {category.lower()} recipes (e.g., {category.lower()}) using mostly these ingredients. "
+            f"Suggest 3 simple {category.lower()} recipes using mostly these ingredients. "
+            f"{context_str}"
             "For each recipe, provide a title, a short description, estimated calories per serving, a list of ingredients with quantities, and step‑by‑step preparation instructions. "
             "Respond ONLY in Russian language. "
             "Return ONLY a JSON object with this format: "

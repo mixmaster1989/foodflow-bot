@@ -8,9 +8,17 @@ Contains:
 - menu_settings_handler: Show settings menu
 """
 from aiogram import F, Router, types
+from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
+
+
+
+@router.message(F.text == "🏠 Главное меню")
+async def menu_button_handler(message: types.Message) -> None:
+    """Handle persistent 'Main Menu' button click."""
+    await show_main_menu(message, message.from_user.first_name)
 
 
 @router.callback_query(F.data == "main_menu")
@@ -44,8 +52,8 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     """
     builder = InlineKeyboardBuilder()
 
-    # Row 1: Shopping Mode (Prominent)
-    builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
+    # Row 1: Shopping Mode (Prominent) - HIDDEN FOR MVP
+    # builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
 
     # Row 2: Core Features
     builder.button(text="📸 Загрузить чек", callback_data="menu_check")
@@ -55,14 +63,16 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
     builder.button(text="📊 Статистика", callback_data="menu_stats")
 
-    # Row 4: Shopping List
+    # Row 4: Tracking
+    builder.button(text="⚖️ Вес", callback_data="menu_weight")
     builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
 
     # Row 5: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
 
-    builder.adjust(1, 2, 2, 1, 2)
+    # Adjusted layout (removed first row of 1 button)
+    builder.adjust(2, 2, 2, 2)
 
     # Image path
     photo_path = types.FSInputFile("assets/main_menu.png")
@@ -91,19 +101,24 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
         )
 
 @router.callback_query(F.data == "menu_check")
-async def menu_check_handler(callback: types.CallbackQuery) -> None:
+async def menu_check_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Show receipt upload instructions.
 
     Displays information about how to upload receipts
-    and what the bot can recognize.
+    and what the bot can recognize. Set state to waiting for receipt.
 
     Args:
         callback: Telegram callback query
+        state: FSM Context
 
     Returns:
         None
 
     """
+    from handlers.shopping import ShoppingMode
+    
+    await state.set_state(ShoppingMode.waiting_for_receipt)
+    
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 

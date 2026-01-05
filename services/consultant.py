@@ -35,7 +35,11 @@ class ConsultantService:
 
     @classmethod
     async def analyze_product(
-        cls, product: Product, user_settings: UserSettings, context: str = "general"
+        cls,
+        product: Product,
+        user_settings: UserSettings,
+        context: str = "general",
+        fridge_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Analyze a single product and provide recommendations.
 
@@ -56,7 +60,9 @@ class ConsultantService:
             return {"warnings": [], "recommendations": [], "missing": []}
 
         try:
-            result = await cls._generate_ai_recommendation(product, user_settings, context)
+            result = await cls._generate_ai_recommendation(
+                product, user_settings, context, fridge_snapshot
+            )
             if result:
                 return result
         except Exception as e:
@@ -108,7 +114,11 @@ class ConsultantService:
 
     @classmethod
     async def _generate_ai_recommendation(
-        cls, product: Product, user_settings: UserSettings, context: str
+        cls,
+        product: Product,
+        user_settings: UserSettings,
+        context: str,
+        fridge_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Generate AI-powered recommendation for a product.
 
@@ -154,9 +164,25 @@ class ConsultantService:
             else "Аллергий нет"
         )
 
+        snapshot_text = ""
+        if fridge_snapshot:
+            total = fridge_snapshot.get("totals", {})
+            items = fridge_snapshot.get("items", [])
+            snapshot_text = (
+                "\n<b>Текущее содержимое холодильника:</b>\n"
+                f"- Продуктов: {len(items)} (показаны последние)\n"
+                + ("\n".join(f"• {i}" for i in items) if items else "• Нет данных") +
+                "\n<b>Суммарно по добавленным продуктам:</b>\n"
+                f"  Калории: {total.get('calories', 0):.0f} ккал\n"
+                f"  Белки: {total.get('protein', 0):.1f} г\n"
+                f"  Жиры: {total.get('fat', 0):.1f} г\n"
+                f"  Углеводы: {total.get('carbs', 0):.1f} г\n"
+            )
+
+        # Build prompt without escaping hell: double braces for literal JSON braces
         prompt = (
-            f"Ты - персональный консультант по питанию. Проанализируй продукт и дай рекомендации.\n\n"
-            f"<b>Профиль пользователя:</b>\n"
+            "Ты - персональный консультант по питанию. Проанализируй продукт и дай рекомендации.\n\n"
+            "<b>Профиль пользователя:</b>\n"
             f"- Пол: {gender_text}\n"
             f"- Рост: {user_settings.height} см\n"
             f"- Вес: {user_settings.weight} кг\n"
@@ -167,17 +193,21 @@ class ConsultantService:
             f"- Дневная норма углеводов: {user_settings.carb_goal} г\n"
             f"- {allergies_text}\n\n"
             f"<b>Продукт:</b>\n{product_info}\n\n"
+            f"{snapshot_text + chr(10) if snapshot_text else ''}"
             f"<b>Контекст:</b> {context_text}\n\n"
-            f"Дай конкретные, полезные рекомендации на русском языке. "
-            f"Учитывай цель пользователя ({goal_text}) и его профиль. "
-            f"Если продукт не подходит для цели - предупреди. "
-            f"Если продукт полезен - похвали. "
-            f"Если чего-то не хватает в рационе - предложи.\n\n"
-            f"Верни ТОЛЬКО JSON объект в формате:\n"
-            f'{{"warnings": ["⚠️ предупреждение 1", "⚠️ предупреждение 2"], '
-            f'"recommendations": ["✅ рекомендация 1", "✅ рекомендация 2"], '
-            f'"missing": ["💡 предложение 1", "💡 предложение 2"]}}\n'
-            f"Если нет предупреждений/рекомендаций/предложений - верни пустой массив."
+            "Твоя задача: Дать КРАТКИЙ и ТОЧНЫЙ совет по МЕННО ЭТОМУ продукту.\n"
+            "1. Не перечисляй содержимое холодильника, используй его только чтобы посоветовать с чем сочетать ЭТОТ продукт.\n"
+            "2. Если КБЖУ продукта = 0 (ошибка данных), скажи об этом.\n"
+            "3. Максимум 2-3 пункта советов.\n"
+            "4. Не пиши общие фразы ('Питайтесь правильно').\n"
+            "5. Обращайся к пользователю на 'ты'."
+            "Если продукт полезен - похвали. "
+            "Если чего-то не хватает в рационе - предложи.\n\n"
+            "Верни ТОЛЬКО JSON объект в формате:\n"
+            "{{\"warnings\": [\"⚠️ предупреждение 1\", \"⚠️ предупреждение 2\"], "
+            "\"recommendations\": [\"✅ рекомендация 1\", \"✅ рекомендация 2\"], "
+            "\"missing\": [\"💡 предложение 1\", \"💡 предложение 2\"]}}\n"
+            "Если нет предупреждений/рекомендаций/предложений - верни пустой массив."
         )
 
         for model in cls.MODELS:
@@ -232,9 +262,19 @@ class ConsultantService:
                             import re
 
                             json_match = re.search(r"\{.*\}", content, re.DOTALL)
+                            import html
                             if json_match:
                                 content = json_match.group(0)
-                            return json.loads(content)
+                            
+                            parsed_json = json.loads(content)
+                            
+                            # Sanitize all strings in the JSON to be safe for HTML parse mode
+                            if isinstance(parsed_json, dict):
+                                for key in ["warnings", "recommendations", "missing"]:
+                                    if key in parsed_json and isinstance(parsed_json[key], list):
+                                        parsed_json[key] = [html.escape(str(item)) for item in parsed_json[key]]
+                            
+                            return parsed_json
                         else:
                             logger.warning(
                                 f"Consultant AI ({model}) attempt {attempt+1}/3 failed: {response.status}"

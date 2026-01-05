@@ -38,7 +38,8 @@ class Receipt(Base):
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    receipt_id = Column(Integer, ForeignKey("receipts.id"))
+    receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # direct link when no receipt
     name = Column(String, nullable=False)
     quantity = Column(Float, default=1.0)
     price = Column(Float, nullable=False)
@@ -47,7 +48,9 @@ class Product(Base):
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
+    source = Column(String, default="receipt")  # receipt | fridge_init | manual | other
     receipt = relationship("Receipt", back_populates="products")
+    user = relationship("User", backref="products")
     label_scans = relationship("LabelScan", back_populates="matched_product")
 
 class ConsumptionLog(Base):
@@ -111,10 +114,13 @@ class UserSettings(Base):
     carb_goal = Column(Integer, default=250)
     allergies = Column(String, nullable=True)  # Comma-separated list
     gender = Column(String, nullable=True)  # "male" or "female"
+    age = Column(Integer, nullable=True)  # User's age in years
     height = Column(Integer, nullable=True)  # height in cm
     weight = Column(Float, nullable=True)  # weight in kg
     goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
     is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
+    reminder_time = Column(String, default="09:00")  # HH:MM format for daily reminders
+    reminders_enabled = Column(Boolean, default=True)  # Enable/disable daily weight reminders
     user = relationship("User", backref="settings")
 
 class ShoppingListItem(Base):
@@ -148,3 +154,13 @@ class CachedRecipe(Base):
         # If you need it, uncomment the line below.
         # UniqueConstraint('user_id', 'ingredients_hash', 'title', name='uq_cached_recipe'),
     )
+
+
+class WeightLog(Base):
+    """Model for tracking user weight over time."""
+    __tablename__ = "weight_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    weight = Column(Float, nullable=False)
+    recorded_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User", backref="weight_logs")

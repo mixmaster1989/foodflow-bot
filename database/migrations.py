@@ -88,6 +88,8 @@ def _run_sqlite_migrations():
                     ("protein", "FLOAT DEFAULT 0.0"),
                     ("fat", "FLOAT DEFAULT 0.0"),
                     ("carbs", "FLOAT DEFAULT 0.0"),
+                    ("user_id", "BIGINT"),
+                    ("source", "TEXT DEFAULT 'receipt'"),
                 ]
             )
 

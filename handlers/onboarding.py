@@ -16,7 +16,7 @@ from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from database.base import get_db
 from database.models import Product, Receipt, UserSettings
@@ -35,6 +35,7 @@ class OnboardingStates(StatesGroup):
     """FSM states for onboarding flow."""
 
     waiting_for_gender = State()
+    waiting_for_age = State()  # NEW: Age input
     waiting_for_height = State()
     waiting_for_weight = State()
     waiting_for_goal = State()
@@ -97,14 +98,14 @@ async def handle_gender_selection(callback: types.CallbackQuery, state: FSMConte
     """
     gender = callback.data.split(":")[1]  # "male" or "female"
     await state.update_data(gender=gender)
-    await state.set_state(OnboardingStates.waiting_for_height)
+    await state.set_state(OnboardingStates.waiting_for_age)
 
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="onboarding_back:gender")
 
     text = (
         "✅ Пол сохранен!\n\n"
-        "2️⃣ Введите свой рост в сантиметрах (например: 175):"
+        "2️⃣ Введите свой возраст (полных лет):"
     )
 
     try:
@@ -113,6 +114,36 @@ async def handle_gender_selection(callback: types.CallbackQuery, state: FSMConte
         await callback.message.delete()
         await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
+
+
+@router.message(OnboardingStates.waiting_for_age)
+async def handle_age_input(message: types.Message, state: FSMContext) -> None:
+    """Handle age input.
+
+    Args:
+        message: Telegram message with age
+        state: FSM context
+    """
+    try:
+        age: int = int(message.text) if message.text else 0
+        if age < 14 or age > 100:
+            await message.answer("Пожалуйста, введите корректный возраст (14-100 лет):")
+            return
+
+        await state.update_data(age=age)
+        await state.set_state(OnboardingStates.waiting_for_height)
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 Назад", callback_data="onboarding_back:age")
+
+        text = (
+            "✅ Возраст сохранен!\n\n"
+            "3️⃣ Введите свой рост в сантиметрах (например: 175):"
+        )
+
+        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except ValueError:
+        await message.answer("Пожалуйста, введите целое число (возраст в годах):")
 
 
 @router.message(OnboardingStates.waiting_for_height)
@@ -141,7 +172,7 @@ async def handle_height_input(message: types.Message, state: FSMContext) -> None
 
         text = (
             "✅ Рост сохранен!\n\n"
-            "3️⃣ Введите свой вес в килограммах (например: 70.5):"
+            "4️⃣ Введите свой вес в килограммах (например: 70.5):"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -179,7 +210,7 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
 
         text = (
             "✅ Вес сохранен!\n\n"
-            "4️⃣ Выбери свою цель:"
+            "5️⃣ Выбери свою цель:"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -208,24 +239,61 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
 
+        # Calculate KBZHU using Mifflin-St Jeor formula
+        gender = data.get("gender", "male")
+        age = data.get("age", 30)
+        height = data.get("height", 170)
+        weight = data.get("weight", 70)
+        
+        # BMR calculation (Mifflin-St Jeor)
+        if gender == "male":
+            bmr = 10 * weight + 6.25 * height - 5 * age + 5
+        else:
+            bmr = 10 * weight + 6.25 * height - 5 * age - 161
+        
+        # Activity multiplier (assuming moderate activity)
+        tdee = bmr * 1.55
+        
+        # Adjust for goal
+        if goal == "lose_weight":
+            calories = int(tdee * 0.8)  # 20% deficit
+        elif goal == "gain_mass":
+            calories = int(tdee * 1.15)  # 15% surplus
+        else:
+            calories = int(tdee)
+        
+        # Macros distribution
+        protein = int(weight * 1.8)  # 1.8g per kg body weight
+        fat = int(calories * 0.25 / 9)  # 25% of calories from fat
+        carbs = int((calories - protein * 4 - fat * 9) / 4)  # Rest from carbs
+
         if settings:
-            settings.gender = data.get("gender")
-            settings.height = data.get("height")
-            settings.weight = data.get("weight")
+            settings.gender = gender
+            settings.age = age
+            settings.height = height
+            settings.weight = weight
             settings.goal = goal
+            settings.calorie_goal = calories
+            settings.protein_goal = protein
+            settings.fat_goal = fat
+            settings.carb_goal = carbs
             settings.is_initialized = True
             await session.commit()
         else:
             settings = UserSettings(
                 user_id=user_id,
-                gender=data.get("gender"),
-                height=data.get("height"),
-                weight=data.get("weight"),
+                gender=gender,
+                age=age,
+                height=height,
+                weight=weight,
                 goal=goal,
+                calorie_goal=calories,
+                protein_goal=protein,
+                fat_goal=fat,
+                carb_goal=carbs,
                 is_initialized=True,
             )
             session.add(settings)
-            await session.commit()
 
     await state.clear()
 
@@ -245,6 +313,7 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
         "🎉 <b>Отлично! Настройка завершена!</b>\n\n"
         f"📋 Твой профиль:\n"
         f"👤 Пол: {'Мужской' if data.get('gender') == 'male' else 'Женский'}\n"
+        f"🎂 Возраст: {data.get('age')} лет\n"
         f"📏 Рост: {data.get('height')} см\n"
         f"⚖️ Вес: {data.get('weight')} кг\n"
         f"🎯 Цель: {goal_text}\n\n"
@@ -350,8 +419,8 @@ async def _recognize_product_from_photo(image_bytes: bytes) -> dict[str, Any] | 
 
     models = [
         "qwen/qwen2.5-vl-32b-instruct:free",
+        "google/gemini-2.5-flash-lite-preview-09-2025",  # paid earlier to avoid long stalls
         "google/gemini-2.0-flash-exp:free",
-        "google/gemini-2.5-flash-lite-preview-09-2025",
         "openai/gpt-4.1-mini",
     ]
 
@@ -363,6 +432,9 @@ async def _recognize_product_from_photo(image_bytes: bytes) -> dict[str, Any] | 
     }
 
     import asyncio
+
+    RETRY_ATTEMPTS = 3
+    RETRY_DELAY = 1.0  # seconds
 
     for model in models:
         payload = {
@@ -381,7 +453,7 @@ async def _recognize_product_from_photo(image_bytes: bytes) -> dict[str, Any] | 
             ],
         }
 
-        for attempt in range(3):
+        for attempt in range(RETRY_ATTEMPTS):
             async with aiohttp.ClientSession() as session:
                 try:
                     async with session.post(
@@ -403,13 +475,13 @@ async def _recognize_product_from_photo(image_bytes: bytes) -> dict[str, Any] | 
                             if data.get("name"):
                                 return data
                         else:
-                            if attempt < 2:
-                                await asyncio.sleep(0.5)
+                            if attempt < RETRY_ATTEMPTS - 1:
+                                await asyncio.sleep(RETRY_DELAY)
                                 continue
                 except Exception as e:
                     logger.error(f"Error recognizing product ({model}) attempt {attempt+1}/3: {e}")
-                    if attempt < 2:
-                        await asyncio.sleep(0.5)
+                    if attempt < RETRY_ATTEMPTS - 1:
+                        await asyncio.sleep(RETRY_DELAY)
                         continue
 
     return None
@@ -480,19 +552,11 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
 
         user_id = message.from_user.id
 
-        # Create a receipt for onboarding products
+        # Create product directly for fridge init (no receipt)
         async for session in get_db():
-            receipt = Receipt(
-                user_id=user_id,
-                raw_text="onboarding_initialization",
-                total_amount=0.0
-            )
-            session.add(receipt)
-            await session.flush()
-
-            # Create product from recognized data
             product = Product(
-                receipt_id=receipt.id,
+                user_id=user_id,
+                source="fridge_init",
                 name=product_data.get("name", "Неизвестный товар"),
                 price=0.0,
                 quantity=1.0,
@@ -506,7 +570,35 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
             await session.commit()
             await session.refresh(product)
 
-            # Get consultant recommendations
+            # Build snapshot of fridge (totals + last items) for contextual recs
+            totals_stmt = select(
+                func.sum(Product.calories),
+                func.sum(Product.protein),
+                func.sum(Product.fat),
+                func.sum(Product.carbs),
+            ).where(Product.user_id == user_id)
+            totals_row = await session.execute(totals_stmt)
+            totals = totals_row.fetchone() or (0, 0, 0, 0)
+
+            names_stmt = (
+                select(Product.name)
+                .where(Product.user_id == user_id)
+                .order_by(Product.id.desc())
+                .limit(5)
+            )
+            name_rows = (await session.execute(names_stmt)).scalars().all()
+
+            fridge_snapshot = {
+                "totals": {
+                    "calories": totals[0] or 0,
+                    "protein": totals[1] or 0,
+                    "fat": totals[2] or 0,
+                    "carbs": totals[3] or 0,
+                },
+                "items": name_rows,
+            }
+
+            # Get consultant recommendations with fridge context
             settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
             settings_result = await session.execute(settings_stmt)
             settings = settings_result.scalar_one_or_none()
@@ -514,7 +606,7 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
             recommendation_text = ""
             if settings and settings.is_initialized:
                 recommendations = await ConsultantService.analyze_product(
-                    product, settings, context="fridge"
+                    product, settings, context="fridge", fridge_snapshot=fridge_snapshot
                 )
                 warnings = recommendations.get("warnings", [])
                 recs = recommendations.get("recommendations", [])
@@ -535,6 +627,11 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
         source_type = "этикетка" if product_data.get("brand") or product_data.get("weight") else "фото продукта"
         kbzhu_note = "" if product_data.get("brand") else "\n<i>КБЖУ - усредненные значения</i>"
 
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Готово", callback_data="onboarding_finish_fridge")
+        builder.button(text="⏭️ Пропустить", callback_data="onboarding_skip_fridge")
+        builder.adjust(1)
+
         await status_msg.edit_text(
             f"✅ <b>Продукт добавлен в холодильник!</b> ({source_type})\n\n"
             f"📦 {product_data.get('name')}\n"
@@ -546,7 +643,8 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
             f"{product_data.get('carbs') or '—'}"
             + kbzhu_note
             + recommendation_text,
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
 
     except Exception as exc:
@@ -615,3 +713,35 @@ async def skip_fridge_initialization(callback: types.CallbackQuery, state: FSMCo
         await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
+
+@router.callback_query(F.data == "force_onboarding")
+async def force_onboarding(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Force restart onboarding from notification.
+
+    Args:
+        callback: Telegram callback query
+        state: FSM context
+    """
+    # Clear any existing state
+    await state.clear()
+    
+    # Start fresh onboarding
+    await state.set_state(OnboardingStates.waiting_for_gender)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
+    builder.button(text="👩 Женский", callback_data="onboarding_gender:female")
+    builder.adjust(2)
+
+    welcome_text = (
+        "🔄 <b>Обновление профиля</b>\n\n"
+        "Давай обновим твои данные для более точных расчетов.\n\n"
+        "1️⃣ Выбери свой пол:"
+    )
+
+    try:
+        await callback.message.edit_text(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()

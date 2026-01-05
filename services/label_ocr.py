@@ -33,15 +33,15 @@ class LabelOCRService:
     """
 
     MODELS: list[str] = [
-        # Free models (try first)
-        "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
-        "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
-        "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
-
-        # Paid models (fallback when free models are rate-limited)
-        "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
-        "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
-        "qwen/qwen-vl-plus",                          # Paid 3: Best accuracy ($0.21/$0.63)
+        # Free first, but retry quickly then jump to paid
+        "qwen/qwen2.5-vl-32b-instruct:free",
+        # Paid earlier to avoid long stalls on free limits
+        "google/gemini-2.5-flash-lite",
+        # Remaining fallbacks
+        "google/gemini-2.0-flash-exp:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free",
+        "mistralai/pixtral-12b",
+        "qwen/qwen-vl-plus",
     ]
 
     @classmethod
@@ -84,6 +84,8 @@ class LabelOCRService:
         )
 
         import asyncio
+        RETRY_ATTEMPTS = 3
+        RETRY_DELAY = 1.0  # seconds
 
         for model in cls.MODELS:
             payload = {
@@ -104,8 +106,8 @@ class LabelOCRService:
                 ]
             }
 
-            # Retry logic: 3 attempts with 0.5s delay
-            for attempt in range(3):
+            # Retry logic: 3 attempts with 1s delay
+            for attempt in range(RETRY_ATTEMPTS):
                 async with aiohttp.ClientSession() as session:
                     try:
                         async with session.post(
@@ -123,13 +125,13 @@ class LabelOCRService:
                                 return parsed_data
 
                             logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
-                            if attempt < 2:
-                                await asyncio.sleep(0.5)
+                            if attempt < RETRY_ATTEMPTS - 1:
+                                await asyncio.sleep(RETRY_DELAY)
                                 continue
                     except Exception as exc:
                         logger.error(f"Label OCR exception ({model}) attempt {attempt+1}/3: {exc}")
-                        if attempt < 2:
-                            await asyncio.sleep(0.5)
+                        if attempt < RETRY_ATTEMPTS - 1:
+                            await asyncio.sleep(RETRY_DELAY)
                             continue
 
             # If we get here, this model failed 3 times, try next model

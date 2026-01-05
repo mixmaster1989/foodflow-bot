@@ -9,6 +9,7 @@ from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy import or_
 from sqlalchemy.future import select
 
 from database.base import get_db
@@ -130,10 +131,23 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
     # 1. Get ingredients
     ingredients = []
     async for session in get_db():
-        stmt = select(Product).join(Receipt).where(Receipt.user_id == callback.from_user.id)
+        stmt = (
+            select(Product)
+            .outerjoin(Receipt)
+            .where(
+                (Receipt.user_id == callback.from_user.id)
+                | (Product.user_id == callback.from_user.id)
+            )
+        )
         result = await session.execute(stmt)
         products = result.scalars().all()
         ingredients = [p.name for p in products]
+
+        # Get user settings
+        from database.models import UserSettings
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings_res = await session.execute(settings_stmt)
+        user_settings = settings_res.scalar_one_or_none()
 
     # Log request details
     log_request(callback.from_user.id, ingredients, category, f"Requesting recipes for category {category}")
@@ -207,7 +221,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
 
     # 2. Call AI with category to get appropriate recipes
     try:
-        data = await AIService.generate_recipes(ingredients, category)
+        data = await AIService.generate_recipes(ingredients, category, user_settings)
 
         if not data or "recipes" not in data:
             raise ValueError("No recipes generated")

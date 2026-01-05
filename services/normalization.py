@@ -80,7 +80,7 @@ class NormalizationService:
             "2. PRESERVE brand names if recognizable (e.g., 'МИЛКА' -> 'Милка', 'Lays' -> 'Lays').\n"
             "3. PRESERVE weight/volume if present (e.g., '450г', '1л', '200мл').\n"
             "4. Categorize it (e.g., Молочные продукты, Мясо, Овощи, Снеки, Бакалея).\n"
-            "5. Estimate calories per 100g.\n"
+            "5. Find nutrition per 100g: Calories, Protein, Fat, Carbs.\n"
             "6. Return a JSON object with a list of normalized items. Keep the original order.\n"
             "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n\n"
             "Input List:\n"
@@ -90,10 +90,10 @@ class NormalizationService:
             "- Do NOT include markdown formatting (no ```json or ```).\n"
             "- Do NOT add explanations, comments, or any text after the JSON.\n"
             "- Your response must start with { and end with }.\n"
-            "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 123}]}\n"
+            "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 250, \"protein\": 10.5, \"fat\": 5.2, \"carbs\": 30.0}]}\n"
             "- Example of WRONG response: {\"normalized\": [...]}\n**Пояснения:** ...\n\n"
             "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
-            "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 123}]}"
+            "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}]}"
         )
 
         import asyncio
@@ -178,7 +178,10 @@ class NormalizationService:
                                             "price": item.get('price', 0.0),
                                             "quantity": item.get('quantity', 1.0),
                                             "category": norm_data.get('category', 'Uncategorized'),
-                                            "calories": norm_data.get('calories', 0)
+                                            "calories": norm_data.get('calories', 0),
+                                            "protein": norm_data.get('protein', 0),
+                                            "fat": norm_data.get('fat', 0),
+                                            "carbs": norm_data.get('carbs', 0)
                                         })
                                     return final_items
 
