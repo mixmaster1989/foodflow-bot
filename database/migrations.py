@@ -116,6 +116,10 @@ def _run_sqlite_migrations():
                 "users",
                 [
                     ("is_verified", "BOOLEAN DEFAULT 0"),
+                    # TODO [CURATOR-1.1]: Add curator columns:
+                    # ("role", "TEXT DEFAULT 'user'"),
+                    # ("curator_id", "BIGINT"),
+                    # ("referral_token", "TEXT"),
                 ]
             )
 

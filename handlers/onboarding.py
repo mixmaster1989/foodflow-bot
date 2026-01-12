@@ -24,6 +24,7 @@ from handlers.menu import show_main_menu
 import logging
 
 from services.consultant import ConsultantService
+from services.photo_queue import PhotoQueueManager
 from services.label_ocr import LabelOCRService
 
 logger = logging.getLogger(__name__)
@@ -371,26 +372,68 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-@router.message(OnboardingStates.initializing_fridge, F.photo)
-async def process_fridge_product_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
-    """Process product photo during fridge initialization.
-
-    Tries to recognize as label first, then as product photo with average KBZHU.
+@router.callback_query(F.data == "onboarding_start_fridge")
+async def start_fridge_initialization(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle start fridge initialization button.
 
     Args:
-        message: Telegram message with product photo
-        bot: Telegram bot instance
+        callback: Telegram callback query
         state: FSM context
+    """
+    await state.set_state(OnboardingStates.initializing_fridge)
 
-    Returns:
-        None
+    text = (
+        "📸 <b>Заполнение холодильника</b>\n\n"
+        "Сфотографируй продукты (этикетки или сами товары), которые у тебя есть.\n"
+        "Я распознаю их и добавлю в твой виртуальный холодильник.\n\n"
+        "Отправляй фото по одному или группой."
+    )
+    
+    # Check if we can edit or need to send new message
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML")
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML")
+        
+    await callback.answer()
 
+
+@router.message(OnboardingStates.initializing_fridge, F.photo)
+async def process_fridge_product_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    """Handle product photo by adding it to the processing queue.
+    
+    This ensures sequential processing and prevents database locking issues.
+    """
+    photo = message.photo[-1]
+    user_id = message.from_user.id
+    
+    # Notify user that we received the photo
+    # (Optional, but good UX if processing is slow)
+    # await message.answer("📸 Фото принято в обработку...")
+
+    await PhotoQueueManager.add_item(
+        user_id=user_id,
+        message=message,
+        bot=bot,
+        state=state,
+        processing_func=process_single_photo,
+        file_id=photo.file_id
+    )
+
+
+async def process_single_photo(message: types.Message, bot: Bot, state: FSMContext, file_id: str) -> None:
+    """Actual verification logic (extracted from handler).
+    
+    Args:
+        message: Original message
+        bot: Bot instance
+        state: FSM context
+        file_id: File ID to download
     """
     status_msg = await message.answer("⏳ Анализирую продукт...")
 
     try:
-        photo = message.photo[-1]
-        file_info = await bot.get_file(photo.file_id)
+        file_info = await bot.get_file(file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
 

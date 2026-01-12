@@ -9,7 +9,11 @@ from database.base import init_db
 from handlers import (
     common,
     correction,
+    admin,
+    support,
+    errors,
     fridge,
+    i_ate,
     menu,
     onboarding,
     receipt,
@@ -41,14 +45,22 @@ async def main():
 
     # Register Middleware
     from handlers.auth import AuthMiddleware
+    from middleware.admin_logger import AdminLoggerMiddleware
+    
+    dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
     dp.update.middleware(AuthMiddleware())
 
     # Register Routers
     # IMPORTANT: shopping.router must be before receipt.router
     # to handle photos in scanning_labels state first
+    dp.include_router(errors.router) # Catch errors globally
     dp.include_router(common.router)
+    dp.include_router(admin.router) # Admin commands
+    dp.include_router(support.router) # Contact Dev
     dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(menu.router)  # Central menu router
+    dp.include_router(i_ate.router)  # Quick food logging
+    # TODO [CURATOR-1.3]: dp.include_router(curator.router)  # Curator dashboard
     dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)
     dp.include_router(fridge.router)
@@ -61,7 +73,7 @@ async def main():
 
     # Start reminder scheduler
     from services.scheduler import start_scheduler
-    start_scheduler(bot)
+    start_scheduler(bot, dp)
 
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 import aiohttp
+import asyncio
 
 from config import settings
 
@@ -16,19 +17,6 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     """Generate recipes using AI models based on available ingredients.
-
-    Supports multiple recipe categories (Salads, Main, Dessert, Breakfast)
-    and uses fallback models for reliability.
-
-    Attributes:
-        MODELS: List of fallback models ordered by quality (best first)
-
-    Example:
-        >>> service = AIService()
-        >>> recipes = await service.generate_recipes(['Молоко', 'Яйца'], 'Breakfast')
-        >>> print(recipes['recipes'][0]['title'])
-        'Омлет с молоком'
-
     """
 
     MODELS: list[str] = [
@@ -42,17 +30,7 @@ class AIService:
 
     @classmethod
     async def generate_recipes(cls, ingredients: list[str], category: str, user_settings: Any = None) -> dict[str, Any] | None:
-        """Generate recipes based on available ingredients and category.
-
-        Args:
-            ingredients: List of available ingredient names
-            category: Recipe category (Salads, Main, Dessert, Breakfast)
-            user_settings: User settings model (optional)
-
-        Returns:
-            Dictionary with 'recipes' key containing list of recipe dicts, or None.
-
-        """
+        """Generate recipes based on available ingredients and category."""
         if not ingredients:
             return None
 
@@ -141,20 +119,10 @@ class AIService:
                         await asyncio.sleep(0.5)
                         continue
         return None
+
     @staticmethod
     async def recognize_product_from_image(image_bytes: bytes) -> dict[str, Any] | None:
-        """Recognize product from photo and get average KBZHU.
-
-        First tries to parse as label, if fails - recognizes as product photo
-        and gets average nutrition values.
-
-        Args:
-            image_bytes: Raw image bytes
-
-        Returns:
-            Dictionary with product info: name, brand, weight, calories, protein, fat, carbs
-            Or None if recognition fails
-        """
+        """Recognize product from photo and get average KBZHU + Fiber."""
         import base64
         import re
         from services.label_ocr import LabelOCRService
@@ -162,18 +130,21 @@ class AIService:
         # First try: parse as label (has KBZHU on it)
         label_data = await LabelOCRService.parse_label(image_bytes)
         if label_data and label_data.get("name") and label_data.get("calories"):
+            # If label service returned data, checking if it has fiber.
+            # If not, we might want to augment it, but LabelOCR should be updated too.
             return label_data
 
         # Second try: recognize product and get average KBZHU
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
         prompt = (
-            "Ты видишь фото продукта питания. Определи что это за продукт и верни усредненные значения КБЖУ.\n\n"
+            "Ты видишь фото продукта питания. Определи что это за продукт и верни усредненные значения КБЖУ и Клетчатки (fiber).\n\n"
             "Верни ТОЛЬКО JSON объект (без markdown) в формате:\n"
             '{"name": "Название продукта на русском", "brand": null, "weight": null, '
-            '"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}\n\n'
-            "calories, protein, fat, carbs - это усредненные значения на 100г для этого типа продукта.\n"
-            "Например, для яблока: calories=52, protein=0.3, fat=0.2, carbs=14.\n"
+            '"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0, "fiber": 0.0}\n\n'
+            "calories, protein, fat, carbs, fiber - это усредненные значения на 100г для этого типа продукта.\n"
+            "ВАЖНО: Если продукт не содержит клетчатки (вода, масло, сахар, мясо без гарнира и т.д.), в поле \"fiber\" укажи строго 0!\n"
+            "Например, для яблока: calories=52, protein=0.3, fat=0.2, carbs=14, fiber=2.4.\n"
             "Если не можешь определить - верни null для всех полей."
         )
 

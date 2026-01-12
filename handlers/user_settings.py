@@ -88,16 +88,19 @@ async def show_settings(callback: types.CallbackQuery) -> None:
             f"🥑 Жиры: <b>{settings.fat_goal}</b> г\n"
             f"🍞 Углеводы: <b>{settings.carb_goal}</b> г\n\n"
             f"🚫 <b>Аллергии/Исключения:</b>\n"
-            f"{settings.allergies or 'Нет'}"
+            f"{settings.allergies or 'Нет'}\n\n"
+            f"📊 <b>Время дневной сводки:</b> {getattr(settings, 'summary_time', '21:00')}\n"
+            f"⏰ <b>Напоминание о весе:</b> {getattr(settings, 'reminder_time', '09:00')}"
         )
 
         builder = InlineKeyboardBuilder()
-        if settings.is_initialized:
-            builder.button(text="✏️ Изменить профиль", callback_data="settings_edit_profile")
+        builder.button(text="✏️ Изменить профиль", callback_data="settings_edit_profile")
         builder.button(text="🎯 Изменить цели КБЖУ", callback_data="settings_edit_goals")
         builder.button(text="🚫 Изменить аллергии", callback_data="settings_edit_allergies")
+        builder.button(text="🕐 Время сводки", callback_data="settings_edit_summary_time")
+        builder.button(text="⏰ Время напоминания", callback_data="settings_edit_reminder_time")
         builder.button(text="🔙 Назад", callback_data="main_menu")
-        builder.adjust(1)
+        builder.adjust(1, 1, 1, 2, 1)
 
         # Image path
         photo_path = types.FSInputFile("assets/main_menu.png")
@@ -371,8 +374,182 @@ async def edit_profile(callback: types.CallbackQuery, state: FSMContext) -> None
         if settings:
             settings.is_initialized = False
             await session.commit()
-        break
+            settings.is_initialized = False
+            await session.commit()
 
     # Start onboarding
     await start_onboarding(callback.message, state)
+
+
+@router.callback_query(F.data == "settings_edit_summary_time")
+async def edit_summary_time(callback: types.CallbackQuery) -> None:
+    """Show time selection for daily summary."""
+    builder = InlineKeyboardBuilder()
+    
+    # Popular times as buttons
+    times = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"]
+    for t in times:
+        builder.button(text=f"🕐 {t}", callback_data=f"set_summary_time:{t}")
+    builder.button(text="🔙 Назад", callback_data="menu_settings")
+    builder.adjust(3, 3, 1)
+    
+    text = (
+        "🕐 <b>Выберите время дневной сводки:</b>\n\n"
+        "В это время вам придёт отчёт о питании за день."
+    )
+    
+    # Handle both photo and text messages
+    try:
+        # Try to edit caption (for photo messages)
+        await callback.message.edit_caption(
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        try:
+            # Try to edit text (for text messages)
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            # Delete and send new
+            await callback.message.delete()
+            await callback.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("set_summary_time:"))
+async def save_summary_time(callback: types.CallbackQuery) -> None:
+    """Save selected summary time."""
+    new_time = callback.data.split(":")[1] + ":" + callback.data.split(":")[2]
+    user_id = callback.from_user.id
+    
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(stmt)).scalar_one_or_none()
+        
+        if settings:
+            settings.summary_time = new_time
+            await session.commit()
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
+    
+    text = (
+        f"✅ Время дневной сводки установлено: <b>{new_time}</b>\n\n"
+        "Теперь отчёт будет приходить в это время каждый день."
+    )
+    
+    try:
+        await callback.message.edit_caption(
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        try:
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "settings_edit_reminder_time")
+async def edit_reminder_time(callback: types.CallbackQuery) -> None:
+    """Show time selection for weight reminder."""
+    builder = InlineKeyboardBuilder()
+    times = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00"]
+    for time in times:
+        builder.button(text=f"⏰ {time}", callback_data=f"set_reminder_time:{time}")
+    builder.button(text="🔙 Назад", callback_data="menu_settings")
+    builder.adjust(3, 3, 1)
+    
+    text = (
+        "⏰ <b>Время напоминания о весе</b>\n\n"
+        "В это время бот будет напоминать записать вес.\n\n"
+        "Выберите удобное время:"
+    )
+    
+    try:
+        await callback.message.edit_caption(
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        try:
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("set_reminder_time:"))
+async def save_reminder_time(callback: types.CallbackQuery) -> None:
+    """Save the selected reminder time."""
+    new_time = callback.data.split(":")[1] + ":00"
+    user_id = callback.from_user.id
+    
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(stmt)).scalar_one_or_none()
+        
+        if settings:
+            settings.reminder_time = new_time
+            await session.commit()
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
+    
+    text = (
+        f"✅ Время напоминания о весе установлено: <b>{new_time}</b>\n\n"
+        "Теперь бот будет напоминать записать вес в это время."
+    )
+    
+    try:
+        await callback.message.edit_caption(
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        try:
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+    await callback.answer()
+

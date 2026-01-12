@@ -23,13 +23,18 @@ router = Router()
 class WeightStates(StatesGroup):
     """FSM states for weight tracking."""
     waiting_for_weight = State()
+    waiting_for_morning_weight = State()
 
 
 @router.callback_query(F.data == "menu_weight")
 async def show_weight_menu(callback: types.CallbackQuery) -> None:
     """Show weight tracking menu with current weight and history."""
     user_id = callback.from_user.id
-
+    
+    # Clear state if entering from menu, to reset any stale states
+    # But wait, checking logic above: usually menus don't clear unless explicit.
+    # Actually, standard behavior: just show menu.
+    
     async for session in get_db():
         # Get current weight from settings
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -75,12 +80,25 @@ async def start_weight_input(callback: types.CallbackQuery, state: FSMContext) -
     """Start weight input flow."""
     await state.set_state(WeightStates.waiting_for_weight)
     
+    user_id = callback.from_user.id
+    current_weight = None
+
+    async for session in get_db():
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        if settings and settings.weight:
+            current_weight = settings.weight
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_weight")
 
+    prompt_suffix = "(например: 72.5)"
+    if current_weight:
+        prompt_suffix = f"(прошлый: {current_weight})"
+
     text = (
         "✏️ <b>Запись веса</b>\n\n"
-        "Введите ваш текущий вес в килограммах (например: 72.5):"
+        f"Введите ваш текущий вес в килограммах {prompt_suffix}:"
     )
 
     try:
@@ -92,6 +110,7 @@ async def start_weight_input(callback: types.CallbackQuery, state: FSMContext) -
 
 
 @router.message(WeightStates.waiting_for_weight)
+@router.message(WeightStates.waiting_for_morning_weight)
 async def save_weight(message: types.Message, state: FSMContext) -> None:
     """Save weight to database."""
     try:

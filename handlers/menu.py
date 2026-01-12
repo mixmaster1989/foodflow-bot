@@ -15,7 +15,7 @@ router = Router()
 
 
 
-@router.message(F.text == "🏠 Главное меню")
+@router.message(F.text.in_({"🏠 Главное меню", "Меню", "Главное меню", "menu", "Menu"}))
 async def menu_button_handler(message: types.Message) -> None:
     """Handle persistent 'Main Menu' button click."""
     await show_main_menu(message, message.from_user.first_name)
@@ -52,27 +52,43 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     """
     builder = InlineKeyboardBuilder()
 
-    # Row 1: Shopping Mode (Prominent) - HIDDEN FOR MVP
-    # builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
-
-    # Row 2: Core Features
-    builder.button(text="📸 Загрузить чек", callback_data="menu_check")
+    # Row 0: BIG "I ATE" button - top priority
+    builder.button(text="🍽️ Я ПОЕЛ!", callback_data="menu_i_ate")
+    
+    # TODO [CURATOR-2.1]: Add curator dashboard button here (visible only if user.role == "curator")
+    # builder.button(text="👨‍🏫 Кабинет Куратора", callback_data="curator_dashboard")
+    
+    # Row 1: Fridge
     builder.button(text="🧊 Холодильник", callback_data="menu_fridge")
 
-    # Row 3: AI Features
+    # Row 2: Core
+    builder.button(text="📸 Загрузить чек", callback_data="menu_check")
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
+
+    # Row 3: Stats
     builder.button(text="📊 Статистика", callback_data="menu_stats")
-
-    # Row 4: Tracking
     builder.button(text="⚖️ Вес", callback_data="menu_weight")
-    # builder.button(text="📝 Список покупок", callback_data="menu_shopping_list")
 
-    # Row 5: System
+    # Row 4: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
+    
+    # Row 5: Contact
+    builder.button(text="📩 Написать разработчику", callback_data="menu_contact_dev")
 
-    # Adjusted layout (removed first row of 1 button)
-    builder.adjust(2, 2, 2, 2)
+    # Row 6: Admin
+    from config import settings
+    if message.from_user.id in settings.ADMIN_IDS:
+        builder.button(text="🔄 RESTART BOT", callback_data="admin_restart_bot")
+        builder.button(text="📨 НАПИСАТЬ ЮЗЕРУ", callback_data="admin_send_message")
+
+    # Layout: 1 (I ATE), 1 (fridge), 2, 2, 2, 1, (2 for admin)
+    rows = [1, 1, 2, 2, 2, 1]
+    if message.from_user.id in settings.ADMIN_IDS:
+        rows.append(2)
+        
+    builder.adjust(*rows)
+
 
     # Image path
     photo_path = types.FSInputFile("assets/main_menu.png")
@@ -92,7 +108,10 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
         )
     except Exception:
         # If edit fails (e.g. previous was text), delete and send new photo
-        await message.delete()
+        try:
+             await message.delete()
+        except Exception:
+            pass
         await message.answer_photo(
             photo=photo_path,
             caption=caption,
@@ -188,40 +207,4 @@ async def menu_help_handler(callback: types.CallbackQuery) -> None:
         )
     await callback.answer()
 
-@router.callback_query(F.data == "menu_settings")
-async def menu_settings_handler(callback: types.CallbackQuery) -> None:
-    """Show settings menu placeholder.
 
-    Displays settings menu (currently in development).
-
-    Args:
-        callback: Telegram callback query
-
-    Returns:
-        None
-
-    """
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="main_menu")
-
-    photo_path = types.FSInputFile("assets/settings.png")
-    caption = (
-        "⚙️ <b>Настройки</b>\n\n"
-        "Здесь ты сможешь настроить свои предпочтения, уведомления и диету.\n"
-        "<i>(Функционал в разработке)</i>"
-    )
-
-    try:
-        await callback.message.edit_media(
-            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
-            reply_markup=builder.as_markup()
-        )
-    except Exception:
-        await callback.message.delete()
-        await callback.message.answer_photo(
-            photo=photo_path,
-            caption=caption,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML"
-        )
-    await callback.answer()

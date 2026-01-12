@@ -22,6 +22,12 @@ class User(Base):
     username = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_verified = Column(Boolean, default=False)  # User auth status
+    
+    # TODO [CURATOR-1.1]: Add role field - Enum: "user" | "curator" | "admin"
+    # TODO [CURATOR-1.1]: Add curator_id ForeignKey - who is this user's curator
+    # TODO [CURATOR-1.1]: Add referral_token - unique token for curator invite links
+    # TODO [CURATOR-1.1]: Add relationship: wards = relationship("User", backref="curator")
+    
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
@@ -44,11 +50,13 @@ class Product(Base):
     name = Column(String, nullable=False)
     quantity = Column(Float, default=1.0)
     price = Column(Float, nullable=False)
+    weight_g = Column(Float, nullable=True)  # Total weight in grams (if applicable)
     category = Column(String, nullable=True)
     calories = Column(Float, default=0.0)
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
     source = Column(String, default="receipt")  # receipt | fridge_init | manual | other
     receipt = relationship("Receipt", back_populates="products")
     user = relationship("User", backref="products")
@@ -63,6 +71,7 @@ class ConsumptionLog(Base):
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
     date = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="consumption_logs")
 
@@ -87,6 +96,7 @@ class LabelScan(Base):
     protein = Column(Float, nullable=True)
     fat = Column(Float, nullable=True)
     carbs = Column(Float, nullable=True)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
     matched_product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     session = relationship("ShoppingSession", back_populates="label_scans")
@@ -113,6 +123,7 @@ class UserSettings(Base):
     protein_goal = Column(Integer, default=150)
     fat_goal = Column(Integer, default=70)
     carb_goal = Column(Integer, default=250)
+    fiber_goal = Column(Integer, default=30) # NEW: Fiber goal
     allergies = Column(String, nullable=True)  # Comma-separated list
     gender = Column(String, nullable=True)  # "male" or "female"
     age = Column(Integer, nullable=True)  # User's age in years
@@ -120,7 +131,8 @@ class UserSettings(Base):
     weight = Column(Float, nullable=True)  # weight in kg
     goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
     is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
-    reminder_time = Column(String, default="09:00")  # HH:MM format for daily reminders
+    reminder_time = Column(String, default="09:00")  # HH:MM for weight reminders
+    summary_time = Column(String, default="21:00")  # HH:MM for daily nutrition summary
     reminders_enabled = Column(Boolean, default=True)  # Enable/disable daily weight reminders
     user = relationship("User", backref="settings")
 

@@ -107,6 +107,9 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
         callback: Telegram callback query with data format "recipes_cat:Category" or "recipes_cat:Category:refresh"
 
     """
+    # Answer callback IMMEDIATELY to prevent timeout on long AI operations
+    await callback.answer()
+    
     # callback data can be 'recipes_cat:Category' or 'recipes_cat:Category:refresh'
     parts = callback.data.split(":")
     category = parts[1]
@@ -214,7 +217,6 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
                 for chunk in message_chunks:
                     await callback.message.answer(chunk, parse_mode="HTML")
             log_response(callback.from_user.id, {"cached": True, "count": len(recent)}, True)
-            await callback.answer()
             return
 
     # If we reach here, we need to call AI (no cache or refresh requested)
@@ -304,5 +306,3 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
             )
         except Exception:
             await status_msg.edit_text(error_caption, reply_markup=builder.as_markup())
-
-    await callback.answer()

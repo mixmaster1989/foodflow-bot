@@ -45,6 +45,13 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         None
 
     """
+    # TODO [CURATOR-1.2]: Parse deep link for referral token
+    # Example: /start ref_abc123 -> extract "abc123"
+    # args = message.text.split()[1] if len(message.text.split()) > 1 else None
+    # if args and args.startswith("ref_"):
+    #     referral_token = args[4:]
+    #     -> find curator by token, link new user to curator_id
+    
     async for session in get_db():
         stmt = select(User).where(User.id == message.from_user.id)
         result = await session.execute(stmt)
@@ -52,8 +59,10 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
         if not user:
             user = User(id=message.from_user.id, username=message.from_user.username)
+            # TODO [CURATOR-1.2]: If referral token found, set user.curator_id here
             session.add(user)
             await session.commit()
+            # TODO [CURATOR-1.2]: Notify curator about new ward
 
         # Check if user has completed onboarding
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)

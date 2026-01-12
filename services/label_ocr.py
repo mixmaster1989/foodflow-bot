@@ -20,16 +20,6 @@ class LabelOCRService:
 
     Uses multiple AI models to extract product name, brand, weight,
     and nutrition values (calories, protein, fat, carbs) from label images.
-
-    Attributes:
-        MODELS: List of fallback models ordered by quality (best first)
-
-    Example:
-        >>> service = LabelOCRService()
-        >>> data = await service.parse_label(image_bytes)
-        >>> print(data['name'])
-        'Молоко 3.2%'
-
     """
 
     MODELS: list[str] = [
@@ -46,20 +36,7 @@ class LabelOCRService:
 
     @classmethod
     async def parse_label(cls, image_bytes: bytes) -> dict[str, Any] | None:
-        """Parse label image and extract product information.
-
-        Args:
-            image_bytes: Raw image bytes (JPEG/PNG format)
-
-        Returns:
-            Dictionary with keys: name, brand, weight, calories, protein, fat, carbs
-            Or None if all models fail
-
-        Note:
-            Tries models in order until one succeeds. Each model has 3 retry attempts.
-            Calories should be per 100g/ml if available.
-
-        """
+        """Parse label image and extract product information."""
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -78,9 +55,11 @@ class LabelOCRService:
             "\"calories\": 0, "
             "\"protein\": 0, "
             "\"fat\": 0, "
-            "\"carbs\": 0}. "
-            "Calories should be per 100g/ml if available. "
-            "If data is missing, set the value to null."
+            "\"carbs\": 0, "
+            "\"fiber\": 0}. "
+            "Calories/Macros should be per 100g/ml if available. "
+            "Look for 'Клетчатка', 'Пищевые волокна', 'Fiber' for the fiber field. "
+            "If data is missing, set the value to 0 if reasonable (e.g. fiber in oil), or null if unsure."
         )
 
         import asyncio
@@ -138,5 +117,3 @@ class LabelOCRService:
             logger.warning(f"Model {model} failed all attempts, switching to next...")
 
         return None
-
-

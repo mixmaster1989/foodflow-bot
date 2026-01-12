@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     DATABASE_URL: str = "sqlite+aiosqlite:///./foodflow.db" # Default to SQLite for easy local dev on Windows
     GLOBAL_PASSWORD: str = "Welcome2026"  # Password for new users
+    ADMIN_IDS: list[int] = [432823154]
+
 
     # Paths
     BASE_DIR: Path = Path(__file__).resolve().parent

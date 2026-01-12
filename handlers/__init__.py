@@ -1,5 +1,38 @@
-"""Handlers package for FoodFlow Bot.
+from . import (
+    common,
+    correction,
+    fridge,
+    i_ate,
+    menu,
+    onboarding,
+    receipt,
+    recipes,
+    shopping,
+    shopping_list,
+    stats,
+    user_settings,
+    weight,
+    admin,
+    support,
+    errors
+)
 
-Contains all Telegram bot handlers for user interactions.
-"""
+__all__ = [
+    "common",
+    "correction",
+    "fridge",
+    "i_ate",
+    "menu",
+    "onboarding",
+    "receipt",
+    "recipes",
+    "shopping",
+    "shopping_list",
+    "stats",
+    "user_settings",
+    "weight",
+    "admin",
+    "support",
+    "errors"
+]
 

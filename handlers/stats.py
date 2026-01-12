@@ -65,10 +65,12 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
             )
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="📅 День", callback_data="stats_day") # Placeholder
-    builder.button(text="🗓️ Неделя", callback_data="stats_week") # Placeholder
+    builder.button(text="📋 Подробно", callback_data="stats_detailed")
+    builder.button(text="📝 История", callback_data="stats_history")
+    builder.button(text="📅 День", callback_data="stats_day")
+    builder.button(text="🗓️ Неделя", callback_data="stats_week")
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    builder.adjust(2, 1)
+    builder.adjust(2, 2, 1)
 
     # Image path
     photo_path = types.FSInputFile("assets/stats.png")
@@ -90,16 +92,103 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
         )
     await callback.answer()
 
+
+@router.callback_query(F.data == "stats_detailed")
+async def stats_detailed_handler(callback: types.CallbackQuery) -> None:
+    """Show detailed report with timestamps for each meal."""
+    from services.reports import generate_detailed_report
+    
+    user_id = callback.from_user.id
+    report = await generate_detailed_report(user_id)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="menu_stats")
+    
+    try:
+        await callback.message.edit_caption(
+            caption=report,
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        try:
+            await callback.message.edit_text(
+                report,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(
+                report,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+    await callback.answer()
+
+
 @router.callback_query(F.data.in_({"stats_day", "stats_week"}))
 async def stats_placeholder(callback: types.CallbackQuery) -> None:
-    """Placeholder handler for future stats features.
-
-    Args:
-        callback: Telegram callback query
-
-    Returns:
-        None
-
-    """
+    """Placeholder handler for future stats features."""
     await callback.answer("Скоро будет доступно!", show_alert=True)
+
+
+@router.callback_query(F.data == "stats_history")
+async def stats_history_handler(callback: types.CallbackQuery) -> None:
+    """Show today's consumption logs with delete buttons."""
+    user_id = callback.from_user.id
+    today = datetime.utcnow().date()
+    
+    async for session in get_db():
+        stmt = select(ConsumptionLog).where(
+            ConsumptionLog.user_id == user_id,
+            func.date(ConsumptionLog.date) == today
+        ).order_by(ConsumptionLog.date.desc())
+        logs = (await session.execute(stmt)).scalars().all()
+    
+    builder = InlineKeyboardBuilder()
+    
+    if not logs:
+        text = "📝 <b>История за сегодня</b>\n\nПока нет записей."
+    else:
+        lines = ["📝 <b>История за сегодня</b>\n\n<i>Нажмите 🗑️ чтобы удалить:</i>\n"]
+        for log in logs:
+            time_str = (log.date.hour + 3) % 24
+            time_fmt = f"{time_str:02d}:{log.date.minute:02d}"
+            cal = int(log.calories) if log.calories else 0
+            lines.append(f"🕐 {time_fmt} — {log.product_name} ({cal} ккал)")
+            builder.button(text=f"🗑️ {log.product_name[:20]}", callback_data=f"delete_log:{log.id}")
+        text = "\n".join(lines)
+        builder.adjust(1)
+    
+    builder.button(text="🔙 Назад", callback_data="menu_stats")
+    
+    try:
+        await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception:
+        try:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("delete_log:"))
+async def delete_log_handler(callback: types.CallbackQuery) -> None:
+    """Delete a consumption log entry."""
+    log_id = int(callback.data.split(":")[1])
+    
+    async for session in get_db():
+        log = await session.get(ConsumptionLog, log_id)
+        if log and log.user_id == callback.from_user.id:
+            await session.delete(log)
+            await session.commit()
+            await callback.answer("✅ Запись удалена!")
+        else:
+            await callback.answer("⚠️ Запись не найдена", show_alert=True)
+            return
+    
+    # Refresh history
+    await stats_history_handler(callback)
 

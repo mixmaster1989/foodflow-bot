@@ -118,20 +118,6 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> No
 
 @router.message(ShoppingMode.scanning_labels, F.photo)
 async def scan_label(message: types.Message, bot: Bot, state: FSMContext) -> None:
-    """Process product label photo during shopping.
-
-    Extracts product name and nutrition info from label image
-    and saves as LabelScan for later matching.
-
-    Args:
-        message: Telegram message with label photo
-        bot: Telegram bot instance
-        state: FSM context containing shopping_session_id
-
-    Returns:
-        None
-
-    """
     data = await state.get_data()
     session_id = data.get("shopping_session_id")
 
@@ -139,11 +125,36 @@ async def scan_label(message: types.Message, bot: Bot, state: FSMContext) -> Non
         await message.answer("❌ Нет активной сессии покупок. Нажми «🛒 Иду в магазин».")
         return
 
+    from services.photo_queue import PhotoQueueManager
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"DEBUG TIMING: calling add_item for {message.from_user.id}")
+    await PhotoQueueManager.add_item(
+        user_id=message.from_user.id,
+        message=message,
+        bot=bot,
+        state=state,
+        processing_func=process_single_label_shopping,
+        file_id=message.photo[-1].file_id
+    )
+    logger.info(f"DEBUG TIMING: returned from add_item for {message.from_user.id}")
+
+async def process_single_label_shopping(message: types.Message, bot: Bot, state: FSMContext, file_id: str) -> None:
+    """Worker function for processing a single label in shopping mode."""
+    data = await state.get_data()
+    session_id = data.get("shopping_session_id")
+    # Note: state data might persist, but if flow canceled it might be stale.
+    # But usually queue processes fast enough or we check validity.
+    
+    if not session_id:
+        # Should checked inside worker? 
+        # Actually state might satisfy even if session cancelled?
+        pass
+
     status_msg = await message.answer("⏳ Сканирую этикетку...")
 
     try:
-        photo = message.photo[-1]
-        file_info = await bot.get_file(photo.file_id)
+        file_info = await bot.get_file(file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
 
@@ -164,10 +175,8 @@ async def scan_label(message: types.Message, bot: Bot, state: FSMContext) -> Non
             )
             session.add(scan)
             await session.commit()
-            break
-
-        # Get consultant recommendations
-        async for session in get_db():
+            
+            # Get consultant recommendations
             settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
             settings_result = await session.execute(settings_stmt)
             settings = settings_result.scalar_one_or_none()
