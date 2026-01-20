@@ -23,14 +23,16 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     is_verified = Column(Boolean, default=False)  # User auth status
     
-    # TODO [CURATOR-1.1]: Add role field - Enum: "user" | "curator" | "admin"
-    # TODO [CURATOR-1.1]: Add curator_id ForeignKey - who is this user's curator
-    # TODO [CURATOR-1.1]: Add referral_token - unique token for curator invite links
-    # TODO [CURATOR-1.1]: Add relationship: wards = relationship("User", backref="curator")
+    # Curator system fields
+    role = Column(String, default="user")  # "user" | "curator" | "admin"
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # who curates this user
+    referral_token = Column(String, unique=True, nullable=True)  # for invite links (curators only)
     
+    # Relationships
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
+    wards = relationship("User", backref="curator", remote_side=[id], foreign_keys=[curator_id])
 
 class Receipt(Base):
     __tablename__ = "receipts"
@@ -72,8 +74,27 @@ class ConsumptionLog(Base):
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
     fiber = Column(Float, default=0.0) # NEW: Fiber tracking
+    base_name = Column(String, nullable=True) # NEW: Normalized name for history grouping
     date = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="consumption_logs")
+
+class SavedDish(Base):
+    __tablename__ = "saved_dishes"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    dish_type = Column(String, default="dish")  # "dish" or "meal"
+    components = Column(JSON, nullable=False) # List of dicts: [{name, weight, calories...}]
+    
+    # Pre-calculated totals for quick logging
+    total_calories = Column(Float, default=0.0)
+    total_protein = Column(Float, default=0.0)
+    total_fat = Column(Float, default=0.0)
+    total_carbs = Column(Float, default=0.0)
+    total_fiber = Column(Float, default=0.0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User", backref="saved_dishes")
 
 class ShoppingSession(Base):
     __tablename__ = "shopping_sessions"

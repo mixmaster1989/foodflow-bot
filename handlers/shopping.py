@@ -518,7 +518,7 @@ async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMConte
 
     await state.clear()
     await callback.answer("Сессия отменена")
-    await show_main_menu(callback.message, callback.from_user.first_name)
+    await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("shopping_delete_scan:"))

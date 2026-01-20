@@ -18,7 +18,7 @@ router = Router()
 @router.message(F.text.in_({"🏠 Главное меню", "Меню", "Главное меню", "menu", "Menu"}))
 async def menu_button_handler(message: types.Message) -> None:
     """Handle persistent 'Main Menu' button click."""
-    await show_main_menu(message, message.from_user.first_name)
+    await show_main_menu(message, message.from_user.first_name, message.from_user.id)
 
 
 @router.callback_query(F.data == "main_menu")
@@ -32,11 +32,11 @@ async def back_to_main(callback: types.CallbackQuery) -> None:
         None
 
     """
-    await show_main_menu(callback.message, callback.from_user.first_name)
+    await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id)
     await callback.answer()
 
 
-async def show_main_menu(message: types.Message, user_name: str) -> None:
+async def show_main_menu(message: types.Message, user_name: str, user_id: int) -> None:
     """Display the main menu with inline buttons.
 
     Shows all available bot features: shopping mode, receipt upload,
@@ -45,6 +45,7 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     Args:
         message: Telegram message object to edit or send menu to
         user_name: User's first name for personalization
+        user_id: Telegram user ID for DB lookup
 
     Returns:
         None
@@ -52,11 +53,31 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
     """
     builder = InlineKeyboardBuilder()
 
-    # Row 0: BIG "I ATE" button - top priority
-    builder.button(text="🍽️ Я ПОЕЛ!", callback_data="menu_i_ate")
+    # Check user role and gender from DB
+    is_curator = False
+    is_female = False
+    from database.base import get_db
+    from database.models import User, UserSettings
+    from sqlalchemy import select
+    async for session in get_db():
+        stmt = select(User).where(User.id == user_id)
+        user = (await session.execute(stmt)).scalar_one_or_none()
+        if user and user.role == "curator":
+            is_curator = True
+        
+        # Check gender from settings
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        if settings and settings.gender == "female":
+            is_female = True
     
-    # TODO [CURATOR-2.1]: Add curator dashboard button here (visible only if user.role == "curator")
-    # builder.button(text="👨‍🏫 Кабинет Куратора", callback_data="curator_dashboard")
+    # Row 0: BIG "I ATE" button - gender aware
+    ate_text = "🍽️ Я СЪЕЛА!" if is_female else "🍽️ Я СЪЕЛ!"
+    builder.button(text=ate_text, callback_data="menu_i_ate")
+    
+    # Curator dashboard button (visible only for curators)
+    if is_curator:
+        builder.button(text="👨‍🏫 Кабинет Куратора", callback_data="curator_dashboard")
     
     # Row 1: Fridge
     builder.button(text="🧊 Холодильник", callback_data="menu_fridge")
@@ -82,16 +103,19 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
         builder.button(text="🔄 RESTART BOT", callback_data="admin_restart_bot")
         builder.button(text="📨 НАПИСАТЬ ЮЗЕРУ", callback_data="admin_send_message")
 
-    # Layout: 1 (I ATE), 1 (fridge), 2, 2, 2, 1, (2 for admin)
-    rows = [1, 1, 2, 2, 2, 1]
+    # Layout depends on curator status
+    if is_curator:
+        rows = [1, 1, 1, 2, 2, 2, 1]  # I ATE, Curator, Fridge, ...
+    else:
+        rows = [1, 1, 2, 2, 2, 1]
     if message.from_user.id in settings.ADMIN_IDS:
         rows.append(2)
         
     builder.adjust(*rows)
 
 
-    # Image path
-    photo_path = types.FSInputFile("assets/main_menu.png")
+    # Video path for main menu
+    video_path = types.FSInputFile("assets/grok-video-74406efc-afd9-467a-a40a-b9936f3beaf7.mp4")
 
     caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
@@ -100,20 +124,20 @@ async def show_main_menu(message: types.Message, user_name: str) -> None:
         "<b>Что будем делать?</b>"
     )
 
-    # Try to edit if possible (if previous was photo), otherwise send new
+    # Try to edit if possible, otherwise send new video
     try:
         await message.edit_media(
-            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            media=types.InputMediaAnimation(media=video_path, caption=caption, parse_mode="HTML"),
             reply_markup=builder.as_markup()
         )
     except Exception:
-        # If edit fails (e.g. previous was text), delete and send new photo
+        # If edit fails, delete and send new animation
         try:
              await message.delete()
         except Exception:
             pass
-        await message.answer_photo(
-            photo=photo_path,
+        await message.answer_animation(
+            animation=video_path,
             caption=caption,
             reply_markup=builder.as_markup(),
             parse_mode="HTML"

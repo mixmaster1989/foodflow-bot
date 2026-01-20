@@ -52,4 +52,4 @@ async def process_support_message(message: types.Message, state: FSMContext, bot
     
     # Return to menu
     from handlers.menu import show_main_menu
-    await show_main_menu(message, message.from_user.first_name)
+    await show_main_menu(message, message.from_user.first_name, message.from_user.id)

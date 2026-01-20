@@ -116,12 +116,50 @@ def _run_sqlite_migrations():
                 "users",
                 [
                     ("is_verified", "BOOLEAN DEFAULT 0"),
-                    # TODO [CURATOR-1.1]: Add curator columns:
-                    # ("role", "TEXT DEFAULT 'user'"),
-                    # ("curator_id", "BIGINT"),
-                    # ("referral_token", "TEXT"),
+                    # Curator system columns
+                    ("role", "TEXT DEFAULT 'user'"),
+                    ("curator_id", "BIGINT"),
+                    ("referral_token", "TEXT"),
                 ]
             )
+
+        # Add base_name to consumption_logs
+        if _table_exists(cursor, "consumption_logs"):
+            _ensure_columns(
+                cursor,
+                "consumption_logs",
+                [
+                    ("base_name", "TEXT"),
+                ]
+            )
+
+        # Add dish_type to saved_dishes
+        if _table_exists(cursor, "saved_dishes"):
+            _ensure_columns(
+                cursor,
+                "saved_dishes",
+                [
+                    ("dish_type", "TEXT DEFAULT 'dish'"),
+                ]
+            )
+
+        # Create saved_dishes table if not exists
+        if not _table_exists(cursor, "saved_dishes"):
+            cursor.execute("""
+                CREATE TABLE saved_dishes (
+                    id INTEGER PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    name VARCHAR NOT NULL,
+                    components JSON NOT NULL,
+                    total_calories FLOAT DEFAULT 0.0,
+                    total_protein FLOAT DEFAULT 0.0,
+                    total_fat FLOAT DEFAULT 0.0,
+                    total_carbs FLOAT DEFAULT 0.0,
+                    total_fiber FLOAT DEFAULT 0.0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+            """)
 
         conn.commit()
     finally:

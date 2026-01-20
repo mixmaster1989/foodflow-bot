@@ -520,7 +520,20 @@ async def log_food_no_scale(callback: types.CallbackQuery, state: FSMContext) ->
         await state.update_data(pending_foods=pending_foods)
     
     await state.set_state(None)  # Clear state but keep pending_foods
-    await callback.answer("✅ Записано!")
+    
+    # Show button to add weight to other pending foods if any left
+    if pending_foods:
+        builder = InlineKeyboardBuilder()
+        builder.button(text=f"📏 Указать вес ({len(pending_foods)} ещё)", callback_data="list_pending_foods")
+        builder.button(text="🏠 Меню", callback_data="main_menu")
+        builder.adjust(1)
+        await callback.message.answer(
+            f"✅ Записано!\n\n<i>Осталось {len(pending_foods)} фото без веса.</i>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.answer("✅ Записано!")
 
 
 @router.callback_query(F.data.startswith("food_edit_name:"))
@@ -733,4 +746,67 @@ async def manual_add_confirm(callback: types.CallbackQuery, state: FSMContext) -
 async def manual_add_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await callback.message.edit_text("❌ Отменено")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "list_pending_foods")
+async def list_pending_foods(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show list of pending foods that need weight input."""
+    data = await state.get_data()
+    pending_foods = data.get("pending_foods", {})
+    
+    if not pending_foods:
+        await callback.answer("Нет фото, ожидающих ввода веса.", show_alert=True)
+        return
+    
+    builder = InlineKeyboardBuilder()
+    text = "📏 <b>Выберите продукт для ввода веса:</b>\n\n"
+    
+    for file_id, product_data in pending_foods.items():
+        name = product_data.get("name", "Продукт")[:25]
+        cal_100 = int(product_data.get("calories", 0) or 0)
+        text += f"▫️ {name} ({cal_100} ккал/100г)\n"
+        builder.button(text=f"📏 {name}", callback_data=f"select_pending:{file_id}")
+    
+    builder.button(text="🔙 В меню", callback_data="main_menu")
+    builder.adjust(1)
+    
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("select_pending:"))
+async def select_pending_food(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Select a pending food to enter weight for."""
+    file_id_short = callback.data.split(":")[1]
+    
+    data = await state.get_data()
+    pending_foods = data.get("pending_foods", {})
+    product_data = pending_foods.get(file_id_short)
+    
+    if not product_data:
+        await callback.answer("⚠️ Продукт не найден (возможно, устарел).", show_alert=True)
+        return
+    
+    await state.update_data(active_food_id=file_id_short)
+    await state.set_state(ReceiptStates.waiting_for_portion_weight)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🍽️ Средняя порция (300г)", callback_data=f"food_no_scale:{file_id_short}")
+    builder.button(text="🔙 К списку", callback_data="list_pending_foods")
+    builder.adjust(1)
+    
+    name = product_data.get("name", "Продукт")
+    cal_100 = int(product_data.get("calories", 0) or 0)
+    
+    await callback.message.edit_text(
+        f"🍽️ <b>{name}</b>\n"
+        f"<i>{cal_100} ккал на 100г</i>\n\n"
+        f"📏 <b>Введите вес в граммах</b> (например: 150)",
+        parse_mode="HTML",
+        reply_markup=builder.as_markup()
+    )
     await callback.answer()

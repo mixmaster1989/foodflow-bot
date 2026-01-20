@@ -26,66 +26,96 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.set_state(IAteStates.waiting_for_description)
     
     builder = InlineKeyboardBuilder()
+    builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
+    builder.button(text="🍽️ Приёмы пищи", callback_data="menu_saved_meals")
+    builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
+    builder.button(text="🍳 Собрать приём", callback_data="menu_build_meal")
     builder.button(text="❌ Отмена", callback_data="main_menu")
+    builder.adjust(2, 2, 1)
     
-    text = (
+    caption = (
         "🍽️ <b>Что съели?</b>\n\n"
-        "Опишите что вы съели и примерный размер порции.\n\n"
+        "Опишите что вы съели <b>с указанием веса</b>.\n\n"
         "<i>Например:\n"
-        "• Тарелка борща\n"
-        "• Куриная грудка 200г с рисом\n"
-        "• 2 яйца и тост с авокадо\n"
-        "• Большая порция пасты карбонара</i>"
+        "• Борщ 300г\n"
+        "• Куриная грудка 200г\n"
+        "• 2 яйца</i>"
     )
     
+    photo_path = types.FSInputFile("assets/i_ate.png")
+    
     try:
-        await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
     except Exception:
         try:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
-        except Exception:
             await callback.message.delete()
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        except Exception:
+            pass
+        await callback.message.answer_photo(
+            photo=photo_path,
+            caption=caption,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 
 @router.message(IAteStates.waiting_for_description)
 async def i_ate_process(message: types.Message, state: FSMContext) -> None:
     """Process food description, get KBJU from AI, save to consumption log."""
-    description = message.text.strip()
+    description = message.text or message.caption
+    if not description:
+        await message.answer("⚠️ Пожалуйста, напишите название блюда текстом (или отправьте фото с описанием).")
+        return
+        
+    description = description.strip()
     user_id = message.from_user.id
     
     status_msg = await message.answer("🔄 Анализирую...")
     
     try:
-        # Use NormalizationService to get KBJU
-        normalizer = NormalizationService()
+        # Use new analyze_food_intake method with weight detection
+        result = await NormalizationService.analyze_food_intake(description)
         
-        # Format as a single item for normalization
-        result = await normalizer.normalize_products([{"name": description}])
+        name = result.get("name", description)
+        calories = float(result.get("calories") or 0)
+        protein = float(result.get("protein") or 0)
+        fat = float(result.get("fat") or 0)
+        carbs = float(result.get("carbs") or 0)
+        fiber = float(result.get("fiber") or 0)
+        weight_grams = result.get("weight_grams")
+        weight_missing = result.get("weight_missing", True)
         
-        if result and len(result) > 0:
-            item = result[0]
-            name = item.get("name", description)
-            calories = float(item.get("calories") or 0)
-            protein = float(item.get("protein") or 0)
-            fat = float(item.get("fat") or 0)
-            carbs = float(item.get("carbs") or 0)
-            fiber = float(item.get("fiber") or 0)
-        else:
-            # Fallback if AI fails
-            name = description
-            calories = 300  # Default estimate
-            protein = 15
-            fat = 10
-            carbs = 35
-            fiber = 2
+        # If weight is missing, ask user to specify
+        if weight_missing:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🍽️ Ещё раз", callback_data="menu_i_ate")
+            builder.button(text="🏠 Меню", callback_data="main_menu")
+            builder.adjust(2)
+            
+            await status_msg.edit_text(
+                f"⚠️ <b>Не указан вес!</b>\n\n"
+                f"Найдено: <b>{name}</b>\n"
+                f"КБЖУ на 100г: {int(calories)} ккал / {protein:.1f}б / {fat:.1f}ж / {carbs:.1f}у\n\n"
+                f"📏 <b>Укажите вес в граммах</b>, чтобы записать точные данные.\n\n"
+                f"<i>Например: {name} 150г</i>",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            # Don't clear state - let user try again
+            return
         
-        # Save to consumption log
+        base_name = result.get("base_name")
+        
+        # Save to consumption log (weight was detected)
         async for session in get_db():
             log = ConsumptionLog(
                 user_id=user_id,
-                product_name=name,
+                product_name=f"{name} ({weight_grams}г)" if weight_grams else name,
+                base_name=base_name,
                 calories=calories,
                 protein=protein,
                 fat=fat,
@@ -99,14 +129,15 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         await state.clear()
         
         builder = InlineKeyboardBuilder()
-        builder.button(text="🍽️ Ещё поел", callback_data="menu_i_ate")
+        builder.button(text="🍽️ Ещё", callback_data="menu_i_ate")
         builder.button(text="📊 Статистика", callback_data="menu_stats")
         builder.button(text="🏠 Меню", callback_data="main_menu")
         builder.adjust(1, 2)
         
+        weight_text = f" ({weight_grams}г)" if weight_grams else ""
         response = (
             f"✅ <b>Записано!</b>\n\n"
-            f"🍽️ {name}\n\n"
+            f"🍽️ {name}{weight_text}\n\n"
             f"🔥 <b>{int(calories)}</b> ккал\n"
             f"🥩 Белки: <b>{protein:.1f}</b>г\n"
             f"🥑 Жиры: <b>{fat:.1f}</b>г\n"
@@ -122,6 +153,8 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         
         builder = InlineKeyboardBuilder()
         builder.button(text="🔄 Попробовать снова", callback_data="menu_i_ate")
+        builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes") # Placeholder for future list
+        builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish") 
         builder.button(text="🏠 Меню", callback_data="main_menu")
         builder.adjust(1)
         

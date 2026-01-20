@@ -8,21 +8,26 @@ from database import migrations
 from database.base import init_db
 from handlers import (
     common,
+    auth,
+    onboarding,
+    menu,
+    i_ate,
+    receipt,
+    shopping,
+    stats,
+    fridge,
+    recipes,
+    user_settings,
+    curator,
+    saved_dishes,
+    global_input,
     correction,
     admin,
     support,
     errors,
-    fridge,
-    i_ate,
-    menu,
-    onboarding,
-    receipt,
-    recipes,
-    shopping,
     shopping_list,
-    stats,
-    user_settings,
     weight,
+    base,
 )
 
 
@@ -60,7 +65,7 @@ async def main():
     dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(menu.router)  # Central menu router
     dp.include_router(i_ate.router)  # Quick food logging
-    # TODO [CURATOR-1.3]: dp.include_router(curator.router)  # Curator dashboard
+    dp.include_router(curator.router)  # Curator dashboard
     dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)
     dp.include_router(fridge.router)
@@ -70,6 +75,8 @@ async def main():
     dp.include_router(shopping_list.router)
     dp.include_router(weight.router)
     dp.include_router(correction.router)
+    dp.include_router(saved_dishes.router)
+    dp.include_router(global_input.router) # Catch-all text handler (Must be LAST)
 
     # Start reminder scheduler
     from services.scheduler import start_scheduler

@@ -1,6 +1,7 @@
 from . import (
     common,
     correction,
+    curator,
     fridge,
     i_ate,
     menu,
@@ -14,12 +15,16 @@ from . import (
     weight,
     admin,
     support,
-    errors
+    errors,
+    errors,
+    global_input,
+    saved_dishes
 )
 
 __all__ = [
     "common",
     "correction",
+    "curator",
     "fridge",
     "i_ate",
     "menu",
@@ -33,6 +38,9 @@ __all__ = [
     "weight",
     "admin",
     "support",
-    "errors"
+    "errors",
+    "errors",
+    "global_input",
+    "saved_dishes"
 ]
 

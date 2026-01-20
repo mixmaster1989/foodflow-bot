@@ -64,7 +64,7 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
 
         # If user already initialized, show main menu
         if settings and settings.is_initialized:
-            await show_main_menu(message, message.from_user.first_name)
+            await show_main_menu(message, message.from_user.first_name, message.from_user.id)
             return
 
         # Start onboarding

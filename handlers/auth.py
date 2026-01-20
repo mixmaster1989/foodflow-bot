@@ -82,7 +82,7 @@ class AuthMiddleware(BaseMiddleware):
                     await session.commit()
                     await message_obj.answer("✅ Пароль принят! Добро пожаловать.", reply_markup=kb)
                     # Show main menu immediately
-                    await show_main_menu(message_obj, message_obj.from_user.first_name)
+                    await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation (we handled it)
 
                 # Check Personal Password (Old Users): MYSELF{id}
@@ -98,7 +98,7 @@ class AuthMiddleware(BaseMiddleware):
                     await session.commit()
                     await message_obj.answer("✅ Личный пароль принят!", reply_markup=kb)
                     # Show main menu immediately
-                    await show_main_menu(message_obj, message_obj.from_user.first_name)
+                    await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation
 
             # If we are here, user is not verified and didn't guess password.

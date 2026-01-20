@@ -1,6 +1,7 @@
 import logging
 import subprocess
 from aiogram import Router, F, types, Bot
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from config import settings
 from database.base import get_db
 from database.models import User
+from handlers.base import BaseCommandHandler
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -21,6 +23,35 @@ class AdminStates(StatesGroup):
 
 def is_admin(user_id: int) -> bool:
     return user_id in settings.ADMIN_IDS
+
+
+@router.message(Command("send_test"))
+async def send_test_message(message: types.Message):
+    """
+    Send a test message to a user.
+    Usage: /send_test <user_id> <message>
+    """
+    if not is_admin(message.from_user.id):
+        return
+
+    args = message.text.split()
+    if len(args) < 3:
+        await message.reply("Usage: /send_test <user_id> <message>")
+        return
+
+    user_id_str, message_text = args[1], " ".join(args[2:])
+
+    if not user_id_str.isdigit():
+        await message.reply("Invalid user ID.")
+        return
+
+    user_id = int(user_id_str)
+
+    try:
+        await BaseCommandHandler.send_arbitrary_message(user_id, message_text)
+        await message.reply("Message sent successfully.")
+    except Exception as e:
+        await message.reply(f"Error sending message: {e}")
 
 
 @router.callback_query(F.data == "admin_restart_bot")

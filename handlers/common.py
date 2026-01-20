@@ -45,24 +45,49 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         None
 
     """
-    # TODO [CURATOR-1.2]: Parse deep link for referral token
-    # Example: /start ref_abc123 -> extract "abc123"
-    # args = message.text.split()[1] if len(message.text.split()) > 1 else None
-    # if args and args.startswith("ref_"):
-    #     referral_token = args[4:]
-    #     -> find curator by token, link new user to curator_id
+    # Parse deep link for referral token: /start ref_abc123
+    referral_token = None
+    curator = None
+    if len(message.text.split()) > 1:
+        args = message.text.split()[1]
+        if args.startswith("ref_"):
+            referral_token = args[4:]
     
     async for session in get_db():
+        # If referral token provided, find the curator
+        if referral_token:
+            curator_stmt = select(User).where(User.referral_token == referral_token)
+            curator = (await session.execute(curator_stmt)).scalar_one_or_none()
+        
         stmt = select(User).where(User.id == message.from_user.id)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 
         if not user:
-            user = User(id=message.from_user.id, username=message.from_user.username)
-            # TODO [CURATOR-1.2]: If referral token found, set user.curator_id here
+            # Create new user, optionally linked to curator
+            user = User(
+                id=message.from_user.id, 
+                username=message.from_user.username,
+                curator_id=curator.id if curator else None
+            )
             session.add(user)
             await session.commit()
-            # TODO [CURATOR-1.2]: Notify curator about new ward
+            
+            # Notify curator about new ward
+            if curator:
+                from aiogram import Bot
+                from config import settings
+                bot = Bot(token=settings.BOT_TOKEN)
+                try:
+                    await bot.send_message(
+                        curator.id,
+                        f"🎉 <b>Новый подопечный!</b>\n\n"
+                        f"К вам присоединился: @{message.from_user.username or 'Пользователь'}",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+                await bot.session.close()
 
         # Check if user has completed onboarding
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
@@ -80,6 +105,6 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         reply_markup=get_main_keyboard()
     )
     # Then show the visual menu (which will edit/send the photo)
-    await show_main_menu(message, message.from_user.first_name)
+    await show_main_menu(message, message.from_user.first_name, message.from_user.id)
 
 

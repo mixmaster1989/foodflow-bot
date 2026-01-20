@@ -148,3 +148,116 @@ class NormalizationService:
             logger.warning(f"Model {model} failed, switching to next...")
 
         return raw_items
+
+    @classmethod
+    async def analyze_food_intake(cls, description: str) -> dict:
+        """Analyze food intake with weight detection.
+        
+        Returns dict with:
+        - name: food name
+        - calories, protein, fat, carbs, fiber: KBJU values
+        - weight_grams: detected weight or None
+        - weight_missing: True if no weight specified
+        """
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+
+        prompt = f'''Analyze this food intake description: "{description}"
+
+TASK:
+1. Extract the food name (in Russian)
+2. Extract the "base_name" (Essence) - the generic name of the product without weight, brand, or adjectives if possible (e.g. "Яблоко 150г" -> "Яблоко", "Творог 5% Простоквашино" -> "Творог 5%").
+3. Detect if weight/portion is specified.
+4. Calculate KBJU based on the specified weight.
+
+WEIGHT DETECTION RULES:
+- "банан 150" = 150 grams
+- "банан 150г" = 150 grams
+- "банан 150 грамм" = 150 grams
+- "2 яйца" = 2 pieces (~120g total)
+- "тарелка борща" = ~300g (estimate)
+- "большая порция" = ~400g (estimate)
+- "банан" (no weight) = weight_missing: true, return per 100g
+
+RETURN JSON ONLY:
+{{
+  "name": "Название продукта (RU)",
+  "base_name": "Суть продукта (RU)",
+  "weight_grams": 150,
+  "weight_missing": false,
+  "calories": 134,
+  "protein": 1.7,
+  "fat": 0.5,
+  "carbs": 34.2,
+  "fiber": 3.9
+}}
+
+If weight is NOT specified:
+{{
+  "name": "Банан",
+  "base_name": "Банан",
+  "weight_grams": null,
+  "weight_missing": true,
+  "calories": 89,
+  "protein": 1.1,
+  "fat": 0.3,
+  "carbs": 22.8,
+  "fiber": 2.6
+}}
+
+CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
+
+        import asyncio
+        import aiohttp
+
+        for model in cls.MODELS[:3]:  # Use first 3 models only
+            for attempt in range(2):
+                try:
+                    payload = {
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1
+                    }
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                content = data["choices"][0]["message"]["content"].strip()
+                                
+                                # Clean JSON
+                                if content.startswith("```"):
+                                    content = content.split("```")[1]
+                                    if content.startswith("json"):
+                                        content = content[4:]
+                                content = content.strip()
+                                
+                                result = json.loads(content)
+                                logger.info(f"Food intake analyzed: {result}")
+                                return result
+                except Exception as e:
+                    logger.error(f"analyze_food_intake error ({model}): {e}")
+                    if attempt < 1:
+                        await asyncio.sleep(0.3)
+                        continue
+        
+        # Fallback
+        return {
+            "name": description,
+            "weight_grams": None,
+            "weight_missing": True,
+            "calories": 100,
+            "protein": 5,
+            "fat": 3,
+            "carbs": 15,
+            "fiber": 1
+        }
