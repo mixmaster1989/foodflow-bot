@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class IAteStates(StatesGroup):
     waiting_for_description = State()
+    waiting_for_weight = State()
 
 
 @router.callback_query(F.data == "menu_i_ate")
@@ -88,27 +89,35 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         fiber = float(result.get("fiber") or 0)
         weight_grams = result.get("weight_grams")
         weight_missing = result.get("weight_missing", True)
+        base_name = result.get("base_name")
         
         # If weight is missing, ask user to specify
         if weight_missing:
+            # Save context and ask for weight
+            await state.update_data(
+                pending_product={
+                    "name": name,
+                    "base_name": base_name,
+                    "calories100": calories, 
+                    "protein100": protein,
+                    "fat100": fat,
+                    "carbs100": carbs,
+                    "fiber100": fiber
+                }
+            )
+            await state.set_state(IAteStates.waiting_for_weight)
+            
             builder = InlineKeyboardBuilder()
-            builder.button(text="🍽️ Ещё раз", callback_data="menu_i_ate")
-            builder.button(text="🏠 Меню", callback_data="main_menu")
-            builder.adjust(2)
+            builder.button(text="❌ Отмена", callback_data="main_menu")
             
             await status_msg.edit_text(
-                f"⚠️ <b>Не указан вес!</b>\n\n"
-                f"Найдено: <b>{name}</b>\n"
-                f"КБЖУ на 100г: {int(calories)} ккал / {protein:.1f}б / {fat:.1f}ж / {carbs:.1f}у\n\n"
-                f"📏 <b>Укажите вес в граммах</b>, чтобы записать точные данные.\n\n"
-                f"<i>Например: {name} 150г</i>",
+                f"🧐 Вы сказали: <i>{description}</i>\n"
+                f"Это похоже на: <b>{name}</b>\n\n"
+                f"⚖️ <b>Сколько грамм?</b> (Напишите число, например: 55)",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup()
             )
-            # Don't clear state - let user try again
             return
-        
-        base_name = result.get("base_name")
         
         # Save to consumption log (weight was detected)
         async for session in get_db():
@@ -162,3 +171,80 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
             f"❌ Ошибка: {e}\n\nПопробуйте ещё раз или опишите еду иначе.",
             reply_markup=builder.as_markup()
         )
+
+
+@router.message(IAteStates.waiting_for_weight, F.text)
+async def handle_weight_input(message: types.Message, state: FSMContext) -> None:
+    """Handle weight input (e.g., '55') after manual entry."""
+    try:
+        weight_text = message.text.replace(',', '.').strip()
+        # Extract number if mixed text (e.g. "55g")
+        import re
+        match = re.search(r'(\d+(?:\.\d+)?)', weight_text)
+        
+        if not match:
+            await message.reply("⚠️ Пожалуйста, введите только число (вес в граммах).")
+            return
+
+        weight = float(match.group(1))
+        
+        data = await state.get_data()
+        product = data.get("pending_product")
+        
+        if not product:
+            await message.reply("⚠️ Ошибка контекста. Попробуйте ввести продукт заново.")
+            await state.clear()
+            return
+            
+        # Recalculate based on weight
+        factor = weight / 100.0
+        
+        name = product['name']
+        base_name = product['base_name']
+        calories = product['calories100'] * factor
+        protein = product['protein100'] * factor
+        fat = product['fat100'] * factor
+        carbs = product['carbs100'] * factor
+        fiber = product['fiber100'] * factor
+        
+        final_name = f"{name} ({int(weight)}г)"
+        
+        async for session in get_db():
+            log = ConsumptionLog(
+                user_id=message.from_user.id,
+                product_name=final_name,
+                base_name=base_name,
+                calories=calories,
+                protein=protein,
+                fat=fat,
+                carbs=carbs,
+                fiber=fiber,
+                date=datetime.utcnow()
+            )
+            session.add(log)
+            await session.commit()
+            
+        await state.clear()
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🍽️ Ещё", callback_data="menu_i_ate")
+        builder.button(text="📊 Статистика", callback_data="menu_stats")
+        builder.button(text="🏠 Меню", callback_data="main_menu")
+        builder.adjust(1, 2)
+        
+        await message.answer(
+            f"✅ <b>Записано!</b>\n\n"
+            f"🍽️ {final_name}\n\n"
+            f"🔥 <b>{int(calories)}</b> ккал\n"
+            f"🥩 Белки: <b>{protein:.1f}</b>г\n"
+            f"🥑 Жиры: <b>{fat:.1f}</b>г\n"
+            f"🍞 Углеводы: <b>{carbs:.1f}</b>г\n"
+            f"🥬 Клетчатка: <b>{fiber:.1f}</b>г",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+        
+    except Exception as e:
+        logger.error(f"Weight Input Error: {e}", exc_info=True)
+        await message.reply(f"❌ Ошибка при сохранении: {e}")
+        await state.clear()
