@@ -104,7 +104,7 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
             stmt = stmt.where(and_(*filters))
             
         # Count total results
-        count_stmt = select(func.count()).select_from(doc).where(stmt.whereclause) 
+ 
         # Actually proper way to count with complex query:
         # We'll just fetch all for now or improve count query later. 
         # For SQLite, fetching all IDs first is fast enough for small fridge.
