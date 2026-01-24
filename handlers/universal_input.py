@@ -151,7 +151,8 @@ async def process_universal_input(
         brain_result = await AIBrainService.analyze_text(content)
         is_herbalife = await herbalife_expert.find_product_by_alias(content)
         
-        if brain_result and brain_result.get("intent") in ["log_consumption", "add_to_fridge"] and not is_herbalife:
+        # Safety check: brain_result must be a dict (AI sometimes returns list)
+        if brain_result and isinstance(brain_result, dict) and brain_result.get("intent") in ["log_consumption", "add_to_fridge"] and not is_herbalife:
             intent = brain_result["intent"]
             product = brain_result.get("product") or content
             weight = brain_result.get("weight") # Float or null
