@@ -153,8 +153,12 @@ class UserSettings(Base):
     goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
     is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
     reminder_time = Column(String, default="09:00")  # HH:MM for weight reminders
-    summary_time = Column(String, default="21:00")  # HH:MM for daily nutrition summary
-    reminders_enabled = Column(Boolean, default=True)  # Enable/disable daily weight reminders
+    summary_time = Column(String, default="21:00")
+    reminders_enabled = Column(Boolean, default=True)
+    
+    # Fridge Summary Cache (24h)
+    fridge_summary_cache = Column(String, nullable=True) # Text
+    fridge_summary_date = Column(DateTime, nullable=True) # Timestamp of last generation
     user = relationship("User", backref="settings")
 
 class ShoppingListItem(Base):

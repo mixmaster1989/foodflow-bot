@@ -5,6 +5,7 @@ Implements fuzzy search, pagination, and AI-ready filtering.
 """
 import logging
 import math
+import json
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -23,27 +24,134 @@ PAGE_SIZE = 10
 
 @router.callback_query(F.data == "fridge_search")
 async def fridge_search_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start fridge search - ask for search query."""
-    from handlers.fridge import FridgeStates # Reuse states or create new
+    """Start fridge search - with AI Summary."""
+    from handlers.fridge import FridgeStates
+    from database.models import UserSettings
+    from services.ai_brain import AIBrainService 
+    from datetime import datetime, timedelta
     
     await state.set_state(FridgeStates.searching_fridge)
     
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ Отмена", callback_data="menu_fridge")
     
-    text = (
-        "🔍 <b>Поиск по холодильнику</b>\n\n"
-        "Введите название продукта (например: <i>молоко, курица, хлеб</i>):"
-    )
+    initial_text = "⏳ <b>Заглядываю в холодильник...</b>"
+    
+    try:
+        await callback.message.edit_caption(caption=initial_text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception:
+        try:
+            await callback.message.edit_text(initial_text, parse_mode="HTML", reply_markup=builder.as_markup())
+        except Exception:
+            await callback.message.answer(initial_text, parse_mode="HTML", reply_markup=builder.as_markup())
+    
+    # 1. Fetch Products
+    user_id = callback.from_user.id
+    summary = ""
+    
+    async for session in get_db():
+        # Get Settings & Cache
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        
+        # Check Cache
+        cached_data = None
+        if user_settings and user_settings.fridge_summary_cache and user_settings.fridge_summary_date:
+            if datetime.utcnow() - user_settings.fridge_summary_date < timedelta(hours=24):
+                cached_data = user_settings.fridge_summary_cache
+                
+        summary_text = ""
+        tags = []
+
+        if cached_data:
+            # Try to parse JSON (new format) or use as text (legacy)
+            try:
+                data = json.loads(cached_data)
+                summary_text = data.get("summary", "")
+                tags = data.get("tags", [])
+                logger.info(f"[AI Summary] Cache HIT for user {user_id}. Tags: {len(tags)}")
+            except json.JSONDecodeError:
+                summary_text = cached_data # Legacy plain text
+                logger.info(f"[AI Summary] Cache HIT (Legacy Text) for user {user_id}")
+        else:
+            # Generate New Summary
+            stmt = (
+                select(Product.name)
+                .outerjoin(Receipt)
+                .where(or_(Receipt.user_id == user_id, Product.user_id == user_id))
+                .order_by(Product.id.desc())
+                .limit(40)
+            )
+            products = (await session.execute(stmt)).scalars().all()
+            
+            if not products:
+                summary_text = "В холодильнике пустовато... Самое время что-то купить! 🛒"
+                logger.info(f"[AI Summary] Empty fridge for user {user_id}")
+            else:
+                try:
+                    logger.info(f"[AI Summary] Generating for user {user_id}, items: {len(products)}")
+                    result = await AIBrainService.summarize_fridge(list(products))
+                    if result:
+                        # Handle Dict or String result
+                        if isinstance(result, dict):
+                            summary_text = result.get("summary", "")
+                            tags = result.get("tags", [])
+                            cache_val = json.dumps(result, ensure_ascii=False)
+                        else:
+                            summary_text = result
+                            cache_val = result # Legacy fallback
+                            
+                        summary = f"🤖 {summary_text}"
+                        
+                        # Update Cache
+                        if user_settings:
+                            user_settings.fridge_summary_cache = cache_val
+                            user_settings.fridge_summary_date = datetime.utcnow()
+                            session.add(user_settings)
+                            await session.commit()
+                            logger.info(f"[AI Summary] Cache UPDATED for user {user_id}")
+                except Exception as e:
+                    logger.error(f"[AI Summary] Failed for {user_id}: {e}")
+                    summary_text = "Не удалось провести ревизию, но вы можете найти продукты ниже."
+
+    # Render
+    text = f"🤖 {summary_text}\n\n" if summary_text else ""
+    text += "🔍 <b>Поиск по холодильнику</b>\n"
+    text += "Введите название продукта или выберите тег:"
+    
+    # Add Tag Buttons
+    if tags:
+        for tag_item in tags:
+            if isinstance(tag_item, dict):
+                # New format: {"tag": "Milk", "emoji": "🥛"}
+                t_val = tag_item.get("tag", "Tag")
+                emoji = tag_item.get("emoji", "🔍")
+                btn_text = f"{emoji} {t_val}"
+                callback_val = t_val
+            else:
+                # Old format: string
+                btn_text = f"🔍 {tag_item}"
+                callback_val = tag_item
+                
+            builder.button(text=btn_text, callback_data=f"fridge_search_tag:{callback_val}")
+        builder.adjust(2) # 2 tags per row
+        
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="menu_fridge"))
     
     try:
         await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception:
-        try:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
-        except Exception:
-            await callback.message.delete()
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("fridge_search_tag:"))
+async def fridge_search_tag_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle click on AI search tag."""
+    tag = callback.data.split(":")[1]
+    await state.update_data(search_query=tag)
+    await show_search_results(callback.message, state, page=0, is_edit=True)
     await callback.answer()
 
 
@@ -77,60 +185,42 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
     
     data = await state.get_data()
     query = data.get("search_query", "")
-    user_id = message.chat.id # Fallback if message.from_user is None
-    if message.from_user:
-        user_id = message.from_user.id
+    user_id = message.chat.id
         
     if not query:
         await message.answer("⚠️ Ошибка поиска: пустой запрос.")
         return
 
-    # 1. Smart Search Logic
-    # Split query into keywords for AND logic
+    # 1. Smart Search Logic (Python-side filtering for Cyrillic support)
     keywords = query.lower().split()
     
     async for session in get_db():
-        # Base query
+        # Fetch ALL products for user (Fridge is usually small < 200 items)
         stmt = select(Product).outerjoin(Receipt).where(
             or_(Receipt.user_id == user_id, Product.user_id == user_id)
-        )
+        ).order_by(Product.id.desc())
         
-        # Add ILIKE filter for EACH keyword (AND logic)
-        # This allows "chicken file" to match "Filet Chicken"
-        if keywords:
-            filters = []
-            for kw in keywords:
-                filters.append(Product.name.ilike(f"%{kw}%"))
-            stmt = stmt.where(and_(*filters))
-            
-        # Count total results
- 
-        # Actually proper way to count with complex query:
-        # We'll just fetch all for now or improve count query later. 
-        # For SQLite, fetching all IDs first is fast enough for small fridge.
+        all_products = (await session.execute(stmt)).scalars().all()
         
-        # Let's use a simpler approach for accuracy: fetch logic first, then slice in python or use pagination sql
-        # Better: use proper Count query
+        # Filter in Python
+        filtered_products = []
+        if not keywords:
+            filtered_products = all_products
+        else:
+            for p in all_products:
+                name_norm = p.name.lower()
+                # Check if ALL keywords are in name (AND logic)
+                if all(kw in name_norm for kw in keywords):
+                    filtered_products.append(p)
+                    
+        total_items = len(filtered_products)
         
-        # Correct Count Query
-        # Reconstruct the where clause for counting
-        # This is tricky with SQLAlchemy imperative style. 
-        # Let's simply execute the main query with limit/offset
+        # Pagination in Python
+        start_idx = page * PAGE_SIZE
+        end_idx = start_idx + PAGE_SIZE
+        products = filtered_products[start_idx:end_idx]
         
-        # We need total count for pagination
-        # Let's perform a count query first
-        count_q = select(func.count()).select_from(Product).outerjoin(Receipt).where(
-             or_(Receipt.user_id == user_id, Product.user_id == user_id)
-        )
-        if keywords:
-             for kw in keywords:
-                 count_q = count_q.where(Product.name.ilike(f"%{kw}%"))
-                 
-        total_items = await session.scalar(count_q) or 0
-        
-        # Get Page Items
-        stmt = stmt.order_by(Product.id.desc()).offset(page * PAGE_SIZE).limit(PAGE_SIZE)
-        products = (await session.execute(stmt)).scalars().all()
+        logger.info(f"[Search Debug] Query: '{query}', Results: {len(products)}, Total: {total_items} (from {len(all_products)} items)")
 
     # 2. Render Response
     builder = InlineKeyboardBuilder()

@@ -106,6 +106,8 @@ def _run_sqlite_migrations():
                     ("weight", "REAL"),
                     ("goal", "TEXT"),
                     ("is_initialized", "BOOLEAN DEFAULT 0"),
+                    ("fridge_summary_cache", "TEXT"),
+                    ("fridge_summary_date", "DATETIME"),
                 ]
             )
 

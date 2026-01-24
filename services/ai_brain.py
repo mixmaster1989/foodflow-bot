@@ -225,3 +225,80 @@ class AIBrainService:
             logger.error(f"Vision Analysis Exception: {e}", exc_info=True)
             
         return None
+
+
+    @classmethod
+    async def summarize_fridge(cls, product_list: List[str]) -> Dict | None:
+        """Generate a structured summary (text + tags) of fridge contents."""
+        
+        products_str = ", ".join(product_list[:40]) # Limit context window
+        
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot",
+        }
+
+        prompt = f"""
+Ты — дружелюбный и вежливый ассистент FoodFlow. 
+Твоя задача — проанализировать список продуктов в холодильнике и вернуть JSON.
+
+Список продуктов: {products_str}
+
+ВЕРНИ JSON объект:
+{{
+  "summary": "Текст саммари (макс 3 предложения). Тон: дружелюбный, профессиональный, легкая ирония. НИКАКОГО сленга.",
+  "tags": [
+    {{"tag": "Молоко", "emoji": "🥛"}}, 
+    {{"tag": "Курица", "emoji": "🍗"}}
+  ] 
+}}
+
+Правила для tags:
+- Выбери 3-4 ключевых слова для поиска.
+- КРИТИЧНО: Теги ("tag") должны быть СЛОВАМИ, которые ФИЗИЧЕСКИ присутствуют в названиях продуктов.
+- "emoji": Подбери ОДИН стандартный эмодзи, подходящий по смыслу. Не используй редкие символы.
+- Пример: если есть "Молоко Простоквашино", tag="Молоко", emoji="🥛". 
+- ЗАПРЕЩЕНО: Придумывать категории, которых нет в тексте.
+- Если список странный, верни пустой список тегов.
+
+Пиши на русском языке. ТОЛЬКО JSON.
+"""
+
+        payload = {
+            "model": cls.MODEL,
+            "messages": [
+                {"role": "system", "content": "You are a helpful culinary assistant. Return ONLY JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+
+        for attempt in range(2):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=15
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            content = data['choices'][0]['message']['content']
+                            # Parse JSON
+                            try:
+                                result = json.loads(content)
+                                if "summary" in result:
+                                    return result
+                            except json.JSONDecodeError:
+                                logger.warning(f"AI Summary JSON Error: {content}")
+                        else:
+                            logger.warning(f"AI Summary error {response.status}")
+            except Exception as e:
+                logger.error(f"AI Summary exception: {e}")
+                
+            await asyncio.sleep(0.5)
+            
+        return None
