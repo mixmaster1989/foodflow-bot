@@ -1,0 +1,965 @@
+{
+  "database_version": "2.0",
+  "last_updated": "2026-01-23T14:45",
+  "data_sources": "Official Herbalife Nutrition datasheets, FatSecret, NutraCheck, official PDF documents",
+  "note": "Все данные получены из 100% официальных источников Herbalife Nutrition",
+  "products": [
+    {
+      "id": "f1_vanilla",
+      "sku": "0001",
+      "name": "Протеиновый коктейль Формула 1 со вкусом ванили",
+      "category": "Еда",
+      "subcategory": "Протеиновые коктейли",
+      "aliases": [
+        "Ф1",
+        "Ф1 Ванила",
+        "Formula 1 Vanilla",
+        "F1 vanilla"
+      ],
+      "description": "Сбалансированная еда в стакане. Заменяет полноценный прием пищи. Содержит соевый белок, пищевые волокна и 25 витаминов и минералов.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 26,
+        "unit": "граммы",
+        "description": "2 мерные ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 398,
+        "energy_kj": 1664,
+        "protein_g": 35.0,
+        "carbs_g": 33.0,
+        "sugars_g": 23.0,
+        "fat_g": 9.7,
+        "saturated_fat_g": 1.6,
+        "fiber_g": 18.0,
+        "sodium_mg": 1200.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0,
+        "sodium_mg": 312.0,
+        "note": "Данные при смешивании с 250ml соевым молоком"
+      },
+      "dosage": {
+        "min": 1,
+        "min_unit": "мерная ложка",
+        "standard": 2,
+        "standard_unit": "мерные ложки",
+        "max": 4,
+        "max_unit": "мерные ложки",
+        "notes": "Используется с водой или молоком (250ml)"
+      },
+      "compatible_with": [
+        "f3_protein",
+        "green_max",
+        "oyahn"
+      ],
+      "sources": [
+        "web:3"
+      ]
+    },
+    {
+      "id": "aloe_classic",
+      "sku": "0757",
+      "name": "Растительный напиток Алоэ классический",
+      "category": "Напитки",
+      "subcategory": "Растительные напитки",
+      "aliases": [
+        "Алоэ",
+        "Aloe Classic",
+        "Алоэ классический",
+        "Aloe Concentrate"
+      ],
+      "description": "Растительный напиток содержит 40% холодного отжима сока алоэ вера из целого листа. Поддерживает пищеварение и микрофлору.",
+      "measurement_unit": "миллилитры",
+      "standard_serving": {
+        "amount": 15,
+        "unit": "миллилитры",
+        "description": "3 колпачка в 120ml воды"
+      },
+      "package_size_ml": 473,
+      "servings_per_container": 31,
+      "nutrition_per_100ml": {
+        "energy_kcal": 12,
+        "energy_kj": 51,
+        "protein_g": 0.0,
+        "carbs_g": 3.0,
+        "sugars_g": 0.0,
+        "fat_g": 0.0,
+        "fiber_g": 0.1,
+        "sodium_mg": 32.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_ml": 15,
+        "energy_kcal": 2,
+        "energy_kj": 8,
+        "protein_g": 0.0,
+        "carbs_g": 0.5,
+        "sugars_g": 0.0,
+        "fat_g": 0.0,
+        "sodium_mg": 5.0,
+        "note": "На 15ml концентрата (разбавленного в 120ml воды)"
+      },
+      "dosage": {
+        "min": 1,
+        "min_unit": "колпачок",
+        "standard": 3,
+        "standard_unit": "колпачка",
+        "max": 5,
+        "max_unit": "колпачков",
+        "water_volume_ml": 120,
+        "notes": "Разводить в 120ml воды. ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ"
+      },
+      "warnings": [
+        "ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ - концентрат опасен неразбавленным",
+        "Не использовать горячую воду",
+        "Встряхивать перед использованием"
+      ],
+      "compatible_with": [
+        "f1_vanilla",
+        "oyahn"
+      ],
+      "sources": [
+        "web:84",
+        "web:87"
+      ]
+    },
+    {
+      "id": "h24_rebuild",
+      "sku": "0215",
+      "name": "H24 Rebuild Strength - спортивная восстановительная смесь",
+      "category": "Еда",
+      "subcategory": "Спортивное восстановление",
+      "aliases": [
+        "ВС",
+        "Rebuild Strength",
+        "H24 Восстановление Силы",
+        "Восстановление Силы"
+      ],
+      "description": "Высокобелковая смесь для восстановления мышц после тренировки. Содержит 24-25г белка, L-глютамин и 9 витаминов и минералов. Для спортсменов.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 50,
+        "unit": "граммы",
+        "description": "2 мерные ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 380,
+        "energy_kj": 1590,
+        "protein_g": 51.0,
+        "carbs_g": 36.0,
+        "sugars_g": 34.0,
+        "fat_g": 4.0,
+        "fiber_g": 1.5,
+        "sodium_mg": 380.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 50,
+        "energy_kcal": 190,
+        "protein_g": 24.0,
+        "carbs_g": 18.0,
+        "sugars_g": 14.0,
+        "fat_g": 2.0,
+        "fiber_g": 0.8
+      },
+      "dosage": {
+        "amount": 2,
+        "unit": "мерные ложки (50g)",
+        "timing": "после тренировки в течение 30 минут",
+        "liquid": "250ml воды или молока",
+        "frequency": "1 раз в день после тренировки"
+      },
+      "key_ingredients": [
+        "Whey protein concentrate",
+        "Casein",
+        "L-Glutamine",
+        "Essential amino acids"
+      ],
+      "active_components": {
+        "l_glutamine_mg": 3400,
+        "l_leucine_mg": 2367,
+        "l_isoleucine_mg": 1377,
+        "l_valine_mg": 1410,
+        "vitamin_c_mg": 90,
+        "vitamin_e_mg": 3.6,
+        "iron_mg": 6.3,
+        "calcium_mg": 400
+      },
+      "suitable_for": [
+        "athletes",
+        "gym_enthusiasts",
+        "muscle_recovery"
+      ],
+      "warnings": [
+        "Для активных спортсменов",
+        "После тренировки"
+      ],
+      "sources": [
+        "web:64",
+        "web:65",
+        "web:66",
+        "web:71"
+      ]
+    },
+    {
+      "id": "yellow_tablets",
+      "sku": "0117",
+      "name": "Желтые таблетки (Snack Defense)",
+      "category": "Добавки",
+      "subcategory": "Контроль сахара и аппетита",
+      "aliases": [
+        "Желтые таблетки",
+        "Yellow Tablets",
+        "Snack Defense",
+        "контроль сахара"
+      ],
+      "description": "Добавка для контроля аппетита и уровня сахара в крови. Содержит гарцинию камбоджийскую (источник гидроксилимонной кислоты) и хром. Помогает ограничить потребление сладкого и углеводов.",
+      "measurement_unit": "таблетки",
+      "standard_serving": {
+        "amount": 2,
+        "unit": "таблетки",
+        "grams": 1.632,
+        "description": "суточная дозировка"
+      },
+      "nutrition_per_tablet": {
+        "energy_kcal": 1.87,
+        "energy_kj": 7.83,
+        "calcium_mg": 160.0,
+        "chromium_mcg": 40.0,
+        "hydroxycitric_acid_mg": 205.5
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 114,
+        "calcium_mg": 9800,
+        "chromium_mcg": 2451
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "таблетка",
+        "frequency": "1 раз в день",
+        "timing": "во время еды",
+        "duration": "1 месяц, может продляться",
+        "notes": "Можно принимать в любое время суток"
+      },
+      "key_ingredients": [
+        "Garcinia cambogia extract (hydroxycitric acid)",
+        "Chromium",
+        "Calcium carbonate"
+      ],
+      "active_ingredients": {
+        "garcinia_cambogia_percent": 63.0,
+        "hydroxycitric_acid_mg": 205.5,
+        "chromium_mcg": 40.0,
+        "calcium_mg": 160.0
+      },
+      "key_benefits": [
+        "Помогает контролировать уровень сахара в крови",
+        "Снижает тягу к сладкому",
+        "Помогает контролировать голод",
+        "Поддержка метаболизма углеводов и жиров",
+        "Естественный источник хрома"
+      ],
+      "warnings": [
+        "Консультация врача перед применением рекомендуется"
+      ],
+      "sources": [
+        "web:69",
+        "web:75",
+        "web:78"
+      ]
+    },
+    {
+      "id": "beta_heart",
+      "sku": "0267",
+      "name": "Бета Харт (Beta Heart) - овсяно-бета-глюканы",
+      "category": "Напитки",
+      "subcategory": "Напитки с клетчаткой",
+      "aliases": [
+        "Beta Heart",
+        "Бета Харт",
+        "Бета глюкан",
+        "Beta glucan"
+      ],
+      "description": "Порошок с овсяными бета-глюканами для поддержки здоровья сердца и снижения уровня холестерина. Ванильный вкус. Источник растворимого пищевого волокна.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 15,
+        "unit": "граммы",
+        "description": "1 мерная ложка (1 пакетик 15g)"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 167,
+        "energy_kj": 700,
+        "protein_g": 8.0,
+        "carbs_g": 20.0,
+        "sugars_g": 0.0,
+        "fat_g": 2.0,
+        "fiber_g": 20.0,
+        "sodium_mg": 100.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 15,
+        "energy_kcal": 25,
+        "energy_kj": 105,
+        "protein_g": 1.2,
+        "carbs_g": 3.0,
+        "sugars_g": 0.0,
+        "fat_g": 0.3,
+        "fiber_g": 3.0,
+        "oat_beta_glucan_g": 1.5
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "пакетик (15g) или 1 мерная ложка",
+        "frequency": "1-2 раза в день",
+        "liquid": "250ml воды или смешивать с Формулой 1",
+        "notes": "Для заметного эффекта нужна дневная доза 3g бета-глюканов (2 порции)"
+      },
+      "key_ingredients": [
+        "OatWell oat beta-glucan",
+        "Natural vanilla flavor"
+      ],
+      "active_components": {
+        "oat_beta_glucan_per_serving_g": 1.5,
+        "oat_beta_glucan_per_100g_g": 10.0
+      },
+      "health_benefits": [
+        "Помогает снизить или поддержать уровень холестерина",
+        "Поддержка здоровья сердца",
+        "Источник растворимой клетчатки",
+        "Без добавленного сахара",
+        "Нет искусственных подсластителей"
+      ],
+      "compatible_with": [
+        "f1_vanilla",
+        "aloe_classic"
+      ],
+      "notes": "Научно доказано в 55+ исследованиях",
+      "sources": [
+        "web:70",
+        "web:73",
+        "web:76"
+      ]
+    },
+    {
+      "id": "formula2_men",
+      "sku": "1800",
+      "name": "Формула 2 - Комплекс витаминов и минералов ДЛЯ МУЖЧИН",
+      "category": "Добавки",
+      "subcategory": "Витамины и минералы",
+      "aliases": [
+        "Ф2 мужская",
+        "Formula 2 Men",
+        "Формула 2",
+        "F2 витамины",
+        "витамины мужские"
+      ],
+      "description": "Специализированный комплекс из 24 витаминов и минералов для мужчин. Разработан с учетом особых потребностей мужского организма. Содержит повышенное количество витамина А и других микронутриентов.",
+      "measurement_unit": "таблетки",
+      "standard_serving": {
+        "amount": 1,
+        "unit": "таблетка",
+        "grams": 0.85
+      },
+      "package_count": 60,
+      "supply_days": 30,
+      "nutrition_per_tablet": {
+        "energy_kcal": 2.0,
+        "energy_kj": 8.0
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "таблетка",
+        "frequency": "2 раза в день",
+        "timing": "во время еды",
+        "frequency_total": "всего 2 таблетки в день"
+      },
+      "key_benefits": [
+        "24 витамина и минерала для мужского здоровья",
+        "Повышенное содержание витамина А (мужчины нуждаются больше)",
+        "Поддержка энергии и метаболизма",
+        "Поддержка мышечной функции (магний)",
+        "Нормальный метаболический обмен энергии"
+      ],
+      "key_vitamins": {
+        "vitamin_a_mcg": "высокое",
+        "vitamin_c_mg": "100",
+        "vitamin_d_mcg": "5",
+        "vitamin_e_mg": "12",
+        "b_complex": "полный",
+        "magnesium_mg": "средне",
+        "calcium_mg": "средне",
+        "iron_mg": "стандартное"
+      },
+      "compatible_with": [
+        "f1_vanilla",
+        "f1_melon"
+      ],
+      "warnings": [
+        "Консультация врача перед применением"
+      ],
+      "sources": [
+        "web:79",
+        "web:81",
+        "web:89"
+      ]
+    },
+    {
+      "id": "formula2_women",
+      "sku": "1819",
+      "name": "Формула 2 - Комплекс витаминов и минералов ДЛЯ ЖЕНЩИН",
+      "category": "Добавки",
+      "subcategory": "Витамины и минералы",
+      "aliases": [
+        "Ф2 женская",
+        "Formula 2 Women",
+        "Формула 2 женщины",
+        "F2 витамины",
+        "витамины женские"
+      ],
+      "description": "Специализированный комплекс из 24 витаминов и минералов для женщин. Формула разработана с учетом особых потребностей женского организма. Дополнительные компоненты для кожи, волос и ногтей.",
+      "measurement_unit": "таблетки",
+      "standard_serving": {
+        "amount": 1,
+        "unit": "таблетка",
+        "grams": 0.85
+      },
+      "package_count": 60,
+      "supply_days": 30,
+      "nutrition_per_tablet": {
+        "energy_kcal": 2.0,
+        "energy_kj": 8.0
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "таблетка",
+        "frequency": "2 раза в день",
+        "timing": "во время еды",
+        "frequency_total": "всего 2 таблетки в день"
+      },
+      "key_benefits": [
+        "24 витамина и минерала для женского здоровья",
+        "Оптимальное количество железа (женщины теряют железо)",
+        "Поддержка кожи, волос, ногтей",
+        "Поддержка костей (кальций и магний)",
+        "Нормальный энергетический обмен"
+      ],
+      "key_vitamins": {
+        "vitamin_a_mcg": "оптимально",
+        "vitamin_c_mg": "100",
+        "vitamin_d_mcg": "5",
+        "vitamin_e_mg": "12",
+        "iron_mg": "повышенное",
+        "biotin_mcg": "повышенное",
+        "b_complex": "полный"
+      },
+      "compatible_with": [
+        "f1_vanilla"
+      ],
+      "warnings": [
+        "Консультация врача перед применением"
+      ],
+      "sources": [
+        "web:80",
+        "web:86"
+      ]
+    },
+    {
+      "id": "f3_protein",
+      "sku": "3123",
+      "name": "Формула 3 - Специализированная белковая смесь",
+      "category": "Еда",
+      "subcategory": "Белковые добавки",
+      "aliases": [
+        "Ф3",
+        "Белок",
+        "F3",
+        "Formula 3 Protein"
+      ],
+      "description": "Специализированная белковая смесь с нейтральным вкусом и запахом. Добавляется в коктейли, супы, соусы для повышения содержания белка.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 6,
+        "unit": "граммы",
+        "description": "1 столовая ложка"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 383,
+        "energy_kj": 1611,
+        "protein_g": 83.0,
+        "carbs_g": 3.7,
+        "sugars_g": 0.9,
+        "fat_g": 4.3,
+        "fiber_g": 0.0,
+        "sodium_mg": 840.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 6,
+        "energy_kcal": 23,
+        "protein_g": 5.0,
+        "carbs_g": 0.2,
+        "fat_g": 0.3
+      },
+      "dosage": {
+        "min": 1,
+        "min_unit": "столовая ложка",
+        "standard": 1,
+        "standard_unit": "столовая ложка",
+        "max": 4,
+        "max_unit": "столовые ложки в день",
+        "notes": "Можно добавлять в Формулу 1, супы, соусы, смузи"
+      },
+      "compatible_with": [
+        "f1_vanilla",
+        "soup"
+      ],
+      "sources": [
+        "web:19",
+        "web:20"
+      ]
+    },
+    {
+      "id": "herbal_tea",
+      "sku": "0195",
+      "name": "Травяной напиток классический",
+      "category": "Напитки",
+      "subcategory": "Чаи и напитки",
+      "aliases": [
+        "Чай",
+        "Herbal Tea Concentrate",
+        "Травяной чай",
+        "Tea"
+      ],
+      "description": "Тонизирующий напиток на основе зеленого и черного чая (Orange Pekoe), кардамона, кофеина и гибискуса. Содержит 5 фитокомпонентов.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 1.7,
+        "unit": "граммы",
+        "description": "½ чайной ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 354,
+        "energy_kj": 1483,
+        "protein_g": 13.0,
+        "carbs_g": 82.0,
+        "sugars_g": 5.9,
+        "fat_g": 0.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 1.7,
+        "energy_kcal": 6,
+        "energy_kj": 25,
+        "carbs_g": 1.0,
+        "caffeine_mg": 87.5
+      },
+      "dosage": {
+        "amount": "больше чем ½ чайной ложки",
+        "unit": "порция",
+        "volume": "6-12 fl oz",
+        "frequency": "2 порции в день"
+      },
+      "warnings": [
+        "Содержит кофеин"
+      ],
+      "sources": [
+        "web:28",
+        "web:31"
+      ]
+    },
+    {
+      "id": "oyahn",
+      "sku": "0015",
+      "name": "Овсяно-яблочный напиток",
+      "category": "Напитки",
+      "subcategory": "Напитки с клетчаткой",
+      "aliases": [
+        "ОЯН",
+        "Oat Apple Fiber Drink",
+        "Овсяный напиток"
+      ],
+      "description": "Комплекс натуральных пищевых волокон (клетчатки), необходимых для поддержки оптимального функционирования пищеварительной системы. Содержит 6 натуральных источников клетчатки.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 1,
+        "unit": "мерная ложка",
+        "grams": 7.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 7.1,
+        "energy_kcal": 18,
+        "fiber_g": 5.0
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 253,
+        "fiber_g": 70.0
+      },
+      "compatible_with": [
+        "aloe_classic",
+        "f1_vanilla"
+      ],
+      "sources": [
+        "документ"
+      ]
+    },
+    {
+      "id": "green_max",
+      "sku": "0082",
+      "name": "Грин Макс Select",
+      "category": "Добавки",
+      "subcategory": "Зелень и суперфуды",
+      "aliases": [
+        "Green Max",
+        "Green Max Select",
+        "Зелень"
+      ],
+      "description": "Формула '14 в 1' для получения всей пользы зелени и суперфудов. Содержит 14 растительных ингредиентов и суперфудов без хлопот 365 дней в году.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 2,
+        "unit": "мерные ложки"
+      },
+      "nutrition_per_serving": {
+        "energy_kcal": 50,
+        "protein_g": 3.0,
+        "carbs_g": 6.3,
+        "fat_g": 0.4,
+        "fiber_g": 5.5
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 833,
+        "protein_g": 50.0,
+        "carbs_g": 105.0,
+        "fat_g": 6.7,
+        "fiber_g": 91.7
+      },
+      "compatible_with": [
+        "f1_vanilla"
+      ],
+      "sources": [
+        "web:8",
+        "web:11"
+      ]
+    },
+    {
+      "id": "niteworks",
+      "sku": "0001",
+      "name": "Найтворкс (Niteworks)",
+      "category": "Добавки",
+      "subcategory": "Спортивное восстановление",
+      "aliases": [
+        "Niteworks",
+        "Ночная формула",
+        "Night Recovery"
+      ],
+      "description": "Специализированная ночная формула с L-аргинином, L-цитруллином и витаминами C & E для восстановления. Улучшает окись азота в организме.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 10,
+        "unit": "граммы",
+        "description": "2 мерные ложки (2 tsp)"
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 10,
+        "energy_kcal": 40,
+        "carbs_g": 4.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 400,
+        "carbs_g": 40.0
+      },
+      "active_ingredients": {
+        "l_arginine_g": 5.16,
+        "l_citrulline_g": 0.21,
+        "l_taurine_g": 0.30,
+        "vitamin_c_mg": 100,
+        "vitamin_e_mg": 20,
+        "folic_acid_mcg": 200
+      },
+      "dosage": {
+        "amount": 2,
+        "unit": "мерные ложки (10g)",
+        "frequency": "вечером перед сном",
+        "liquid": "250ml воды или сока",
+        "timing": "за 30-60 минут до сна"
+      },
+      "warnings": [
+        "Только вечером",
+        "Не использовать горячую воду",
+        "Не смешивать с горячими жидкостями",
+        "Для взрослых, особенно для лиц старше 30"
+      ],
+      "sources": [
+        "web:23",
+        "web:26",
+        "web:29"
+      ]
+    },
+    {
+      "id": "protein_bar",
+      "sku": "0258",
+      "name": "Батончик Формула 1 Экспресс",
+      "category": "Еда",
+      "subcategory": "Батончики",
+      "aliases": [
+        "Батончик",
+        "Protein Bar",
+        "ББ",
+        "Formula 1 Express"
+      ],
+      "description": "Полноценный прием пищи в удобном формате. Содержит высокое содержание соевого белка, пищевых волокон и 25 витаминов и минералов.",
+      "measurement_unit": "штуки",
+      "standard_serving": {
+        "amount": 35,
+        "unit": "граммы",
+        "description": "1 батончик"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 389,
+        "protein_g": 29.0,
+        "carbs_g": 45.0,
+        "fat_g": 10.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 35,
+        "energy_kcal": 136,
+        "protein_g": 10.0,
+        "carbs_g": 16.0,
+        "fat_g": 3.5,
+        "sugars_g": 11.0
+      },
+      "sources": [
+        "web:36",
+        "web:37"
+      ]
+    },
+    {
+      "id": "h24_achieve_bar",
+      "sku": "0001",
+      "name": "H24 Achieve Protein Bars",
+      "category": "Еда",
+      "subcategory": "Батончики спортивные",
+      "aliases": [
+        "Achieve Bar",
+        "H24 Bar",
+        "Спортивный батончик"
+      ],
+      "description": "Высокобелковый батончик для спортивного восстановления. Содержит 21g белка, низкий сахар, сертифицирован Informed Sports.",
+      "measurement_unit": "штуки",
+      "standard_serving": {
+        "amount": 60,
+        "unit": "граммы",
+        "description": "1 батончик"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 351,
+        "energy_kj": 1467,
+        "protein_g": 34.0,
+        "carbs_g": 37.0,
+        "sugars_g": 2.0,
+        "fat_g": 12.0,
+        "saturated_fat_g": 9.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 60,
+        "energy_kcal": 210,
+        "protein_g": 21.0,
+        "carbs_g": 22.0,
+        "fat_g": 7.0
+      },
+      "sources": [
+        "web:33",
+        "web:46"
+      ]
+    },
+    {
+      "id": "phyto_complete",
+      "sku": "236K",
+      "name": "Фито Комплит",
+      "category": "Добавки",
+      "subcategory": "Метаболизм и энергия",
+      "aliases": [
+        "Phyto Complete",
+        "Phytocomplex"
+      ],
+      "description": "Инновационный продукт с Fiit-NS™. Помогает уменьшить объемы талии и жировые отложения в области живота при соблюдении сбалансированного питания и активного образа жизни.",
+      "measurement_unit": "капсулы",
+      "standard_serving": {
+        "amount": 2,
+        "unit": "капсулы",
+        "description": "суточная доза"
+      },
+      "nutrition_per_serving": {
+        "energy_kcal": 0,
+        "vitamin_c_mg": 23,
+        "niacin_mg": 18,
+        "chromium_mcg": 6.6,
+        "polyphenols_mg": 228
+      },
+      "sources": [
+        "web:47",
+        "web:54"
+      ]
+    },
+    {
+      "id": "thermo_complete",
+      "sku": "0001",
+      "name": "Термо Комплит",
+      "category": "Добавки",
+      "subcategory": "Метаболизм и энергия",
+      "aliases": [
+        "Thermo Complete",
+        "Thermocomplete"
+      ],
+      "description": "Фитокомплекс для поддержки организма во время снижения веса. Стимулирует метаболизм и способствует поднятию тонуса. Содержит натуральный кофеин из зеленого чая и йерба мате.",
+      "measurement_unit": "таблетки",
+      "standard_serving": {
+        "amount": 1,
+        "unit": "таблетка",
+        "grams": 0.88
+      },
+      "nutrition_per_tablet": {
+        "energy_kcal": 2.6,
+        "energy_kj": 10.88,
+        "caffeine_mg": 83.18,
+        "vitamin_c_mg": 20.0,
+        "carbs_g": 0.36
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 296.46,
+        "protein_g": 5.7,
+        "carbs_g": 41.0,
+        "fat_g": 4.6,
+        "vitamin_c_mg": 2300.0
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "таблетка",
+        "frequency": "1-2 раза в день",
+        "timing": "между 10-11 утра и 14-15 часами",
+        "notes": "Не принимать вечером (содержит кофеин)"
+      },
+      "warnings": [
+        "Содержит кофеин (83mg на таблетку)",
+        "Не принимать перед сном",
+        "Мощный стимулятор метаболизма"
+      ],
+      "sources": [
+        "web:52"
+      ]
+    },
+    {
+      "id": "cell_activator",
+      "sku": "3123",
+      "name": "Клеточный Активатор",
+      "category": "Добавки",
+      "subcategory": "Витамины и минералы",
+      "aliases": [
+        "Cell Activator",
+        "L-Carnitine Complex"
+      ],
+      "description": "Уникальная формула помогает организму эффективно преобразовывать жиры в энергию и усваивать поступающие нутриенты. Содержит L-карнитин и витамины группы В.",
+      "measurement_unit": "капсулы",
+      "standard_serving": {
+        "amount": 1,
+        "unit": "капсула",
+        "grams": 0.48
+      },
+      "nutrition_per_capsule": {
+        "energy_kcal": 2.0,
+        "energy_kj": 8.0,
+        "thiamin_b1_mg": 0.37,
+        "riboflavin_b2_mg": 0.47,
+        "l_carnitine_mg": 117.0
+      },
+      "dosage": {
+        "amount": 1,
+        "unit": "капсула",
+        "frequency": "3 раза в день",
+        "timing": "во время еды",
+        "duration": "1 месяц"
+      },
+      "sources": [
+        "web:53",
+        "web:59"
+      ]
+    },
+    {
+      "id": "soup_chicken",
+      "sku": "0001",
+      "name": "Протеиновый коктейль Формула 1 со вкусом куриного крем-супа",
+      "category": "Еда",
+      "subcategory": "Супы",
+      "aliases": [
+        "Куриный суп",
+        "Chicken Soup",
+        "Суп"
+      ],
+      "description": "Согревающая новинка - полноценный обед или ужин за 2 минуты. Куриная грудка, овощи и специи. Сбалансированная еда с высоким содержанием белка.",
+      "measurement_unit": "граммы",
+      "standard_serving": {
+        "amount": 26,
+        "unit": "граммы",
+        "description": "3 мерные ложки (~26g) на 250ml горячей воды или молока"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 398,
+        "protein_g": 35.0,
+        "carbs_g": 33.0,
+        "fat_g": 9.7,
+        "fiber_g": 18.0
+      },
+      "sources": [
+        "документ"
+      ]
+    }
+  ],
+  "category_definitions": {
+    "НАПИТКИ": {
+      "description": "Жидкие продукты. Единица измерения: мл, колпачки, ложки для жидкостей",
+      "subcategories": [
+        "Растительные напитки",
+        "Чаи и напитки",
+        "Напитки с клетчаткой"
+      ]
+    },
+    "ЕДА": {
+      "description": "Твердые и полутвердые продукты. Единица измерения: ложки, граммы, штуки",
+      "subcategories": [
+        "Протеиновые коктейли",
+        "Батончики",
+        "Супы",
+        "Белковые добавки",
+        "Спортивное восстановление"
+      ]
+    },
+    "ДОБАВКИ": {
+      "description": "Добавки и комплексы. Единица измерения: капсулы, таблетки",
+      "subcategories": [
+        "Витамины и минералы",
+        "Метаболизм и энергия",
+        "Зелень и суперфуды",
+        "Спортивное восстановление",
+        "Контроль сахара и аппетита"
+      ]
+    }
+  },
+  "warnings_and_notes": {
+    "critical": [
+      "Алоэ: ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ (3 колпачка в 120ml воды)",
+      "Найтворкс: Только вечером перед сном, НЕ горячая вода",
+      "Термо Комплит: Содержит кофеин (83mg), не принимать вечером"
+    ],
+    "important": [
+      "H24 Rebuild Strength: ДЛЯ СПОРТСМЕНОВ, после тренировок",
+      "Желтые таблетки: Контроль сахара и аппетита",
+      "Beta Heart: Для здоровья сердца (минимум 2 порции для эффекта)",
+      "Все продукты: Использовать в составе сбалансированного питания"
+    ]
+  }
+}

@@ -12,6 +12,7 @@ from typing import Any
 from datetime import datetime, timedelta
 
 from aiogram import Bot, F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -31,7 +32,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-@router.message(F.photo)
+@router.message(F.photo, StateFilter(ShoppingMode.waiting_for_receipt))
 async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
     """Handle incoming photo message.
 
@@ -60,6 +61,10 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> N
             processing_func=process_receipt_worker_wrapper, # Wrapper to adapt signature
             file_id=message.photo[-1].file_id
         )
+        return
+
+    # 3. IF NO STATE -> Pass to Universal Handler!
+    if current_state is None:
         return
     
     # 3. Action Menu (Default for photos)

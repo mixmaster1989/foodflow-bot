@@ -20,14 +20,15 @@ from handlers import (
     user_settings,
     curator,
     saved_dishes,
-    global_input,
-    correction,
-    admin,
-    support,
-    errors,
-    shopping_list,
     weight,
     base,
+    universal_input,
+    errors, 
+    shopping_list,
+    admin,
+    support,
+    correction,
+    # global_input,
 )
 
 
@@ -76,7 +77,8 @@ async def main():
     dp.include_router(weight.router)
     dp.include_router(correction.router)
     dp.include_router(saved_dishes.router)
-    dp.include_router(global_input.router) # Catch-all text handler (Must be LAST)
+    # dp.include_router(global_input.router) # DEPRECATED
+    dp.include_router(universal_input.router) # Universal Handler (Text/Voice/Photo)
 
     # Start reminder scheduler
     from services.scheduler import start_scheduler

@@ -16,13 +16,14 @@ router = Router()
 
 
 @router.message(F.text.in_({"🏠 Главное меню", "Меню", "Главное меню", "menu", "Menu"}))
-async def menu_button_handler(message: types.Message) -> None:
+async def menu_button_handler(message: types.Message, state: FSMContext) -> None:
     """Handle persistent 'Main Menu' button click."""
+    await state.clear()  # Clear any active state!
     await show_main_menu(message, message.from_user.first_name, message.from_user.id)
 
 
 @router.callback_query(F.data == "main_menu")
-async def back_to_main(callback: types.CallbackQuery) -> None:
+async def back_to_main(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Return to the main menu by editing the current message.
 
     Args:
@@ -32,6 +33,7 @@ async def back_to_main(callback: types.CallbackQuery) -> None:
         None
 
     """
+    await state.clear()  # Clear any active state!
     await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id)
     await callback.answer()
 

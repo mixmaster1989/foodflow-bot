@@ -150,4 +150,17 @@ async def save_weight(message: types.Message, state: FSMContext) -> None:
         )
 
     except ValueError:
-        await message.answer("Пожалуйста, введите число (вес в кг, можно с десятичной точкой):")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="❌ Отмена (Я хочу записать еду)", callback_data="menu_weight") # Redirect to weight menu or cancel? menu_weight acts as back/cancel here effectively or we can clear state.
+        # Actually standard practice is usually 'cancel' -> clears state.
+        # But 'menu_weight' button above (line 93) was 'Back'.
+        # Let's use a clear 'cancel' that clears state and goes to main menu or just clears.
+        builder.button(text="🔙 Отмена", callback_data="main_menu") 
+        
+        await message.answer(
+            "⚠️ <b>Ожидается вес тела (кг)</b>\n\n"
+            "Вы ввели текст, но я жду число (например: 75.5).\n"
+            "Если вы хотели записать съеденное — нажмите кнопку ниже.",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
