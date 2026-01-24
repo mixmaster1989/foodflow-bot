@@ -21,8 +21,10 @@ from handlers import (
     curator,
     saved_dishes,
     weight,
+    weight,
     base,
     universal_input,
+    fridge_search,
     errors, 
     shopping_list,
     admin,
@@ -70,6 +72,7 @@ async def main():
     dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)
     dp.include_router(fridge.router)
+    dp.include_router(fridge_search.router) # New Smart Search
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
     dp.include_router(user_settings.router)
