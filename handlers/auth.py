@@ -81,7 +81,21 @@ class AuthMiddleware(BaseMiddleware):
                     
                     await session.commit()
                     await message_obj.answer("✅ Пароль принят! Добро пожаловать.", reply_markup=kb)
-                    # Show main menu immediately
+                    
+                    # Check if onboarding is needed (CRITICAL FIX)
+                    from database.models import UserSettings
+                    from handlers.onboarding import start_onboarding
+                    settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+                    user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+                    
+                    if not user_settings or not user_settings.is_initialized:
+                        # Start onboarding for new users
+                        state = data.get("state")
+                        if state:
+                            await start_onboarding(message_obj, state)
+                        return
+                    
+                    # Show main menu only if already initialized
                     await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation (we handled it)
 
@@ -97,7 +111,18 @@ class AuthMiddleware(BaseMiddleware):
                     
                     await session.commit()
                     await message_obj.answer("✅ Личный пароль принят!", reply_markup=kb)
-                    # Show main menu immediately
+                    
+                    # Check if onboarding is needed (same fix as global password)
+                    settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+                    user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+                    
+                    if not user_settings or not user_settings.is_initialized:
+                        state = data.get("state")
+                        if state:
+                            await start_onboarding(message_obj, state)
+                        return
+                    
+                    # Show main menu only if already initialized
                     await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation
 
