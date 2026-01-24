@@ -3,8 +3,10 @@ import json
 import logging
 import aiohttp
 import asyncio
+import time
 from typing import List, Dict
 from config import settings
+from monitoring import stats, get_ai_semaphore
 
 logger = logging.getLogger("ai.brain")
 
@@ -59,27 +61,40 @@ class AIBrainService:
             "response_format": {"type": "json_object"}
         }
 
-        for attempt in range(2):
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=10
-                    ) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            content = data['choices'][0]['message']['content']
-                            # Clean output just in case
-                            content = content.replace("```json", "").replace("```", "").strip()
-                            return json.loads(content)
-                        else:
-                            logger.warning(f"AI Brain error {response.status}: {await response.text()}")
-            except Exception as e:
-                logger.error(f"AI Brain exception: {e}")
-                
-            await asyncio.sleep(0.5)
+
+        # Use semaphore to limit concurrent AI calls (Phase 1 optimization)
+        semaphore = get_ai_semaphore(max_concurrent=5)
+        
+        async with semaphore:
+            start_time = time.time()
+            for attempt in range(2):
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=10
+                        ) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                content = data['choices'][0]['message']['content']
+                                # Clean output just in case
+                                content = content.replace("```json", "").replace("```", "").strip()
+                                
+                                # Track stats
+                                duration_ms = (time.time() - start_time) * 1000
+                                stats.record_ai_call(duration_ms)
+                                
+                                return json.loads(content)
+                            else:
+                                logger.warning(f"AI Brain error {response.status}: {await response.text()}")
+                                stats.record_error()
+                except Exception as e:
+                    logger.error(f"AI Brain exception: {e}")
+                    stats.record_error()
+                    
+                await asyncio.sleep(0.5)
             
         return None
 
@@ -125,26 +140,39 @@ class AIBrainService:
             "response_format": {"type": "json_object"}
         }
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=10
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        content = data['choices'][0]['message']['content']
-                        logger.info(f"Herbalife AI Raw Response: {content[:200]}")
-                        result = json.loads(content)
-                        matched_id = result.get("matched_product_id")
-                        logger.info(f"Herbalife AI Matched ID: {matched_id}, Reason: {result.get('reason', 'N/A')}")
-                        return matched_id
-                    else:
-                        logger.warning(f"Herbalife AI HTTP Error: {response.status}")
-        except Exception as e:
-            logger.error(f"Herbalife Resolution AI Error: {e}")
+
+        # Use semaphore to limit concurrent AI calls
+        semaphore = get_ai_semaphore(max_concurrent=5)
+        
+        async with semaphore:
+            start_time = time.time()
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=10
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            content = data['choices'][0]['message']['content']
+                            logger.info(f"Herbalife AI Raw Response: {content[:200]}")
+                            result = json.loads(content)
+                            matched_id = result.get("matched_product_id")
+                            logger.info(f"Herbalife AI Matched ID: {matched_id}, Reason: {result.get('reason', 'N/A')}")
+                            
+                            # Track stats
+                            duration_ms = (time.time() - start_time) * 1000
+                            stats.record_ai_call(duration_ms)
+                            
+                            return matched_id
+                        else:
+                            logger.warning(f"Herbalife AI HTTP Error: {response.status}")
+                            stats.record_error()
+            except Exception as e:
+                logger.error(f"Herbalife Resolution AI Error: {e}")
+                stats.record_error()
             
 
     @classmethod
@@ -275,30 +303,42 @@ class AIBrainService:
             "response_format": {"type": "json_object"}
         }
 
-        for attempt in range(2):
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=15
-                    ) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            content = data['choices'][0]['message']['content']
-                            # Parse JSON
-                            try:
-                                result = json.loads(content)
-                                if "summary" in result:
-                                    return result
-                            except json.JSONDecodeError:
-                                logger.warning(f"AI Summary JSON Error: {content}")
-                        else:
-                            logger.warning(f"AI Summary error {response.status}")
-            except Exception as e:
-                logger.error(f"AI Summary exception: {e}")
-                
-            await asyncio.sleep(0.5)
+
+        # Use semaphore to limit concurrent AI calls
+        semaphore = get_ai_semaphore(max_concurrent=5)
+        
+        async with semaphore:
+            start_time = time.time()
+            for attempt in range(2):
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=15
+                        ) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                content = data['choices'][0]['message']['content']
+                                # Parse JSON
+                                try:
+                                    result = json.loads(content)
+                                    if "summary" in result:
+                                        # Track stats
+                                        duration_ms = (time.time() - start_time) * 1000
+                                        stats.record_ai_call(duration_ms)
+                                        return result
+                                except json.JSONDecodeError:
+                                    logger.warning(f"AI Summary JSON Error: {content}")
+                                    stats.record_error()
+                            else:
+                                logger.warning(f"AI Summary error {response.status}")
+                                stats.record_error()
+                except Exception as e:
+                    logger.error(f"AI Summary exception: {e}")
+                    stats.record_error()
+                    
+                await asyncio.sleep(0.5)
             
         return None

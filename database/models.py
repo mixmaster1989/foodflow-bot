@@ -48,7 +48,7 @@ class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, autoincrement=True)
     receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=True)
-    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # direct link when no receipt
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True, index=True)  # INDEX for fridge queries
     name = Column(String, nullable=False)
     quantity = Column(Float, default=1.0)
     price = Column(Float, nullable=False)
