@@ -132,10 +132,43 @@ async def get_health_summary() -> str:
 
 # Semaphore для ограничения AI вызовов (Phase 1)
 AI_SEMAPHORE: Optional[asyncio.Semaphore] = None
+AI_SEMAPHORE_WAITING: int = 0  # Counter for waiting requests
 
-def get_ai_semaphore(max_concurrent: int = 5) -> asyncio.Semaphore:
+import logging
+_sem_logger = logging.getLogger("ai.semaphore")
+
+class LoggingSemaphore:
+    """Semaphore wrapper with logging for debugging."""
+    
+    def __init__(self, value: int):
+        self._semaphore = asyncio.Semaphore(value)
+        self._max = value
+        self._active = 0
+        self._waiting = 0
+    
+    async def __aenter__(self):
+        self._waiting += 1
+        if self._active >= self._max:
+            _sem_logger.info(f"[Semaphore] ⏳ QUEUE: {self._waiting} waiting, {self._active}/{self._max} active")
+        await self._semaphore.acquire()
+        self._waiting -= 1
+        self._active += 1
+        _sem_logger.info(f"[Semaphore] ▶️ ACQUIRED: {self._active}/{self._max} active, {self._waiting} waiting")
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._active -= 1
+        self._semaphore.release()
+        _sem_logger.info(f"[Semaphore] ✅ RELEASED: {self._active}/{self._max} active, {self._waiting} waiting")
+        return False
+
+
+_LOGGING_SEMAPHORE: Optional[LoggingSemaphore] = None
+
+def get_ai_semaphore(max_concurrent: int = 5) -> LoggingSemaphore:
     """Получить семафор для ограничения параллельных AI вызовов"""
-    global AI_SEMAPHORE
-    if AI_SEMAPHORE is None:
-        AI_SEMAPHORE = asyncio.Semaphore(max_concurrent)
-    return AI_SEMAPHORE
+    global _LOGGING_SEMAPHORE
+    if _LOGGING_SEMAPHORE is None:
+        _LOGGING_SEMAPHORE = LoggingSemaphore(max_concurrent)
+        _sem_logger.info(f"[Semaphore] 🚀 INITIALIZED: max {max_concurrent} concurrent AI calls")
+    return _LOGGING_SEMAPHORE
