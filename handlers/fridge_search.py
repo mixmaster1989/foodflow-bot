@@ -155,13 +155,12 @@ async def fridge_search_tag_handler(callback: types.CallbackQuery, state: FSMCon
     await callback.answer()
 
 
-@router.message(F.text, lambda msg: msg.text and len(msg.text) > 1) 
-# Note: State filter should be applied in main registration or here if importing states
+# Import FridgeStates for state filtering
+from handlers.fridge import FridgeStates
+
+@router.message(FridgeStates.searching_fridge, F.text, lambda msg: msg.text and len(msg.text) > 1) 
 async def fridge_search_query(message: types.Message, state: FSMContext) -> None:
-    """Handle search query input."""
-    
-    # Verify state (since we can't easily import FridgeStates here without circular imports if not careful)
-    # Ideally, we should move States to a shared module. For now, we assume this handler is registered with the correct state filter in main.py
+    """Handle search query input - ONLY in searching_fridge state."""
     
     query = message.text.strip()
     await state.update_data(search_query=query)
