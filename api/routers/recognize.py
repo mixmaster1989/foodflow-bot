@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from api.dependencies import CurrentUser
+from api.auth import CurrentUser
 from api.schemas import FoodRecognitionResult
 from services.ai import AIService
 

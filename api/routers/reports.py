@@ -4,7 +4,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import DailyReport
 from database.models import ConsumptionLog, UserSettings
 

@@ -1,7 +1,7 @@
 from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, Update, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from sqlalchemy.future import select
 
 from config import settings
@@ -61,7 +61,10 @@ class AuthMiddleware(BaseMiddleware):
 
             # Helper for keyboard
             kb = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="🏠 Главное меню")]],
+                keyboard=[[
+                    KeyboardButton(text="🏠 Главное меню"),
+                    KeyboardButton(text="🚀 Mini App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+                ]],
                 resize_keyboard=True,
                 persistent=True
             )

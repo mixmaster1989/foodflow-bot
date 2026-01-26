@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import ConsumeRequest, ProductCreate, ProductList, ProductRead
 from database.models import ConsumptionLog, Product, Receipt
 from datetime import datetime
@@ -20,18 +20,15 @@ async def list_products(
     """List all products in user's fridge."""
     # Count total
     count_stmt = (
-        select(func.count())
-        .select_from(Product)
-        .outerjoin(Receipt)
-        .where(or_(Receipt.user_id == user.id, Product.user_id == user.id))
+        select(func.count(Product.id))
+        .where(Product.user_id == user.id)
     )
     total = await session.scalar(count_stmt) or 0
     
     # Fetch page
     stmt = (
         select(Product)
-        .outerjoin(Receipt)
-        .where(or_(Receipt.user_id == user.id, Product.user_id == user.id))
+        .where(Product.user_id == user.id)
         .order_by(Product.id.desc())
         .offset(page * page_size)
         .limit(page_size)

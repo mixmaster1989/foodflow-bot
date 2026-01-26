@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import ConsumptionLogCreate, ConsumptionLogRead
 from database.models import ConsumptionLog
 

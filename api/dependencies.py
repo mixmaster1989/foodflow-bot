@@ -4,7 +4,6 @@ from typing import Annotated, AsyncGenerator
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.auth import get_current_user_required
 from database.base import async_session
 from database.models import User
 
@@ -20,4 +19,3 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 # Type aliases for cleaner dependency injection
 DBSession = Annotated[AsyncSession, Depends(get_db_session)]
-CurrentUser = Annotated[User, Depends(get_current_user_required)]

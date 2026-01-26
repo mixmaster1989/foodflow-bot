@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from api.auth import create_access_token, get_current_user_required
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import Token, UserCreate, UserLogin, UserSettingsRead
 from database.models import User, UserSettings
 
@@ -17,6 +17,7 @@ async def register(user_data: UserCreate, session: DBSession):
     For Telegram users, telegram_id is the unique identifier.
     """
     # Check if user exists
+    print(f"🔐 [AUTH] Register/Login request for ID: {user_data.telegram_id} ({user_data.username})")
     existing = await session.get(User, user_data.telegram_id)
     
     if not existing:

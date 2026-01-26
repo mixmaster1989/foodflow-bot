@@ -6,7 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     BOT_TOKEN: str
     OPENROUTER_API_KEY: str
-    DATABASE_URL: str = "sqlite+aiosqlite:///./foodflow.db" # Default to SQLite for easy local dev on Windows
+    DATABASE_URL: str = "sqlite+aiosqlite:////home/user1/foodflow-bot/foodflow.db" 
+    JWT_SECRET_KEY: str = "foodflow-super-secret-key-change-in-production"
     GLOBAL_PASSWORD: str = "Welcome2026"  # Password for new users
     ADMIN_IDS: list[int] = [432823154]
 

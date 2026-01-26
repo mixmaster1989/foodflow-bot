@@ -87,6 +87,19 @@ async def main():
     from services.scheduler import start_scheduler
     start_scheduler(bot, dp)
 
+    # Set Global Menu Button to open Mini App
+    from aiogram.types import MenuButtonWebApp, WebAppInfo
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="FoodFlow App 🚀",
+                web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/")
+            )
+        )
+        logging.info("✅ Global Menu Button set to Mini App")
+    except Exception as e:
+        logging.warning(f"⚠️ Failed to set Menu Button: {e}")
+
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)
 

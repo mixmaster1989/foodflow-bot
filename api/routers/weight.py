@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import WeightLogCreate, WeightLogRead
 from database.models import UserSettings, WeightLog
 

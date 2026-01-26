@@ -1,0 +1,82 @@
+server {
+    server_name tretyakov-igor.online www.tretyakov-igor.online tretyakov-igor.ru www.tretyakov-igor.ru igortretyakov.ru www.igortretyakov.ru;
+    return 301 http://tretyakov-igor.tech$request_uri;
+
+    listen 443 ssl http2; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/tretyakov-igor.ru/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/tretyakov-igor.ru/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    server_name tretyakov-igor.tech www.tretyakov-igor.tech;
+    
+    root /home/user1/portfolio-site/out;
+    index index.html;
+    
+    access_log /var/log/nginx/tretyakov_access.log;
+    error_log /var/log/nginx/tretyakov_error.log;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API Proxy for FoodFlow (CRITICAL FIX)
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # FoodFlow Mini App (Production Build) - SAFE ADDITION
+    location /foodflow/ {
+        alias /home/user1/foodflow-bot/frontend/dist/;
+        index index.html;
+        try_files $uri $uri/ /foodflow/index.html;
+        
+        # Allow framing by Telegram for this location
+        add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://web.t.me https://*.web.telegram.org https://*.web.t.me;" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    listen 443 ssl http2; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/tretyakov-igor.tech/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/tretyakov-igor.tech/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    if ($host = www.tretyakov-igor.tech) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+    if ($host = tretyakov-igor.tech) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name tretyakov-igor.tech www.tretyakov-igor.tech;
+    return 404; # managed by Certbot
+}
+
+server {
+    if ($host = www.igortretyakov.ru) { return 301 https://$host$request_uri; } # managed by Certbot
+    if ($host = igortretyakov.ru) { return 301 https://$host$request_uri; } # managed by Certbot
+    if ($host = www.tretyakov-igor.online) { return 301 https://$host$request_uri; } # managed by Certbot
+    if ($host = tretyakov-igor.online) { return 301 https://$host$request_uri; } # managed by Certbot
+    if ($host = www.tretyakov-igor.ru) { return 301 https://$host$request_uri; } # managed by Certbot
+    if ($host = tretyakov-igor.ru) { return 301 https://$host$request_uri; } # managed by Certbot
+
+    listen 80;
+    server_name tretyakov-igor.online www.tretyakov-igor.online tretyakov-igor.ru www.tretyakov-igor.ru igortretyakov.ru www.igortretyakov.ru;
+    return 404; # managed by Certbot
+}

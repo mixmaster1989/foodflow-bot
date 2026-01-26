@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import ReceiptParseResult
 from database.models import Product, Receipt
 from services.normalization import NormalizationService

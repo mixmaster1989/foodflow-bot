@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import ShoppingListItemCreate, ShoppingListItemRead
 from database.models import ShoppingListItem
 

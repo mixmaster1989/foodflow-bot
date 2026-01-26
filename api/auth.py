@@ -10,12 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import TokenData
+import logging
 from config import settings
 from database.base import get_db
 from database.models import User
 
+logger = logging.getLogger("api.auth")
+
 # JWT Configuration
-SECRET_KEY = getattr(settings, 'JWT_SECRET_KEY', 'foodflow-super-secret-key-change-in-production')
+SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
@@ -27,8 +30,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Create JWT access token."""
+    """Create JWT access token with stringified sub."""
     to_encode = data.copy()
+    
+    # CRITICAL: Subject MUST be a string for many JWT libraries
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
+        
     expire = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -37,23 +45,26 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 def verify_token(token: str) -> TokenData | None:
     """Verify JWT token and extract data."""
     try:
+        # Standard decode
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
+            logger.warning("[Auth] Token missing 'sub' claim")
             return None
-        return TokenData(user_id=user_id)
-    except JWTError:
+        return TokenData(user_id=int(user_id))
+    except JWTError as e:
+        logger.error(f"[Auth] JWT Decode Error: {e}")
+        return None
+    except (ValueError, TypeError) as e:
+        logger.error(f"[Auth] Token Data Error: {e}")
         return None
 
 
 async def get_current_user(
-    token: Annotated[str | None, Depends(oauth2_scheme)]
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+    session: Annotated[AsyncSession, Depends(__import__('api.dependencies', fromlist=['get_db_session']).get_db_session)]
 ) -> User | None:
-    """Get current user from JWT token.
-    
-    Returns None if no token or invalid token (for optional auth).
-    Raises 401 if token is present but invalid.
-    """
+    """Get current user from JWT token using shared session."""
     if not token:
         return None
     
@@ -65,15 +76,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    async for session in get_db():
-        user = await session.get(User, token_data.user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-            )
-        return user
-    return None
+    # Use the session to keep object attached
+    user = await session.get(User, token_data.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    return user
 
 
 async def get_current_user_required(
@@ -87,3 +97,8 @@ async def get_current_user_required(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+# Shortcut for cleaner dependency injection in routers
+CurrentUser = Annotated[User, Depends(get_current_user_required)]
+DBSession = Annotated[AsyncSession, Depends(__import__('api.dependencies', fromlist=['get_db_session']).get_db_session)]

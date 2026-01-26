@@ -6,7 +6,12 @@ Contains:
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from sqlalchemy.future import select
 
 from database.base import get_db
@@ -22,11 +27,23 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     """Create persistent main menu keyboard."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🏠 Главное меню")]
+            [
+                KeyboardButton(text="🚀 ОТКРЫТЬ MINI APP", web_app=types.WebAppInfo(url="https://tretyakov-igor.tech/foodflow/")),
+                KeyboardButton(text="🏠 Меню")
+            ]
         ],
         resize_keyboard=True,
         persistent=True
     )
+
+
+@router.message(Command("webapp"))
+async def cmd_webapp(message: types.Message):
+    """Send Inline Button for Web App (More reliable initData)."""
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚀 Open FoodFlow", web_app=types.WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))]
+    ])
+    await message.answer("👇 Попробуй открыть через эту кнопку (Inline):", reply_markup=kb)
 
 
 @router.message(Command("start"))

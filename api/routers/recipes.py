@@ -1,7 +1,7 @@
 """Recipes router for FoodFlow API."""
 from fastapi import APIRouter
 
-from api.dependencies import DBSession, CurrentUser
+from api.auth import DBSession, CurrentUser
 from api.schemas import RecipeRead, RecipeRequest
 from database.models import Product, UserSettings
 from services.ai import AIService
