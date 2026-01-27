@@ -189,10 +189,13 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         }
     }
 
+    const [consumeImmediately, setConsumeImmediately] = useState(false)
+
     const handleSave = async () => {
         setLoading(true)
         try {
-            await fridgeApi.addProduct({
+            // 1. Add Product
+            const product = await fridgeApi.addProduct({
                 ...formData,
                 calories: Number(formData.calories) || 0,
                 protein: Number(formData.protein) || 0,
@@ -203,6 +206,15 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 price: Number(formData.price) || 0,
                 category: isHerbalife ? 'herbalife' : 'smart_add'
             })
+
+            // 2. Consume Immediately (if checked)
+            if (consumeImmediately && product.id) {
+                await fridgeApi.consumeProduct(product.id, {
+                    amount: 1, // Consume 1 unit (or full weight if tracked by weight? Logic suggests 1 unit for now)
+                    unit: 'qty'
+                })
+            }
+
             onSuccess()
             handleClose()
         } catch (err) {
@@ -371,6 +383,21 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                                     </div>
                                 ))}
                             </div>
+                        </div>
+
+                        {/* Eat Immediately Option */}
+                        <div
+                            onClick={() => setConsumeImmediately(!consumeImmediately)}
+                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${consumeImmediately ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-neutral-800 border-neutral-700 hover:border-neutral-600'}`}
+                        >
+                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${consumeImmediately ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-500'}`}>
+                                {consumeImmediately && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                            <div>
+                                <p className={`text-sm font-medium ${consumeImmediately ? 'text-emerald-400' : 'text-neutral-300'}`}>Съесть сразу</p>
+                                <p className="text-[10px] text-neutral-500">Добавит в холодильник И сразу запишет в цели</p>
+                            </div>
+                            <Utensils className={`w-4 h-4 ml-auto ${consumeImmediately ? 'text-emerald-500' : 'text-neutral-600'}`} />
                         </div>
 
                         <div className="flex gap-2 mt-4 pt-2">

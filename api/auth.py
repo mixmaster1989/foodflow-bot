@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -61,14 +61,17 @@ def verify_token(token: str) -> TokenData | None:
 
 
 async def get_current_user(
-    token: Annotated[str | None, Depends(oauth2_scheme)],
-    session: Annotated[AsyncSession, Depends(__import__('api.dependencies', fromlist=['get_db_session']).get_db_session)]
+    token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    token_query: Annotated[str | None, Query(alias="token")] = None,
+    # Need to avoid circular import by using dynamic import or manual session
+    session: Annotated[AsyncSession, Depends(get_db)] = None 
 ) -> User | None:
-    """Get current user from JWT token using shared session."""
-    if not token:
+    """Get current user from JWT token (header or query param)."""
+    final_token = token or token_query
+    if not final_token:
         return None
     
-    token_data = verify_token(token)
+    token_data = verify_token(final_token)
     if not token_data or not token_data.user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -76,7 +79,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Use the session to keep object attached
+    # Get user directly from session
+    # We use __import__ trick if dependencies are nested, but get_db is usually safe
     user = await session.get(User, token_data.user_id)
     if not user:
         raise HTTPException(
@@ -101,4 +105,4 @@ async def get_current_user_required(
 
 # Shortcut for cleaner dependency injection in routers
 CurrentUser = Annotated[User, Depends(get_current_user_required)]
-DBSession = Annotated[AsyncSession, Depends(__import__('api.dependencies', fromlist=['get_db_session']).get_db_session)]
+DBSession = Annotated[AsyncSession, Depends(get_db)]

@@ -3,7 +3,7 @@
 Contains:
 - cmd_start: Initial bot start handler that creates user if not exists
 """
-from aiogram import Router, types
+from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
@@ -28,13 +28,18 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="🚀 ОТКРЫТЬ MINI APP", web_app=types.WebAppInfo(url="https://tretyakov-igor.tech/foodflow/")),
-                KeyboardButton(text="🏠 Меню")
+                KeyboardButton(text="🏠 Главное меню")
             ]
         ],
         resize_keyboard=True,
         persistent=True
     )
+
+
+@router.message(F.text == "🏠 Главное меню")
+async def btn_main_menu(message: types.Message, state: FSMContext):
+    """Handle '🏠 Главное меню' button click by routing to /start logic."""
+    await cmd_start(message, state)
 
 
 @router.message(Command("webapp"))

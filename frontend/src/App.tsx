@@ -21,21 +21,34 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [aiTags, setAiTags] = useState<any[]>([])
+  const [bgUrl, setBgUrl] = useState<string | null>(null)
 
   // Fetch Data Function
   const refreshData = async (query?: string) => {
     if (!token) return
     setIsLoading(true)
     try {
+      // Background check - once per refresh
+      if (activeTab === 'fridge' && !query) {
+        setBgUrl(`${import.meta.env.VITE_API_BASE_URL || ''}/api/assets/daily-bg?token=${token}&v=${new Date().getDate()}`)
+      }
+
+      // Always fetch report to keep goals updated
+      const reportPromise = statsApi.getDailyReport()
+
       if (query !== undefined || searchQuery) {
         // Search Mode
-        const data = await searchApi.fridge(query ?? searchQuery)
-        setProducts(data.results || [])
+        const [searchData, reportData] = await Promise.all([
+          searchApi.fridge(query ?? searchQuery),
+          reportPromise
+        ])
+        setProducts(searchData.results || [])
+        setReport(reportData)
       } else {
         // Regular Mode + AI Summary
         const [searchData, reportData] = await Promise.all([
           searchApi.fridge('', true),
-          statsApi.getDailyReport()
+          reportPromise
         ])
         setProducts(searchData.results || [])
         setAiSummary(searchData.summary)
@@ -115,17 +128,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans p-4 pb-24">
+    <div className="min-h-screen text-neutral-100 font-sans p-4 pb-24 relative overflow-x-hidden">
+      {/* Dynamic Background Bomb 💣 */}
+      <div className="dynamic-bg">
+        {bgUrl && <img src={bgUrl} alt="" className={isLoading ? 'opacity-0' : 'opacity-40'} />}
+      </div>
+
       {/* Header */}
-      <header className="flex items-center justify-between mb-8">
+      <header className="flex items-center justify-between mb-8 relative z-10">
         <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
             FoodFlow
           </h1>
           <p className="text-neutral-500 text-sm">С возвращением, {user?.first_name || 'Шеф'}!</p>
         </div>
-        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-          <Apple className="w-6 h-6" />
+        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group overflow-hidden">
+          {/* Radiant avatar fallback */}
+          <div className="absolute inset-0 bg-emerald-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <Apple className="w-6 h-6 relative" />
         </div>
       </header>
 
@@ -250,14 +270,26 @@ function App() {
             ) : products.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
                 {products.map((item) => (
-                  <div key={item.id} className="group flex items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-2xl hover:border-emerald-500/30 transition-colors">
+                  <div key={item.id} className="group flex items-center justify-between p-4 bg-neutral-900/40 backdrop-blur-md border border-white/5 rounded-2xl hover:border-emerald-500/30 transition-all hover:translate-x-1 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-neutral-800 rounded-xl group-hover:bg-emerald-500/10 transition-colors">
-                        <Apple className="w-5 h-5 text-neutral-400 group-hover:text-emerald-500 transition-colors" />
+                      <div className="w-12 h-12 rounded-xl bg-neutral-950 border border-white/5 flex items-center justify-center group-hover:bg-emerald-500/10 transition-colors overflow-hidden relative">
+                        {item.photo_url ? (
+                          <img src={item.photo_url} className="w-full h-full object-cover" alt={item.name} />
+                        ) : (
+                          <div className="relative w-full h-full flex items-center justify-center">
+                            <img
+                              src={`${import.meta.env.VITE_API_BASE_URL || ''}/api/assets/icon/${encodeURIComponent(item.name)}?token=${token}`}
+                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                              alt={item.name}
+                              onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                            />
+                            <Apple className="w-5 h-5 text-neutral-600 absolute hidden" />
+                          </div>
+                        )}
                       </div>
                       <div>
-                        <h3 className="font-medium text-sm">{item.name}</h3>
-                        <p className="text-xs text-neutral-500">{item.weight_g}г • {Math.round(item.calories)} ккал</p>
+                        <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
+                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{item.weight_g}г • {Math.round(item.calories)} ккал</p>
                       </div>
                     </div>
 

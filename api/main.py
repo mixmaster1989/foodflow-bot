@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.main")
 
-from api.routers import auth, products, consumption, recipes, weight, shopping_list, reports, receipts, recognize, smart, search, herbalife, universal
+from api.routers import auth, products, consumption, recipes, weight, shopping_list, reports, receipts, recognize, smart, search, herbalife, universal, assets
 
 
 @asynccontextmanager
@@ -55,6 +55,7 @@ app.include_router(smart.router, prefix="/api/smart", tags=["Smart Features"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(herbalife.router, prefix="/api/herbalife", tags=["Herbalife Expert"])
 app.include_router(universal.router, prefix="/api/universal", tags=["Universal Input"])
+app.include_router(assets.router, prefix="/api/assets", tags=["Assets (Flux)"])
 
 
 
