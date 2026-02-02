@@ -111,6 +111,10 @@ export const consumptionApi = {
     getLogs: async (days: number = 7) => {
         const response = await apiClient.get('/consumption', { params: { days } });
         return response.data;
+    },
+    manualLog: async (data: any) => {
+        const response = await apiClient.post('/consumption/manual', data);
+        return response.data;
     }
 };
 

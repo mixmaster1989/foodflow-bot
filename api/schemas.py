@@ -103,7 +103,7 @@ class ConsumptionLogBase(BaseModel):
 
 
 class ConsumptionLogCreate(ConsumptionLogBase):
-    pass
+    weight_g: float | None = None
 
 
 class ConsumptionLogRead(ConsumptionLogBase):

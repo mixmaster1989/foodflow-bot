@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Loader2, Sparkles, CheckCircle2, Camera, Mic, Leaf, RefreshCcw } from 'lucide-react'
+import { X, Loader2, Sparkles, CheckCircle2, Camera, Mic, Leaf, RefreshCcw, Utensils } from 'lucide-react'
 import { fridgeApi, universalApi } from '../api/client'
 
 interface AddProductModalProps {
@@ -21,6 +21,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     // Smart Input State
     const [query, setQuery] = useState('')
     const [isHerbalife, setIsHerbalife] = useState(false)
+    const [consumeImmediately, setConsumeImmediately] = useState(false) // Moved up (Fixed #310)
 
     // ... (rest of metadata)
 
@@ -189,7 +190,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         }
     }
 
-    const [consumeImmediately, setConsumeImmediately] = useState(false)
+    // const [consumeImmediately, setConsumeImmediately] = useState(false) // Moved to top
 
     const handleSave = async () => {
         setLoading(true)

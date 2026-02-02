@@ -26,6 +26,7 @@ import logging
 from services.consultant import ConsultantService
 from services.photo_queue import PhotoQueueManager
 from services.label_ocr import LabelOCRService
+from services.nutrition_calculator import NutritionCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ class OnboardingStates(StatesGroup):
     waiting_for_height = State()
     waiting_for_weight = State()
     waiting_for_goal = State()
+    waiting_for_calorie_confirmation = State() # NEW: Confirm calculated values
+    waiting_for_manual_calories = State()      # NEW: Manual calorie input
     initializing_fridge = State()  # Scanning products for initial fridge setup
 
 
@@ -232,41 +235,123 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
 
     """
     goal = callback.data.split(":")[1]  # "lose_weight", "maintain", "healthy", "gain_mass"
+    
+    # Store goal in state
+    await state.update_data(goal=goal)
     data = await state.get_data()
 
-    user_id: int = callback.from_user.id
+    # Calculate recommendations
+    gender = data.get("gender", "male")
+    age = data.get("age", 30)
+    height = data.get("height", 170)
+    weight = data.get("weight", 70)
+    
+    targets = NutritionCalculator.calculate_targets(gender, weight, height, age, goal)
+    
+    # Store calculated targets in state as "pending"
+    await state.update_data(pending_targets=targets)
+    
+    await state.set_state(OnboardingStates.waiting_for_calorie_confirmation)
+    
+    # Show recommendations
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
+    builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
+    builder.adjust(1)
+    
+    goal_names = {
+        "lose_weight": "Похудение",
+        "maintain": "Поддержание",
+        "healthy": "Здоровье",
+        "gain_mass": "Набор массы"
+    }
 
+    text = (
+        f"🎯 <b>Цель: {goal_names.get(goal, 'Здоровье')}</b>\n\n"
+        f"Исходя из твоих параметров, я рассчитал рекомендуемые нормы:\n\n"
+        f"🔥 <b>Калории: {targets['calories']} ккал</b>\n"
+        f"🥩 Белки: {targets['protein']} г\n"
+        f"🥑 Жиры: {targets['fat']} г\n"
+        f"🍞 Углеводы: {targets['carbs']} г\n\n"
+        "Согласен с этим расчетом?"
+    )
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "onboarding_goals:accept")
+async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Accept calculated goals and finish."""
+    data = await state.get_data()
+    targets = data.get("pending_targets")
+    
+    if not targets:
+        await callback.answer("Ошибка данных, начните заново", show_alert=True)
+        return
+        
+    await finish_onboarding_process(callback.message, state, targets)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "onboarding_goals:manual")
+async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Ask for manual calories."""
+    await state.set_state(OnboardingStates.waiting_for_manual_calories)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="onboarding_back:goals") # We need to handle this back
+    
+    text = (
+        "✏️ <b>Ввод своей нормы</b>\n\n"
+        "Введите желаемое количество калорий в день (например: 1800).\n"
+        "Я автоматически пересчитаю БЖУ под твою цель."
+    )
+    
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(OnboardingStates.waiting_for_manual_calories)
+async def handle_manual_calories_input(message: types.Message, state: FSMContext) -> None:
+    """Process manual calories and recalculate macros."""
+    try:
+        calories = int(message.text)
+        if calories < 500 or calories > 10000:
+            await message.answer("Пожалуйста, введите разумное число (500-10000).")
+            return
+            
+        data = await state.get_data()
+        weight = data.get("weight", 70)
+        goal = data.get("goal", "healthy")
+        
+        # Recalculate macros based on NEW calories
+        targets = NutritionCalculator.calculate_macros(calories, weight, goal)
+        
+        await finish_onboarding_process(message, state, targets)
+        
+    except ValueError:
+        await message.answer("Пожалуйста, введите целое число.")
+
+
+async def finish_onboarding_process(message: types.Message, state: FSMContext, targets: dict) -> None:
+    """Save all data to DB and show finish screen."""
+    data = await state.get_data()
+    user_id = message.from_user.id
+    
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-
-        # Calculate KBZHU using Mifflin-St Jeor formula
+        
         gender = data.get("gender", "male")
         age = data.get("age", 30)
         height = data.get("height", 170)
         weight = data.get("weight", 70)
-        
-        # BMR calculation (Mifflin-St Jeor)
-        if gender == "male":
-            bmr = 10 * weight + 6.25 * height - 5 * age + 5
-        else:
-            bmr = 10 * weight + 6.25 * height - 5 * age - 161
-        
-        # Activity multiplier (assuming moderate activity)
-        tdee = bmr * 1.55
-        
-        # Adjust for goal
-        if goal == "lose_weight":
-            calories = int(tdee * 0.8)  # 20% deficit
-        elif goal == "gain_mass":
-            calories = int(tdee * 1.15)  # 15% surplus
-        else:
-            calories = int(tdee)
-        
-        # Macros distribution
-        protein = int(weight * 1.8)  # 1.8g per kg body weight
-        fat = int(calories * 0.25 / 9)  # 25% of calories from fat
-        carbs = int((calories - protein * 4 - fat * 9) / 4)  # Rest from carbs
+        goal = data.get("goal", "healthy")
 
         if settings:
             settings.gender = gender
@@ -274,10 +359,11 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
             settings.height = height
             settings.weight = weight
             settings.goal = goal
-            settings.calorie_goal = calories
-            settings.protein_goal = protein
-            settings.fat_goal = fat
-            settings.carb_goal = carbs
+            settings.calorie_goal = targets["calories"]
+            settings.protein_goal = targets["protein"]
+            settings.fat_goal = targets["fat"]
+            settings.carb_goal = targets["carbs"]
+            settings.fiber_goal = targets.get("fiber", 30)
             settings.is_initialized = True
             await session.commit()
         else:
@@ -288,14 +374,15 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
                 height=height,
                 weight=weight,
                 goal=goal,
-                calorie_goal=calories,
-                protein_goal=protein,
-                fat_goal=fat,
-                carb_goal=carbs,
+                calorie_goal=targets["calories"],
+                protein_goal=targets["protein"],
+                fat_goal=targets["fat"],
+                carb_goal=targets["carbs"],
+                fiber_goal=targets.get("fiber", 30),
                 is_initialized=True,
             )
             session.add(settings)
-
+            
     await state.clear()
 
     goal_text = {

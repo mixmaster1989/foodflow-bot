@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Loader2, ShoppingBasket } from 'lucide-react'
+import { Loader2, ShoppingBasket, Apple, LayoutGrid, PlusCircle, Activity, Trash2, Utensils, Search as SearchIcon, X, Zap } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
-import { fridgeApi, statsApi } from './api/client'
-import { Apple, LayoutGrid, PlusCircle, Activity, Trash2, Utensils, Search as SearchIcon, X } from 'lucide-react'
+import { fridgeApi, statsApi, searchApi } from './api/client'
 import { AddProductModal } from './components/AddProductModal'
 import { ShoppingList } from './components/ShoppingList'
 import { ConsumptionHistory } from './components/ConsumptionHistory'
-import { searchApi } from './api/client'
+import { QuickLogModal } from './components/QuickLogModal'
 
 function App() {
   const { user, token, isLoading: authLoading, error: authError } = useAuth()
@@ -14,6 +13,7 @@ function App() {
   const [report, setReport] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'fridge' | 'shopping'>('fridge')
 
@@ -345,9 +345,23 @@ function App() {
         >
           <ShoppingBasket className="w-6 h-6" />
         </button>
+        <div className="relative">
+          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20"></div>
+          <button
+            className="relative z-10 p-3 bg-neutral-800 rounded-full border border-neutral-700 text-neutral-400 hover:text-white hover:border-blue-500 transition-all active:scale-95"
+            onClick={() => setIsQuickLogOpen(true)}
+          >
+            <Zap className="w-5 h-5" />
+          </button>
+        </div>
       </nav>
 
       {/* Modals */}
+      <QuickLogModal
+        isOpen={isQuickLogOpen}
+        onClose={() => setIsQuickLogOpen(false)}
+        onSuccess={refreshData}
+      />
       <AddProductModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

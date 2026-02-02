@@ -202,3 +202,55 @@ class WeightLog(Base):
     weight = Column(Float, nullable=False)
     recorded_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", backref="weight_logs")
+
+
+class Marathon(Base):
+    """Marathon managed by a curator."""
+    __tablename__ = "marathons"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, default=True)
+    
+    # Store wave configuration [start, end, label]
+    waves_config = Column(JSON, nullable=True) 
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    curator = relationship("User", backref="marathons", foreign_keys=[curator_id])
+    participants = relationship("MarathonParticipant", back_populates="marathon")
+
+
+class MarathonParticipant(Base):
+    """Participant in a specific marathon."""
+    __tablename__ = "marathon_participants"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    marathon_id = Column(Integer, ForeignKey("marathons.id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    
+    start_weight = Column(Float, nullable=True) # Weight at entry
+    final_weight = Column(Float, nullable=True) # Weight at exit/finish
+    
+    # Cached totals for quick leadership board
+    total_snowflakes = Column(Integer, default=0)
+    
+    is_active = Column(Boolean, default=True) # If kicked -> False
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    
+    marathon = relationship("Marathon", back_populates="participants")
+    user = relationship("User", backref="marathon_participations")
+    snowflake_logs = relationship("SnowflakeLog", back_populates="participant")
+
+
+class SnowflakeLog(Base):
+    """Log of activity points (snowflakes) assigned by curator."""
+    __tablename__ = "snowflake_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    participant_id = Column(Integer, ForeignKey("marathon_participants.id"), nullable=False)
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=False) # Audit who gave points
+    amount = Column(Integer, nullable=False) # Can be negative
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    participant = relationship("MarathonParticipant", back_populates="snowflake_logs")

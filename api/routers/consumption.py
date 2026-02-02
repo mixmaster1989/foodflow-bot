@@ -43,10 +43,38 @@ async def create_consumption_log(
     user: CurrentUser,
     session: DBSession,
 ):
-    """Log food consumption manually."""
+    """Log food consumption (standard)."""
     log = ConsumptionLog(
         user_id=user.id,
         product_name=log_data.product_name,
+        calories=log_data.calories,
+        protein=log_data.protein,
+        fat=log_data.fat,
+        carbs=log_data.carbs,
+        fiber=log_data.fiber,
+        date=datetime.utcnow(),
+    )
+    session.add(log)
+    await session.commit()
+    await session.refresh(log)
+    return ConsumptionLogRead.model_validate(log)
+
+
+@router.post("/manual", response_model=ConsumptionLogRead, status_code=201)
+async def create_manual_log(
+    log_data: ConsumptionLogCreate,
+    user: CurrentUser,
+    session: DBSession,
+):
+    """Manual log from Quick Log (formats name with weight)."""
+    final_name = log_data.product_name
+    if log_data.weight_g:
+        final_name = f"{log_data.product_name} ({int(log_data.weight_g)}г)"
+
+    log = ConsumptionLog(
+        user_id=user.id,
+        product_name=final_name,
+        base_name=log_data.product_name, # Save clean name too for grouping
         calories=log_data.calories,
         protein=log_data.protein,
         fat=log_data.fat,

@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from database.base import get_db
 from database.models import UserSettings
+from services.nutrition_calculator import NutritionCalculator
 
 router = Router()
 
@@ -126,25 +127,91 @@ async def show_settings(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data == "settings_edit_goals")
 async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Initiate editing nutrition goals.
+    """Initiate editing nutrition goals with recommendations."""
+    user_id = callback.from_user.id
+    
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings = (await session.execute(stmt)).scalar_one_or_none()
+        
+        if not settings:
+            await callback.answer("Профиль не найден", show_alert=True)
+            return
 
-    Sets FSM state to wait for calorie goal input.
+        # Calculate recommendations based on current profile
+        targets = NutritionCalculator.calculate_targets(
+            gender=settings.gender or "male",
+            weight=settings.weight or 70,
+            height=settings.height or 170,
+            age=settings.age or 30,
+            goal=settings.goal or "healthy"
+        )
+        
+        # Save pending targets
+        await state.update_data(pending_targets=targets)
+        await state.update_data(current_settings_weight=settings.weight) # helpful for macros
+        await state.update_data(current_settings_goal=settings.goal)
+        
+        # Build UI
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Принять рекомендованные", callback_data="settings_goals:accept")
+        builder.button(text="✏️ Ввести свои калории", callback_data="settings_goals:manual")
+        builder.button(text="🔙 Отмена", callback_data="menu_settings")
+        builder.adjust(1)
 
-    Args:
-        callback: Telegram callback query
-        state: FSM context
+        text = (
+            "🎯 <b>Редактирование целей КБЖУ</b>\n\n"
+            f"Текущая цель: <b>{settings.calorie_goal}</b> ккал\n"
+            f"Рекомендуемая: <b>{targets['calories']}</b> ккал\n\n"
+            f"<i>Рекомендация рассчитана для ваших параметров ({settings.weight}кг, {settings.age} лет).</i>\n\n"
+            "Вы можете принять расчет или настроить вручную."
+        )
 
-    Returns:
-        None
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.answer()
 
-    """
+
+@router.callback_query(F.data == "settings_goals:accept")
+async def accept_recommended_goals(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Save recommended goals."""
+    data = await state.get_data()
+    targets = data.get("pending_targets")
+    
+    if not targets:
+        await callback.answer("Ошибка данных", show_alert=True)
+        return
+        
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings = (await session.execute(stmt)).scalar_one_or_none()
+        
+        if settings:
+            settings.calorie_goal = targets["calories"]
+            settings.protein_goal = targets["protein"]
+            settings.fat_goal = targets["fat"]
+            settings.carb_goal = targets["carbs"]
+            settings.fiber_goal = targets.get("fiber", 30)
+            await session.commit()
+            
+    await state.clear()
+    await show_settings(callback) # Return to settings menu
+
+
+@router.callback_query(F.data == "settings_goals:manual")
+async def start_manual_goals(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start manual calorie input."""
     await state.set_state(SettingsStates.waiting_for_calories)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="menu_settings")
 
     edit_text = (
-        "🎯 <b>Настройка целей</b>\n\n"
-        "Введите вашу дневную норму <b>калорий</b> (числом, например 2000):"
+        "✏️ <b>Ввод своей нормы</b>\n\n"
+        "Введите вашу дневную норму <b>калорий</b> (числом, например 2000):\n"
+        "<i>Я автоматически пересчитаю БЖУ под вашу цель.</i>"
     )
 
     try:
@@ -154,129 +221,63 @@ async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> 
         await callback.message.answer(edit_text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
+
 @router.message(SettingsStates.waiting_for_calories)
 async def set_calories(message: types.Message, state: FSMContext) -> None:
-    """Set calorie goal and proceed to protein goal.
-
-    Args:
-        message: Telegram message with calorie goal (integer)
-        state: FSM context
-
-    Returns:
-        None
-
-    """
+    """Set calorie goal and auto-calculate macros."""
     try:
-        calories: int = int(message.text) if message.text else 0
-        await state.update_data(calorie_goal=calories)
+        calories: int = int(message.text)
+        if calories < 500 or calories > 10000:
+             await message.answer("Пожалуйста, введите разумное число (500-10000).")
+             return
 
-        # Save calories to database (create or update settings)
+        # Retrieve context for macro calc
+        data = await state.get_data()
+        
+        # If we came from settings menu directly without cache (unlikely but possible), fetch defaults
+        weight = data.get("current_settings_weight", 70)
+        goal = data.get("current_settings_goal", "healthy")
+        
+        # If not in state, try DB fallback
+        if not weight or not goal:
+             async for session in get_db():
+                stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
+                settings = (await session.execute(stmt)).scalar_one_or_none()
+                if settings:
+                    weight = settings.weight or 70
+                    goal = settings.goal or "healthy"
+        
+        # Calculate macros
+        targets = NutritionCalculator.calculate_macros(calories, weight, goal)
+        
+        # Save to DB immediately (simplification for UX)
         async for session in get_db():
             stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
             settings = (await session.execute(stmt)).scalar_one_or_none()
 
             if settings:
                 settings.calorie_goal = calories
+                settings.protein_goal = targets["protein"]
+                settings.fat_goal = targets["fat"]
+                settings.carb_goal = targets["carbs"]
+                settings.fiber_goal = targets.get("fiber", 30)
                 await session.commit()
             else:
-                settings = UserSettings(
-                    user_id=message.from_user.id,
-                    calorie_goal=calories
-                )
-                session.add(settings)
-                await session.commit()
-
-        await state.set_state(SettingsStates.waiting_for_protein)
-        await message.answer("Отлично! Теперь введите норму <b>белков</b> (г):", parse_mode="HTML")
-    except ValueError:
-        await message.answer("Пожалуйста, введите целое число.")
-
-@router.message(SettingsStates.waiting_for_protein)
-async def set_protein(message: types.Message, state: FSMContext) -> None:
-    """Set protein goal and proceed to fat goal.
-
-    Args:
-        message: Telegram message with protein goal (integer)
-        state: FSM context
-
-    Returns:
-        None
-
-    """
-    try:
-        protein: int = int(message.text) if message.text else 0
-        await state.update_data(protein_goal=protein)
-        await state.set_state(SettingsStates.waiting_for_fat)
-        await message.answer("Теперь введите норму <b>жиров</b> (г):", parse_mode="HTML")
-    except ValueError:
-        await message.answer("Пожалуйста, введите целое число.")
-
-@router.message(SettingsStates.waiting_for_fat)
-async def set_fat(message: types.Message, state: FSMContext) -> None:
-    """Set fat goal and proceed to carbs goal.
-
-    Args:
-        message: Telegram message with fat goal (integer)
-        state: FSM context
-
-    Returns:
-        None
-
-    """
-    try:
-        fat: int = int(message.text) if message.text else 0
-        await state.update_data(fat_goal=fat)
-        await state.set_state(SettingsStates.waiting_for_carbs)
-        await message.answer("И наконец, норму <b>углеводов</b> (г):", parse_mode="HTML")
-    except ValueError:
-        await message.answer("Пожалуйста, введите целое число.")
-
-@router.message(SettingsStates.waiting_for_carbs)
-async def set_carbs(message: types.Message, state: FSMContext) -> None:
-    """Set carbs goal and save all nutrition goals to database.
-
-    Args:
-        message: Telegram message with carbs goal (integer)
-        state: FSM context containing calorie_goal, protein_goal, fat_goal
-
-    Returns:
-        None
-
-    """
-    try:
-        carbs: int = int(message.text) if message.text else 0
-        data = await state.get_data()
-
-        async for session in get_db():
-            stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
-            settings = (await session.execute(stmt)).scalar_one_or_none()
-
-            if settings:
-                settings.calorie_goal = data['calorie_goal']
-                settings.protein_goal = data['protein_goal']
-                settings.fat_goal = data['fat_goal']
-                settings.carb_goal = carbs
-                await session.commit()
-            else:
-                settings = UserSettings(
-                    user_id=message.from_user.id,
-                    calorie_goal=data['calorie_goal'],
-                    protein_goal=data['protein_goal'],
-                    fat_goal=data['fat_goal'],
-                    carb_goal=carbs
-                )
-                session.add(settings)
-                await session.commit()
+                 # Should not happen in settings edit, but safety first
+                 pass
 
         await state.clear()
 
-        # Show updated settings
-        # We can't easily call callback handler from message handler without mocking,
-        # so let's just send a message with button to go back
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
 
-        await message.answer("✅ Цели успешно обновлены!", reply_markup=builder.as_markup())
+        await message.answer(
+            f"✅ <b>Цели обновлены!</b>\n\n"
+            f"🔥 {calories} ккал\n"
+            f"🥩 {targets['protein']} / 🥑 {targets['fat']} / 🍞 {targets['carbs']}",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
 
     except ValueError:
         await message.answer("Пожалуйста, введите целое число.")
