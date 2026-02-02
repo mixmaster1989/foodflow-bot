@@ -47,7 +47,7 @@ async def curator_dashboard(callback: types.CallbackQuery) -> None:
             log_stmt = select(ConsumptionLog).where(
                 ConsumptionLog.user_id == ward.id,
                 func.date(ConsumptionLog.date) == today
-            )
+            ).limit(1)
             has_logs = (await session.execute(log_stmt)).scalar_one_or_none()
             if has_logs:
                 active_count += 1
