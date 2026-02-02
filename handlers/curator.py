@@ -53,11 +53,12 @@ async def curator_dashboard(callback: types.CallbackQuery) -> None:
                 active_count += 1
     
     builder = InlineKeyboardBuilder()
+    builder.button(text="🏆 Марафон", callback_data="curator_marathon_menu")
     builder.button(text="👥 Мои подопечные", callback_data="curator_wards:0")
     builder.button(text="📢 Рассылка", callback_data="curator_broadcast_start")
     builder.button(text="🔗 Моя ссылка", callback_data="curator_generate_link")
     builder.button(text="🔙 В меню", callback_data="main_menu")
-    builder.adjust(1, 2, 1)
+    builder.adjust(1, 1, 2, 1)
     
     text = (
         f"👨‍🏫 <b>Кабинет Куратора</b>\n\n"

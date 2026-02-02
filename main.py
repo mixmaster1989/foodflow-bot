@@ -32,6 +32,7 @@ from handlers import (
     correction,
     # global_input,
 )
+from handlers.marathon import curator_menu
 
 
 async def main():
@@ -68,6 +69,7 @@ async def main():
     dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(menu.router)  # Central menu router
     dp.include_router(i_ate.router)  # Quick food logging
+    dp.include_router(curator_menu.router) # Marathon Module
     dp.include_router(curator.router)  # Curator dashboard
     dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)

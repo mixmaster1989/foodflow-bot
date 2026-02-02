@@ -413,8 +413,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
     builder.button(text="⏭️ Пропустить", callback_data="onboarding_skip_fridge")
     builder.adjust(1)
 
-    await callback.message.answer(finish_text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer()
+    await message.answer(finish_text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("onboarding_back:"))
