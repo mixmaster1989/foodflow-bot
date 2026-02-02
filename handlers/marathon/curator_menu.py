@@ -26,6 +26,9 @@ class CuratorMarathonStates(StatesGroup):
     
     managing_waves = State() # Editing wave toggles
     
+    creating_wave_name = State() # Wave name input
+    creating_wave_dates = State() # Wave dates input
+    
     awarding_snowflakes = State() # Selecting user to award
     entering_snowflake_amount = State() # Entering amount
     entering_snowflake_reason = State() # Entering reason
@@ -607,24 +610,238 @@ async def stop_marathon(callback: types.CallbackQuery) -> None:
     await show_marathon_menu(callback)
 
 
-# ===================== WAVES CONFIG (Stub) =====================
+# ===================== WAVES CONFIG =====================
 
 @router.callback_query(F.data.startswith("marathon_waves:"))
-async def show_waves_config(callback: types.CallbackQuery) -> None:
-    """Show wave configuration (stub for MVP)."""
+async def show_waves_config(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show wave configuration with list of current waves."""
     marathon_id = int(callback.data.split(":")[1])
     
+    await state.update_data(marathon_id=marathon_id)
+    
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        
+        if not marathon:
+            await callback.answer("❌ Марафон не найден", show_alert=True)
+            return
+        
+        waves = marathon.waves_config or {}
+        # waves format: {"wave_1": {"name": "Первая волна", "start": "2026-03-01", "end": "2026-03-10"}, ...}
+        
+        builder = InlineKeyboardBuilder()
+        
+        # List existing waves
+        if waves:
+            for wave_id, wave_data in sorted(waves.items()):
+                name = wave_data.get("name", wave_id)
+                start = wave_data.get("start", "?")
+                end = wave_data.get("end", "?")
+                builder.button(
+                    text=f"🌊 {name} ({start} — {end})",
+                    callback_data=f"wave_detail:{marathon_id}:{wave_id}"
+                )
+        
+        builder.button(text="➕ Добавить волну", callback_data=f"wave_add:{marathon_id}")
+        builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
+        builder.adjust(1)
+        
+        # Build status text
+        now_str = datetime.utcnow().strftime("%d.%m")
+        wave_count = len(waves)
+        
+        text = (
+            f"⚙️ **Настройка Волн**\n\n"
+            f"📅 Марафон: {marathon.start_date.strftime('%d.%m')} — {marathon.end_date.strftime('%d.%m')}\n"
+            f"🌊 Волн: **{wave_count}**\n\n"
+        )
+        
+        if not waves:
+            text += "_Волны не настроены. Добавьте первую!_"
+        else:
+            text += "Нажмите на волну для редактирования."
+        
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        except Exception:
+            pass
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("wave_add:"))
+async def start_add_wave(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start adding a new wave."""
+    marathon_id = int(callback.data.split(":")[1])
+    await state.update_data(marathon_id=marathon_id)
+    await state.set_state(CuratorMarathonStates.creating_wave_name)
+    
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
+    builder.button(text="🔙 Отмена", callback_data=f"marathon_waves:{marathon_id}")
     
     text = (
-        "⚙️ **Настройка Волн**\n\n"
-        "🚧 Эта функция в разработке.\n"
-        "Пока что используются общие даты марафона."
+        "➕ **Новая Волна**\n\n"
+        "Введите название волны:\n"
+        "_(Например: Первая волна, Старт, Финиш)_"
     )
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     await callback.answer()
+
+
+@router.message(CuratorMarathonStates.creating_wave_name)
+async def process_wave_name(message: types.Message, state: FSMContext) -> None:
+    """Save wave name and ask for dates."""
+    wave_name = message.text.strip()
+    await state.update_data(wave_name=wave_name)
+    await state.set_state(CuratorMarathonStates.creating_wave_dates)
+    
+    text = (
+        f"✅ Название: **{wave_name}**\n\n"
+        "Теперь введите **даты начала и конца** волны:\n"
+        "Формат: `ДД.ММ ДД.ММ`\n\n"
+        "Пример: `01.03 10.03`"
+    )
+    
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(CuratorMarathonStates.creating_wave_dates)
+async def process_wave_dates(message: types.Message, state: FSMContext) -> None:
+    """Parse dates and save wave."""
+    data = await state.get_data()
+    marathon_id = data.get("marathon_id")
+    wave_name = data.get("wave_name")
+    
+    try:
+        raw = message.text.replace(",", " ").strip()
+        parts = raw.split()
+        
+        if len(parts) != 2:
+            raise ValueError("Need 2 dates")
+        
+        # Parse dates (assuming current year)
+        year = datetime.utcnow().year
+        start_str = parts[0]
+        end_str = parts[1]
+        
+        # Support both DD.MM and DD.MM.YYYY
+        if len(start_str) <= 5:
+            start_str = f"{start_str}.{year}"
+        if len(end_str) <= 5:
+            end_str = f"{end_str}.{year}"
+        
+        start_date = datetime.strptime(start_str, "%d.%m.%Y")
+        end_date = datetime.strptime(end_str, "%d.%m.%Y")
+        
+        if end_date <= start_date:
+            await message.answer("❌ Дата конца должна быть позже даты начала.")
+            return
+        
+        async for session in get_db():
+            marathon = await session.get(Marathon, marathon_id)
+            
+            if not marathon:
+                await message.answer("❌ Марафон не найден.")
+                await state.clear()
+                return
+            
+            # Generate wave ID
+            waves = marathon.waves_config or {}
+            wave_id = f"wave_{len(waves) + 1}"
+            
+            # Add wave
+            waves[wave_id] = {
+                "name": wave_name,
+                "start": start_date.strftime("%d.%m"),
+                "end": end_date.strftime("%d.%m")
+            }
+            
+            marathon.waves_config = waves
+            await session.commit()
+        
+        await state.clear()
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 К волнам", callback_data=f"marathon_waves:{marathon_id}")
+        
+        await message.answer(
+            f"✅ **Волна '{wave_name}' создана!**\n\n"
+            f"📅 {start_date.strftime('%d.%m')} — {end_date.strftime('%d.%m')}",
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+        
+    except ValueError:
+        await message.answer("❌ Ошибка формата. Попробуйте еще раз:\n`ДД.ММ ДД.ММ`", parse_mode="Markdown")
+
+
+@router.callback_query(F.data.startswith("wave_detail:"))
+async def show_wave_detail(callback: types.CallbackQuery) -> None:
+    """Show wave details with delete option."""
+    parts = callback.data.split(":")
+    marathon_id = int(parts[1])
+    wave_id = parts[2]
+    
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        
+        if not marathon:
+            await callback.answer("❌ Марафон не найден", show_alert=True)
+            return
+        
+        waves = marathon.waves_config or {}
+        wave = waves.get(wave_id)
+        
+        if not wave:
+            await callback.answer("❌ Волна не найдена", show_alert=True)
+            return
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🗑️ Удалить волну", callback_data=f"wave_delete:{marathon_id}:{wave_id}")
+        builder.button(text="🔙 Назад", callback_data=f"marathon_waves:{marathon_id}")
+        builder.adjust(1)
+        
+        text = (
+            f"🌊 **{wave.get('name', wave_id)}**\n\n"
+            f"📅 Начало: **{wave.get('start', '?')}**\n"
+            f"📅 Конец: **{wave.get('end', '?')}**"
+        )
+        
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        except Exception:
+            pass
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("wave_delete:"))
+async def delete_wave(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Delete a wave from marathon."""
+    parts = callback.data.split(":")
+    marathon_id = int(parts[1])
+    wave_id = parts[2]
+    
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        
+        if not marathon:
+            await callback.answer("❌ Марафон не найден", show_alert=True)
+            return
+        
+        waves = marathon.waves_config or {}
+        
+        if wave_id in waves:
+            del waves[wave_id]
+            marathon.waves_config = waves
+            await session.commit()
+            await callback.answer("✅ Волна удалена!", show_alert=True)
+        else:
+            await callback.answer("❌ Волна не найдена", show_alert=True)
+    
+    # Go back to waves list
+    callback.data = f"marathon_waves:{marathon_id}"
+    await show_waves_config(callback, state)
+
 
 
 
