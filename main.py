@@ -55,8 +55,10 @@ async def main():
     # Register Middleware
     from handlers.auth import AuthMiddleware
     from middleware.admin_logger import AdminLoggerMiddleware
+    from middleware.user_enrichment import UserEnrichmentMiddleware
     
     dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
+    dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
     dp.update.middleware(AuthMiddleware())
 
     # Register Routers

@@ -20,7 +20,12 @@ class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True)  # Telegram ID
     username = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)  # Telegram first name
+    last_name = Column(String, nullable=True)   # Telegram last name
+    language_code = Column(String, nullable=True)  # e.g. "ru", "en"
+    is_premium = Column(Boolean, default=False)  # Telegram Premium
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_verified = Column(Boolean, default=False)  # User auth status
     
     # Curator system fields
