@@ -216,43 +216,59 @@ class AIBrainService:
                 "X-Title": "FoodFlow Bot",
             }
 
-            payload = {
-                "model": "google/gemini-2.0-flash-exp:free", # Using Free/Exp model for Vision
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{b64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
+            VISION_MODELS = [
+                "google/gemini-2.5-flash-lite-preview-09-2025", # Main
+                "qwen/qwen2.5-vl-72b-instruct:free"               # Fallback
+            ]
 
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=20
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        content = data['choices'][0]['message']['content']
-                        logger.info(f"Vision Analysis: {content[:100]}...")
-                        return content
-                    else:
-                        logger.warning(f"Vision API Error: {response.status} - {await response.text()}")
+                for model in VISION_MODELS:
+                    try:
+                        payload = {
+                            "model": model,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": prompt},
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:image/jpeg;base64,{b64_image}"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+
+                        logger.info(f"Vision Analysis: Trying model {model}...")
                         
-        except Exception as e:
-            logger.error(f"Vision Analysis Exception: {e}", exc_info=True)
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=30 # Increased timeout for Vision
+                        ) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                content = data['choices'][0]['message']['content']
+                                logger.info(f"Vision Analysis ({model}): {content[:100]}...")
+                                return content
+                            else:
+                                error_text = await response.text()
+                                logger.warning(f"Vision API Error ({model}): {response.status} - {error_text}")
+                                # Continue to next model
+                    except Exception as e:
+                        logger.error(f"Vision Analysis Exception ({model}): {e}")
+                        # Continue to next model
             
-        return None
+            logger.error("All Vision models failed.")
+            return None
+
+        except Exception as e:
+            logger.error(f"Vision Analysis Outer Exception: {e}", exc_info=True)
+            return None
 
 
     @classmethod

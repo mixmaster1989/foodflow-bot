@@ -97,6 +97,8 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         # 1. Analyze via Vision
         description = await AIBrainService.analyze_image(message, prompt="Что на фото? Если это еда или продукты, напиши название и вкус. Если чек - напиши 'чек'.")
         
+        logger.info(f"📸 Photo Analysis Result: '{description}'")
+
         if not description:
              await status_msg.edit_text("❌ Не удалось понять, что на фото.")
              return
@@ -488,6 +490,7 @@ async def process_text_food_logging(
             base_name = name 
         else:
             result = await NormalizationService.analyze_food_intake(text)
+            logger.info(f"🍌 Normalization Result for '{text}': {result}")
             
             name = result.get("name", text)
             calories = float(result.get("calories") or 0)
