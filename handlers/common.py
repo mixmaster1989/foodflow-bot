@@ -110,6 +110,27 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 except Exception:
                     pass
                 await bot.session.close()
+        else:
+            # User exists - check if we should link to curator
+            # Only link if user has no curator yet and referral token provided
+            if curator and not user.curator_id:
+                user.curator_id = curator.id
+                await session.commit()
+                
+                # Notify curator about new ward
+                from aiogram import Bot
+                from config import settings
+                bot = Bot(token=settings.BOT_TOKEN)
+                try:
+                    await bot.send_message(
+                        curator.id,
+                        f"🎉 <b>Новый подопечный!</b>\n\n"
+                        f"К вам присоединился: @{message.from_user.username or 'Пользователь'}",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+                await bot.session.close()
 
         # Check if user has completed onboarding
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
