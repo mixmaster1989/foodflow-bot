@@ -87,10 +87,12 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
         if not user:
             # Create new user, optionally linked to curator
+            # If coming via referral link, auto-verify (no password needed)
             user = User(
                 id=message.from_user.id, 
                 username=message.from_user.username,
-                curator_id=curator.id if curator else None
+                curator_id=curator.id if curator else None,
+                is_verified=True if curator else False  # Referral = auto-verified!
             )
             session.add(user)
             await session.commit()
@@ -115,6 +117,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             # Only link if user has no curator yet and referral token provided
             if curator and not user.curator_id:
                 user.curator_id = curator.id
+                user.is_verified = True  # Referral = auto-verified!
                 await session.commit()
                 
                 # Notify curator about new ward
