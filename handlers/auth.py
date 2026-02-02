@@ -62,8 +62,7 @@ class AuthMiddleware(BaseMiddleware):
             # Helper for keyboard
             kb = ReplyKeyboardMarkup(
                 keyboard=[[
-                    KeyboardButton(text="🏠 Главное меню"),
-                    KeyboardButton(text="🚀 Mini App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+                    KeyboardButton(text="🏠 Главное меню")
                 ]],
                 resize_keyboard=True,
                 persistent=True
