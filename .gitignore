@@ -68,6 +68,8 @@ foodflow.log
 *.sqlite
 *.sqlite3
 foodflow.db
+*.db-shm
+*.db-wal
 
 # Testing
 .pytest_cache/
