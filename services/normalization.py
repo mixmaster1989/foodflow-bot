@@ -175,13 +175,13 @@ TASK:
 4. Calculate KBJU based on the specified weight.
 
 WEIGHT DETECTION RULES:
-- "банан 150" = 150 grams
-- "банан 150г" = 150 grams
-- "банан 150 грамм" = 150 grams
-- "2 яйца" = 2 pieces (~120g total)
-- "тарелка борща" = ~300g (estimate)
-- "большая порция" = ~400g (estimate)
-- "банан" (no weight) = weight_missing: true, return per 100g
+- "банан 150" -> 150 grams
+- "банан 150г" -> 150 grams
+- "хлеб 40" -> 40 grams
+- "2 яйца" -> ~120g (calculate based on count)
+- "тарелка борща" -> ~300g (estimate standard portion)
+- "банан" (no number) -> weight_missing: true (return per 100g)
+- ALWAYS extract the number if it appears after the name.
 
 RETURN JSON ONLY:
 {{
@@ -261,3 +261,50 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
             "carbs": 15,
             "fiber": 1
         }
+
+    @classmethod
+    async def suggest_dish_name(cls, ingredients: list[str]) -> str:
+        """Suggest a culinary name for a list of ingredients."""
+        if not ingredients:
+            return "Мое блюдо"
+            
+        ing_str = ", ".join(ingredients)
+        
+        prompt = (
+            f"Ingredients: {ing_str}\n"
+            "Task: Name this dish in Russian (max 3-4 words). "
+            "Examples: 'Oats, Milk, Berries' -> 'Овсяная каша с ягодами'. "
+            "'Eggs, Tomato' -> 'Яичница с помидорами'. "
+            "'Bread, Cheese' -> 'Бутерброд с сыром'. "
+            "Return ONLY the name, nothing else."
+        )
+
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+        
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": "mistralai/mistral-small-3.2-24b-instruct:free", # Fast & Free
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3
+                    },
+                    timeout=10
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        result = data["choices"][0]["message"]["content"].strip()
+                        # Clean quotes if model adds them
+                        return result.strip('"').strip("'")
+        except Exception as e:
+            logger.error(f"Dish Naming Failed: {e}")
+            
+        return "Мое блюдо"

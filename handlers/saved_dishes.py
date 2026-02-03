@@ -23,122 +23,262 @@ class SavedDishStates(StatesGroup):
     naming_meal = State()   # Entering meal name
 
 # --- Entry Point: Build Dish ---
+# --- Entry Point: Build Dish ---
 @router.callback_query(F.data == "menu_build_dish")
 async def start_build_dish(callback: types.CallbackQuery, state: FSMContext):
-    """Start the flow to build a saved dish from history."""
+    """Start the interactive flow to build a saved dish."""
     await state.clear()
-    user_id = callback.from_user.id
     
-    # 1. Fetch History once
-    async for session in get_db():
-        stmt = (
-            select(ConsumptionLog)
-            .where(ConsumptionLog.user_id == user_id)
-            .where(ConsumptionLog.base_name != None)
-            .order_by(desc(ConsumptionLog.date))
-            .limit(500)
-        )
-        result = await session.execute(stmt)
-        logs = result.scalars().all()
-        
-    freq = Counter([log.base_name for log in logs])
-    unique_items = sorted(freq.keys(), key=lambda x: freq[x], reverse=True)
-    
-    if not unique_items:
-        await callback.answer("История пуста! Сначала запишите, что вы ели.", show_alert=True)
-        return
-
-    # Save to state
     await state.set_state(SavedDishStates.building_dish)
     await state.update_data(
-        history_items=unique_items, # Full list
-        selected_indices=[], # Indices from history_items
-        current_page=0
+        dish_components=[],
+        total_stats={"cal": 0, "prot": 0, "fat": 0, "carb": 0, "fib": 0}
     )
     
-    await render_builder_ui(callback.message, state)
-    await callback.answer()
-
-async def render_builder_ui(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    items = data.get("history_items", [])
-    selected_indices = set(data.get("selected_indices", []))
-    page = data.get("current_page", 0)
-    
-    ITEMS_PER_PAGE = 8
-    total_pages = (len(items) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-    
-    start_idx = page * ITEMS_PER_PAGE
-    end_idx = min(start_idx + ITEMS_PER_PAGE, len(items))
-    current_batch = items[start_idx:end_idx]
-    
     builder = InlineKeyboardBuilder()
-    
-    # Render items with selection marks
-    for i, item_name in enumerate(current_batch):
-        real_idx = start_idx + i
-        is_selected = real_idx in selected_indices
-        mark = "✅" if is_selected else "⬜"
-        # Callback limited to ~64 bytes. passing ID is short.
-        builder.button(
-            text=f"{mark} {item_name}", 
-            callback_data=f"dish_toggle:{real_idx}"
-        )
-    
-    builder.adjust(1)
-    
-    # Navigation Row
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(types.InlineKeyboardButton(text="⬅️", callback_data="dish_prev"))
-        
-    count = len(selected_indices)
-    action_text = f"💾 Создать ({count})" if count > 0 else "Выберите..."
-    callback_action = "dish_ask_name" if count > 0 else "dish_noop"
-    
-    nav_buttons.append(types.InlineKeyboardButton(text=action_text, callback_data=callback_action))
-    
-    if page < total_pages - 1:
-        nav_buttons.append(types.InlineKeyboardButton(text="➡️", callback_data="dish_next"))
-        
-    builder.row(*nav_buttons)
-    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="main_menu"))
+    builder.button(text="❌ Отмена", callback_data="main_menu")
     
     text = (
         "🏗️ <b>Конструктор Блюда</b>\n\n"
-        "Отметьте продукты из вашей истории:\n"
-        f"<i>Страница {page+1}/{total_pages}</i>"
+        "Давайте соберем блюдо по ингредиентам.\n"
+        "Напишите <b>первый ингредиент</b> (например: <i>Хлеб 40г</i>)"
     )
     
-    # Edit or Reply
     try:
-        if message.from_user.is_bot:
-            await message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-        else:
-            await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.edit_text(
+            text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
     except Exception:
-        # Fallback if edit fails (e.g. message too old)
-        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        # If we can't edit (e.g. it was a photo), delete and send new
+        await callback.message.delete()
+        await callback.message.answer(
+            text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+    await callback.answer()
+
+@router.message(SavedDishStates.building_dish, F.text)
+async def process_ingredient_input(message: types.Message, state: FSMContext):
+    """Handle text input for ingredients."""
+    text = message.text.strip()
+    
+    # Analyze text
+    from services.normalization import NormalizationService
+    
+    # Using NormalizationService to get data
+    # Note: We rely on it to handle "Bread 40g" and return parsed weight
+    msg = await message.answer(f"🔄 Добавляю: <i>{text}</i>...", parse_mode="HTML")
+    
+    try:
+        result = await NormalizationService.analyze_food_intake(text)
+        
+        name = result.get("name", text)
+        calories = float(result.get("calories") or 0)
+        protein = float(result.get("protein") or 0)
+        fat = float(result.get("fat") or 0)
+        carbs = float(result.get("carbs") or 0)
+        fiber = float(result.get("fiber") or 0)
+        weight_grams = result.get("weight_grams")
+        
+        if not weight_grams:
+             # FALLBACK 1: Try Regex locally
+             import re
+             match = re.search(r'(\d+(?:[.,]\d+)?)\s*(?:г|гр|грамм|g|ml|мл)?', text, re.IGNORECASE)
+             if match:
+                 try:
+                     weight_grams = float(match.group(1).replace(',', '.'))
+                     # Recalculate stats based on new weight vs 100g base
+                     # The AI usually returns stats per 100g if weight is missing
+                     factor = weight_grams / 100.0
+                     calories = calories * factor # Note: AI might have returned 100g stats
+                     protein = protein * factor
+                     fat = fat * factor
+                     carbs = carbs * factor
+                     fiber = fiber * factor
+                 except:
+                     pass
+
+        if not weight_grams:
+             # If still missing after regex, ask user
+             await msg.edit_text(
+                 f"⚠️ <b>{name}</b>: Не понял вес.\n"
+                 "Пожалуйста, напишите с весом, например: <i>Хлеб 40г</i>"
+             )
+             return
+
+        # Add to state
+        data = await state.get_data()
+        components = data.get("dish_components", [])
+        stats = data.get("total_stats", {"cal": 0, "prot": 0, "fat": 0, "carb": 0, "fib": 0})
+        
+        # New component
+        comp = {
+            "name": name,
+            "base_name": result.get("base_name", name),
+            "weight": weight_grams,
+            "calories": calories,
+            "protein": protein,
+            "fat": fat,
+            "carbs": carbs,
+            "fiber": fiber
+        }
+        components.append(comp)
+        
+        # Update totals
+        stats["cal"] += calories
+        stats["prot"] += protein
+        stats["fat"] += fat
+        stats["carb"] += carbs
+        stats["fib"] += fiber
+        
+        await state.update_data(dish_components=components, total_stats=stats)
+        
+        # Render list
+        comp_list = "\n".join([f"• {c['name']} ({c['weight']}г) - {int(c['calories'])} ккал" for c in components])
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Закончить и назвать", callback_data="dish_finish_building")
+        builder.button(text="❌ Отмена", callback_data="main_menu")
+        builder.adjust(1)
+        
+        await msg.edit_text(
+            f"🏗️ <b>Блюдо собирается...</b>\n\n"
+            f"{comp_list}\n\n"
+            f"<b>Итого:</b> {int(stats['cal'])} ккал\n"
+            f"🥩 {stats['prot']:.1f} | 🥑 {stats['fat']:.1f} | 🍞 {stats['carb']:.1f} | 🥬 {stats['fib']:.1f}\n\n"
+            f"👇 <b>Что дальше?</b> (Напишите следующий ингредиент или нажмите 'Закончить')",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        logger.error(f"Ingredient Add Error: {e}", exc_info=True)
+        await msg.edit_text(f"❌ Ошибка: {e}")
+
+@router.callback_query(SavedDishStates.building_dish, F.data == "dish_finish_building")
+async def finish_building_dish(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    components = data.get("dish_components", [])
+    
+    if not components:
+        await callback.answer("Сначала добавьте ингредиенты!", show_alert=True)
+        return
+
+    # Generate suggestion
+    from services.normalization import NormalizationService
+    ing_names = [c['name'] for c in components]
+    
+    # Show loading status
+    try:
+        await callback.message.edit_text("🤖 <i>Придумываю название...</i>", parse_mode="HTML")
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer("🤖 <i>Придумываю название...</i>", parse_mode="HTML")
+
+    suggested_name = await NormalizationService.suggest_dish_name(ing_names)
+    
+    await state.set_state(SavedDishStates.naming_dish)
+    await state.update_data(suggested_name=suggested_name)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"🏷️ {suggested_name}", callback_data="dish_use_suggestion")
+    builder.button(text="❌ Отмена", callback_data="main_menu")
+    builder.adjust(1)
+
+    text = (
+        f"📝 <b>Как назовем блюдо?</b>\n\n"
+        f"Я предлагаю: <b>{suggested_name}</b>\n"
+        f"Нажмите кнопку ниже или напишите свое название."
+    )
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        
+    await callback.answer()
+
+@router.callback_query(SavedDishStates.naming_dish, F.data == "dish_use_suggestion")
+async def use_suggested_name(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    name = data.get("suggested_name", "Мое блюдо")
+    await save_dish_internal(callback.message, state, name)
+    await callback.answer()
 
 @router.callback_query(SavedDishStates.building_dish, F.data.startswith("dish_toggle:"))
 async def on_toggle(callback: types.CallbackQuery, state: FSMContext):
-    try:
-        idx = int(callback.data.split(":")[1])
-        data = await state.get_data()
-        selected = set(data.get("selected_indices", []))
-        
-        if idx in selected:
-            selected.remove(idx)
-        else:
-            selected.add(idx)
-            
-        await state.update_data(selected_indices=list(selected))
-        await render_builder_ui(callback.message, state)
-    except Exception as e:
-        logger.error(f"Toggle error: {e}")
-        await callback.answer("Ошибка выбора")
-    
+    # Backward compatibility: No-op for new interactive builder
     await callback.answer()
+
+async def save_dish_internal(message: types.Message, state: FSMContext, name: str):
+    """Shared save logic for text input and button click."""
+    data = await state.get_data()
+    # Try to get user_id from message or from state if message is tricky (callback message)
+    user_id = message.chat.id 
+
+    status_msg = await message.answer(f"💾 Сохраняю <b>{name}</b>...", parse_mode="HTML")
+    
+    components = []
+    total_cal = 0.0
+    total_prot = 0.0
+    total_fat = 0.0
+    total_carb = 0.0
+    total_fib = 0.0
+    
+    if "dish_components" in data:
+        raw_components = data["dish_components"]
+        for c in raw_components:
+            components.append({
+                "name": c["name"],
+                "base_name": c["base_name"],
+                "calories": c["calories"],
+                "protein": c["protein"],
+                "fat": c["fat"],
+                "carbs": c["carbs"],
+                "fiber": c.get("fiber", 0)
+            })
+            total_cal += c["calories"]
+            total_prot += c["protein"]
+            total_fat += c["fat"]
+            total_carb += c["carbs"]
+            total_fib += c.get("fiber", 0)
+    
+    # Save to DB
+    async for session in get_db():
+        new_dish = SavedDish(
+            user_id=user_id,
+            name=name,
+            components=components,
+            total_calories=total_cal,
+            total_protein=total_prot,
+            total_fat=total_fat,
+            total_carbs=total_carb,
+            total_fiber=total_fib
+        )
+        session.add(new_dish)
+        await session.commit()
+
+    await state.clear()
+    
+    # Format components list
+    comp_text = "\n".join([f"• {c.get('name', c.get('base_name', '?'))}" for c in components])
+    
+    await status_msg.edit_text(
+        f"✅ <b>Блюдо сохранено!</b>\n\n"
+        f"🥪 <b>{name}</b>\n\n"
+        f"🔥 <b>{int(total_cal)}</b> ккал\n"
+        f"🥩 Белки: <b>{total_prot:.1f}</b>г\n"
+        f"🥑 Жиры: <b>{total_fat:.1f}</b>г\n"
+        f"🍞 Углеводы: <b>{total_carb:.1f}</b>г\n"
+        f"🥬 Клетчатка: <b>{total_fib:.1f}</b>г\n\n"
+        f"<b>Состав:</b>\n{comp_text}\n\n"
+        f"Теперь просто пишите <i>\"{name}\"</i> в чат!",
+        parse_mode="HTML"
+    )
 
 @router.callback_query(SavedDishStates.building_dish, F.data == "dish_prev")
 async def on_prev(callback: types.CallbackQuery, state: FSMContext):
@@ -173,81 +313,7 @@ async def noop(callback: types.CallbackQuery):
 @router.message(SavedDishStates.naming_dish, F.text)
 async def save_dish_final(message: types.Message, state: FSMContext):
     name = message.text.strip()
-    data = await state.get_data()
-    items = data["history_items"]
-    selected_indices = data["selected_indices"]
-    
-    user_id = message.from_user.id
-    
-    status_msg = await message.answer(f"💾 Сохраняю <b>{name}</b>...")
-    
-    components = []
-    total_cal = 0.0
-    total_prot = 0.0
-    total_fat = 0.0
-    total_carb = 0.0
-    total_fib = 0.0
-    
-    async for session in get_db():
-        for idx in selected_indices:
-            base_name = items[idx]
-            # Fetch most recent log with stats
-            stmt = (
-                select(ConsumptionLog)
-                .where(ConsumptionLog.user_id == user_id)
-                .where(ConsumptionLog.base_name == base_name)
-                .order_by(desc(ConsumptionLog.date))
-                .limit(1)
-            )
-            res = await session.execute(stmt)
-            log = res.scalars().first()
-            if log:
-                components.append({
-                    "name": log.product_name,
-                    "base_name": base_name,
-                    "calories": log.calories,
-                    "protein": log.protein,
-                    "fat": log.fat,
-                    "carbs": log.carbs,
-                    "fiber": log.fiber
-                })
-                total_cal += log.calories or 0
-                total_prot += log.protein or 0
-                total_fat += log.fat or 0
-                total_carb += log.carbs or 0
-                total_fib += log.fiber or 0
-
-        # Save to DB
-        new_dish = SavedDish(
-            user_id=user_id,
-            name=name,
-            components=components,
-            total_calories=total_cal,
-            total_protein=total_prot,
-            total_fat=total_fat,
-            total_carbs=total_carb,
-            total_fiber=total_fib
-        )
-        session.add(new_dish)
-        await session.commit()
-        
-    await state.clear()
-    
-    # Format components list
-    comp_text = "\n".join([f"• {c.get('name', c.get('base_name', '?'))}" for c in components])
-    
-    await status_msg.edit_text(
-        f"✅ <b>Блюдо сохранено!</b>\n\n"
-        f"🥪 <b>{name}</b>\n\n"
-        f"🔥 <b>{int(total_cal)}</b> ккал\n"
-        f"🥩 Белки: <b>{total_prot:.1f}</b>г\n"
-        f"🥑 Жиры: <b>{total_fat:.1f}</b>г\n"
-        f"🍞 Углеводы: <b>{total_carb:.1f}</b>г\n"
-        f"🥬 Клетчатка: <b>{total_fib:.1f}</b>г\n\n"
-        f"<b>Состав:</b>\n{comp_text}\n\n"
-        f"Теперь просто пишите <i>\"{name}\"</i> в чат!",
-        parse_mode="HTML"
-    )
+    await save_dish_internal(message, state, name)
 
 # =====================================================
 # "Мои блюда" - List View

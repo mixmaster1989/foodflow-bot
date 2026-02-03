@@ -21,6 +21,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from handlers.i_ate import show_confirmation_interface, IAteStates
+
 from config import settings
 from services.voice_stt import SpeechToText
 from services.ai_brain import AIBrainService
@@ -559,32 +561,23 @@ async def process_text_food_logging(
 
         final_name = f"{name} ({weight_grams}г)" if weight_grams else name
         
-        async for session in get_db():
-            log = ConsumptionLog(
-                user_id=user_id,
-                product_name=final_name,
-                base_name=base_name,
-                calories=calories,
-                protein=protein,
-                fat=fat,
-                carbs=carbs,
-                fiber=fiber,
-                date=datetime.utcnow()
-            )
-            session.add(log)
-            await session.commit()
-            
-        await state.clear()
-        
-        weight_note = "" if weight_grams else "\n⚠️ <i>Вес не указан, посчитано на 100г.</i>"
-        
-        await msg.edit_text(
-            f"✅ <b>Записано!</b>\n\n"
-            f"🍽️ {final_name}\n\n"
-            f"🔥 <b>{int(calories)}</b> ккал\n"
-            f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f}{weight_note}",
-            parse_mode="HTML"
+        # Prepare data for confirmation
+        # Ensure pending_product matches what i_ate expects
+        await state.update_data(
+            pending_product={
+                "name": final_name,
+                "base_name": base_name,
+                "calories100": calories, 
+                "protein100": protein,
+                "fat100": fat,
+                "carbs100": carbs,
+                "fiber100": fiber
+            }
         )
+        
+        # Redirect to I Ate Confirmation
+        await show_confirmation_interface(msg, state)
+        # Note: We do NOT clear state here, show_confirmation_interface sets its own state
         
     except Exception as e:
         logger.error(f"Text Log Error: {e}", exc_info=True)
@@ -972,31 +965,19 @@ async def handle_universal_weight(message: types.Message, state: FSMContext) -> 
                     f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f} | 🥬 {fiber:.1f}"
                 )
             else:
-                # Save to ConsumptionLog
-                log = ConsumptionLog(
-                    user_id=message.from_user.id,
-                    product_name=final_name,
-                    base_name=base_name,
-                    calories=calories,
-                    protein=protein,
-                    fat=fat,
-                    carbs=carbs,
-                    fiber=fiber,
-                    date=datetime.utcnow()
+                # Redirect to I Ate Confirmation
+                await state.update_data(
+                    pending_product={
+                        "name": final_name,
+                        "base_name": base_name,
+                        "calories100": calories,
+                        "protein100": protein,
+                        "fat100": fat,
+                        "carbs100": carbs,
+                        "fiber100": fiber
+                    }
                 )
-                session.add(log)
-                success_text = (
-                    f"✅ <b>Записано!</b>\n\n"
-                    f"🍽️ {final_name}\n\n"
-                    f"🔥 <b>{int(calories)}</b> ккал\n"
-                    f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f} | 🥬 {fiber:.1f}"
-                )
-            
-            await session.commit()
-            
-        await state.clear()
-        
-        await message.answer(success_text, parse_mode="HTML")
+                await show_confirmation_interface(message, state)
         
     except Exception as e:
         logger.error(f"Univ Weight Error: {e}", exc_info=True)
