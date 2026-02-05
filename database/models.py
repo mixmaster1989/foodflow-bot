@@ -218,6 +218,7 @@ class Marathon(Base):
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
+    is_registration_open = Column(Boolean, default=True) # Can users join via link?
     
     # Store wave configuration [start, end, label]
     waves_config = Column(JSON, nullable=True) 

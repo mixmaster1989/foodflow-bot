@@ -67,16 +67,58 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         None
 
     """
-    # Parse deep link for referral token: /start ref_abc123
+    # Parse deep link for referral token: /start ref_abc123 OR marathon invite: /start m_101
     referral_token = None
+    marathon_invite_id = None
     curator = None
+    
     if len(message.text.split()) > 1:
         args = message.text.split()[1]
         if args.startswith("ref_"):
             referral_token = args[4:]
+        elif args.startswith("m_"):
+            try:
+                marathon_invite_id = int(args[2:])
+            except ValueError:
+                pass
     
     async for session in get_db():
-        # If referral token provided, find the curator
+        # Handle Marathon Invite
+        if marathon_invite_id:
+            from services.marathon_service import MarathonService
+            user_info = {
+                "username": message.from_user.username,
+                "first_name": message.from_user.first_name,
+                "last_name": message.from_user.last_name
+            }
+            result = await MarathonService.process_invite(
+                session, marathon_invite_id, message.from_user.id, user_info
+            )
+            
+            if result["success"]:
+                await message.answer(f"🎉 {result['message']}")
+                # Notify curator about new participant
+                if result.get("curator_id"):
+                    from aiogram import Bot
+                    from config import settings
+                    bot = Bot(token=settings.BOT_TOKEN)
+                    try:
+                        name = message.from_user.username or message.from_user.first_name
+                        marathon_name = result.get("marathon_name", "Марафон")
+                        await bot.send_message(
+                            result["curator_id"],
+                            f"🏃‍♂️ <b>Новый участник в марафоне!</b>\n\n"
+                            f"В марафон «{marathon_name}» вступил: @{name}",
+                            parse_mode="HTML"
+                        )
+                    except Exception:
+                        pass
+                    await bot.session.close()
+            else:
+                await message.answer(f"⚠️ {result['message']}")
+        
+        # If referral token provided, find the curator (only if not marathon invite? or both?)
+        # Let's allow both independently, but usually mutually exclusive.
         if referral_token:
             curator_stmt = select(User).where(User.referral_token == referral_token)
             curator = (await session.execute(curator_stmt)).scalar_one_or_none()
@@ -88,11 +130,12 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         if not user:
             # Create new user, optionally linked to curator
             # If coming via referral link, auto-verify (no password needed)
+            # If came via Marathon Link, user ALREADY created by Service above!
             user = User(
                 id=message.from_user.id, 
                 username=message.from_user.username,
                 curator_id=curator.id if curator else None,
-                is_verified=True if curator else False  # Referral = auto-verified!
+                is_verified=True if curator else False
             )
             session.add(user)
             await session.commit()

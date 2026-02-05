@@ -73,13 +73,20 @@ async def show_marathon_menu(callback: types.CallbackQuery) -> None:
                 .where(MarathonParticipant.marathon_id == marathon.id, MarathonParticipant.is_active == True)
             )
             
+            # Registration Status
+            reg_status_icon = "🟢" if getattr(marathon, "is_registration_open", True) else "🔴"
+            reg_action_text = "🔴 Закрыть рег." if getattr(marathon, "is_registration_open", True) else "🟢 Открыть рег."
+            
+            builder.button(text="🔗 Пригласить", callback_data=f"marathon_invite:{marathon.id}")
+            builder.button(text=reg_action_text, callback_data=f"marathon_toggle_reg:{marathon.id}")
+            
             builder.button(text="👥 Участники", callback_data=f"marathon_participants:{marathon.id}")
             builder.button(text="❄️ Снежинки (Баллы)", callback_data=f"marathon_snowflakes:{marathon.id}")
             builder.button(text="📊 Рейтинг (Вес)", callback_data=f"marathon_leaderboard:{marathon.id}")
             builder.button(text="⚙️ Настройки Волн", callback_data=f"marathon_waves:{marathon.id}")
             builder.button(text="🛑 Завершить Марафон", callback_data=f"marathon_stop_confirm:{marathon.id}")
             builder.button(text="🔙 Назад", callback_data="main_menu")
-            builder.adjust(2, 1, 1, 1)
+            builder.adjust(2, 2, 1, 1, 1, 1)
             
             # Determine status of waves
             waves = marathon.waves_config or {}
@@ -91,13 +98,15 @@ async def show_marathon_menu(callback: types.CallbackQuery) -> None:
             elif marathon.end_date < now:
                 current_wave = "🏁 Завершен (ждет закрытия)"
             else:
-                # Check specific waves if implemented
                 current_wave = "🔥 Идет"
+
+            reg_text = "Открыта" if getattr(marathon, "is_registration_open", True) else "Закрыта"
 
             text = (
                 f"🏆 **Марафон: {marathon.name}**\n\n"
                 f"📅 Даты: {marathon.start_date.strftime('%d.%m')} - {marathon.end_date.strftime('%d.%m')}\n"
                 f"👥 Участников: **{part_count}**\n"
+                f"📝 Регистрация: **{reg_status_icon} {reg_text}**\n"
                 f"Статус: {current_wave}\n"
             )
 
@@ -608,6 +617,56 @@ async def stop_marathon(callback: types.CallbackQuery) -> None:
             await session.commit()
     
     await callback.answer("🏁 Марафон завершен!", show_alert=True)
+    await show_marathon_menu(callback)
+
+
+# ===================== INVITES & REGISTRATION =====================
+
+@router.callback_query(F.data.startswith("marathon_invite:"))
+async def show_invite_link(callback: types.CallbackQuery) -> None:
+    """Generate and show invite link."""
+    marathon_id = int(callback.data.split(":")[1])
+    
+    # Get bot username for deep link
+    bot_user = await callback.bot.get_me()
+    username = bot_user.username
+    
+    link = f"https://t.me/{username}?start=m_{marathon_id}"
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
+    
+    text = (
+        "🔗 **Ссылка для приглашения**\n\n"
+        f"Отправьте эту ссылку участникам:\n\n"
+        f"`{link}`\n\n"
+        "_(Нажмите на ссылку, чтобы скопировать)_"
+    )
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    except Exception:
+        pass
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("marathon_toggle_reg:"))
+async def toggle_registration(callback: types.CallbackQuery) -> None:
+    """Toggle registration open/closed status."""
+    marathon_id = int(callback.data.split(":")[1])
+    
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        if marathon:
+            # Toggle (default to True if None)
+            current = getattr(marathon, "is_registration_open", True)
+            marathon.is_registration_open = not current
+            await session.commit()
+            
+            status_text = "открыта" if marathon.is_registration_open else "закрыта"
+            await callback.answer(f"📝 Регистрация {status_text}!", show_alert=False)
+    
+    # Refresh menu
     await show_marathon_menu(callback)
 
 
