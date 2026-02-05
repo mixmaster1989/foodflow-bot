@@ -365,7 +365,6 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
             settings.carb_goal = targets["carbs"]
             settings.fiber_goal = targets.get("fiber", 30)
             settings.is_initialized = True
-            await session.commit()
         else:
             settings = UserSettings(
                 user_id=user_id,
@@ -382,6 +381,8 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 is_initialized=True,
             )
             session.add(settings)
+            
+        await session.commit()
             
     await state.clear()
 
