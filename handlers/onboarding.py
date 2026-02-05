@@ -341,7 +341,7 @@ async def handle_manual_calories_input(message: types.Message, state: FSMContext
 async def finish_onboarding_process(message: types.Message, state: FSMContext, targets: dict) -> None:
     """Save all data to DB and show finish screen."""
     data = await state.get_data()
-    user_id = message.from_user.id
+    user_id = message.chat.id # Use chat.id because message.from_user is bot in callbacks
     
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)

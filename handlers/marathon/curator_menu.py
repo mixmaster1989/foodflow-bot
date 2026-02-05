@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from database.base import get_db
 from database.models import User, Marathon, MarathonParticipant
+from utils.user import get_user_display_name, get_user_display_long
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +235,7 @@ async def manage_participants_menu(callback: types.CallbackQuery, state: FSMCont
         for ward in wards:
             is_selected = ward.id in selected_ids
             mark = "✅" if is_selected else "⬜"
-            name = ward.username or f"User {ward.id}"
+            name = get_user_display_name(ward)
             builder.button(
                 text=f"{mark} {name}", 
                 callback_data=f"toggle_part:{marathon_id}:{ward.id}"
@@ -363,7 +364,7 @@ async def show_snowflakes_menu(callback: types.CallbackQuery, state: FSMContext)
         builder = InlineKeyboardBuilder()
         
         for part, user in participants:
-            name = user.username or f"User {user.id}"
+            name = get_user_display_name(user)
             builder.button(
                 text=f"❄️ {part.total_snowflakes} | {name}",
                 callback_data=f"snowflake_select:{marathon_id}:{part.id}"
@@ -539,7 +540,7 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
                 loss_pct = 0
             
             leaderboard.append({
-                "name": user.username or f"User {user.id}",
+                "name": get_user_display_name(user),
                 "loss_kg": loss_kg,
                 "loss_pct": loss_pct,
                 "snowflakes": part.total_snowflakes

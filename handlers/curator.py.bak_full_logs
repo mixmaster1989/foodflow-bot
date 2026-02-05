@@ -14,12 +14,11 @@ from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func
 
 from config import settings
 from database.base import get_db
 from database.models import User, ConsumptionLog, UserSettings
-from utils.user import get_user_display_name, get_user_display_long
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -110,7 +109,7 @@ async def curator_ward_list(callback: types.CallbackQuery) -> None:
             
             ward_stats.append({
                 "id": ward.id,
-                "name": get_user_display_name(ward),
+                "name": ward.username or f"id:{ward.id}",
                 "calories": calories,
                 "protein": protein,
                 "active": calories > 0
@@ -190,7 +189,7 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     builder.adjust(2)
     
     text = (
-        f"👤 <b>{get_user_display_long(ward)}</b>\n\n"
+        f"👤 <b>@{ward.username or ward_id}</b>\n\n"
         f"📅 <b>Сегодня:</b>\n"
         f"🔥 Калории: <b>{int(total_cal)}</b> / {goal_cal}\n"
         f"🥩 Белки: <b>{total_prot:.1f}</b>г\n"
@@ -203,79 +202,15 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
         for log in logs[:5]:
             time_str = log.date.strftime("%H:%M")
             text += f"🕐 {time_str} — {log.product_name} ({int(log.calories)} ккал)\n"
-        
-        if len(logs) > 5:
-            builder.button(text="📜 Весь список", callback_data=f"curator_ward_logs:{ward_id}:0")
     else:
         text += "<i>Сегодня ничего не записывал</i>"
     
-    builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
-    builder.button(text="🔙 К списку", callback_data="curator_wards:0")
-    builder.adjust(1) # List vertically for better UI
-    
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception:
         await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
     await callback.answer()
 
-
-@router.callback_query(F.data.startswith("curator_ward_logs:"))
-async def curator_ward_logs_list(callback: types.CallbackQuery) -> None:
-    """Show paginated list of all ward logs for today."""
-    parts = callback.data.split(":")
-    ward_id = int(parts[1])
-    page = int(parts[2])
-    page_size = 10
-    
-    async for session in get_db():
-        ward = await session.get(User, ward_id)
-        if not ward:
-            await callback.answer("Пользователь не найден")
-            return
-            
-        today = datetime.utcnow().date()
-        log_stmt = select(ConsumptionLog).where(
-            ConsumptionLog.user_id == ward_id,
-            func.date(ConsumptionLog.date) == today
-        ).order_by(ConsumptionLog.date.desc())
-        all_logs = (await session.execute(log_stmt)).scalars().all()
-        
-    total_pages = (len(all_logs) + page_size - 1) // page_size
-    start = page * page_size
-    end = start + page_size
-    page_logs = all_logs[start:end]
-    
-    text = (
-        f"📜 <b>Еда за сегодня: {get_user_display_name(ward)}</b>\n"
-        f"Страница {page + 1}/{max(1, total_pages)}\n\n"
-    )
-    
-    for log in page_logs:
-        time_str = log.date.strftime("%H:%M")
-        text += f"• <code>{time_str}</code> <b>{log.product_name}</b>\n"
-        text += f"  └ {int(log.calories)} ккал | Б:{log.protein:.1f} Ж:{log.fat:.1f} У:{log.carbs:.1f}\n"
-    
-    builder = InlineKeyboardBuilder()
-    
-    # Pagination buttons
-    nav_row = []
-    if page > 0:
-        nav_row.append(types.InlineKeyboardButton(text="⬅️ Предыдущая", callback_data=f"curator_ward_logs:{ward_id}:{page-1}"))
-    if page < total_pages - 1:
-        nav_row.append(types.InlineKeyboardButton(text="➡️ Следующая", callback_data=f"curator_ward_logs:{ward_id}:{page+1}"))
-    
-    if nav_row:
-        builder.row(*nav_row)
-        
-    builder.button(text="🔙 К подопечному", callback_data=f"curator_ward:{ward_id}")
-    builder.adjust(1) if not nav_row else builder.adjust(len(nav_row), 1)
-
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    await callback.answer()
 
 @router.callback_query(F.data == "curator_generate_link")
 async def curator_generate_link(callback: types.CallbackQuery) -> None:

@@ -287,24 +287,25 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
         }
         
         import aiohttp
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json={
-                        "model": "mistralai/mistral-small-3.2-24b-instruct:free", # Fast & Free
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3
-                    },
-                    timeout=10
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        result = data["choices"][0]["message"]["content"].strip()
-                        # Clean quotes if model adds them
-                        return result.strip('"').strip("'")
-        except Exception as e:
-            logger.error(f"Dish Naming Failed: {e}")
+        for model in cls.MODELS:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": model, 
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.3
+                        },
+                        timeout=10
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            result = data["choices"][0]["message"]["content"].strip()
+                            return result.strip('"').strip("'")
+            except Exception as e:
+                logger.error(f"Dish Naming Failed ({model}): {e}")
+                continue # Try next model
             
         return "Мое блюдо"

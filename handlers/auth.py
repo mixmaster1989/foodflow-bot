@@ -76,7 +76,13 @@ class AuthMiddleware(BaseMiddleware):
                 if text == settings.GLOBAL_PASSWORD:
                     if not user:
                         # Create user if not exists
-                        user = User(id=user_id, username=event.message.from_user.username, is_verified=True)
+                        user = User(
+                            id=user_id, 
+                            username=event.message.from_user.username,
+                            first_name=event.message.from_user.first_name,
+                            last_name=event.message.from_user.last_name,
+                            is_verified=True
+                        )
                         session.add(user)
                     else:
                         user.is_verified = True
@@ -106,7 +112,13 @@ class AuthMiddleware(BaseMiddleware):
                 if text == expected_personal:
                     if not user:
                          # Should not happen for old users, but if so...
-                        user = User(id=user_id, username=event.message.from_user.username, is_verified=True)
+                        user = User(
+                            id=user_id, 
+                            username=event.message.from_user.username,
+                            first_name=event.message.from_user.first_name,
+                            last_name=event.message.from_user.last_name,
+                            is_verified=True
+                        )
                         session.add(user)
                     else:
                         user.is_verified = True
