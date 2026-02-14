@@ -70,8 +70,45 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
 async def i_ate_process(message: types.Message, state: FSMContext) -> None:
     """Process food description, get KBJU from AI, save to consumption log."""
     description = message.text or message.caption
+    
+    # Voice message support: transcribe via STT
+    if not description and message.voice:
+        status_msg = await message.answer("🎤 <i>Распознаю голос...</i>", parse_mode="HTML")
+        try:
+            from services.voice_stt import SpeechToText
+            from aiogram import Bot
+            import os
+            
+            bot = Bot(token=settings.BOT_TOKEN)
+            stt = SpeechToText()
+            
+            file_info = await bot.get_file(message.voice.file_id)
+            temp_dir = "services/temp"
+            os.makedirs(temp_dir, exist_ok=True)
+            ogg_path = f"{temp_dir}/i_ate_voice_{message.voice.file_id}.ogg"
+            
+            await bot.download_file(file_info.file_path, ogg_path)
+            description = await stt.process_voice_message(ogg_path)
+            
+            try:
+                os.remove(ogg_path)
+            except:
+                pass
+            await bot.session.close()
+            
+            if not description:
+                await status_msg.edit_text("❌ Не удалось распознать голос. Попробуйте ещё раз или напишите текстом.")
+                return
+            
+            await status_msg.edit_text(f"🎤 <i>Распознано:</i> {description}", parse_mode="HTML")
+            logger.info(f"🎤 I_ATE STT: {description}")
+        except Exception as e:
+            logger.error(f"I_ATE STT Error: {e}")
+            await message.answer(f"❌ Ошибка распознавания: {e}")
+            return
+    
     if not description:
-        await message.answer("⚠️ Пожалуйста, напишите название блюда текстом (или отправьте фото с описанием).")
+        await message.answer("⚠️ Пожалуйста, напишите название блюда текстом (или отправьте фото/голосовое с описанием).")
         return
         
     description = description.strip()
@@ -80,7 +117,27 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
     status_msg = await message.answer("🔄 Анализирую...")
     
     try:
-        # Use new analyze_food_intake method with weight detection
+        # Check if multi-item input via AI Brain
+        from services.ai_brain import AIBrainService
+        brain_result = await AIBrainService.analyze_text(description)
+        
+        if brain_result and isinstance(brain_result, dict) and brain_result.get("multi") and brain_result.get("items"):
+            items = brain_result["items"]
+            if len(items) > 1:
+                # Route to batch flow (from universal_input)
+                from handlers.universal_input import process_batch_food_logging
+                await process_batch_food_logging(message, state, items, status_msg)
+                return
+        
+        # Also handle raw list from AI
+        if brain_result and isinstance(brain_result, list) and len(brain_result) > 1:
+            items = [{"product": item.get("product") or item.get("name", ""), "weight": item.get("weight")} for item in brain_result if isinstance(item, dict)]
+            if items:
+                from handlers.universal_input import process_batch_food_logging
+                await process_batch_food_logging(message, state, items, status_msg)
+                return
+        
+        # Single item: use NormalizationService as before
         result = await NormalizationService.analyze_food_intake(description)
         
         name = result.get("name", description)
@@ -218,6 +275,7 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     protein = product.get('protein100', 0)
     fat = product.get('fat100', 0)
     carbs = product.get('carbs100', 0)
+    fiber = product.get('fiber100', 0)
     
     # Check if these are actually totals (from i_ate_process they are just values, mapped to 100 for storage sake? 
     # No, in i_ate_process we stored them as calories100 etc in the 'else' block, but as plain vars in the main block.
@@ -227,12 +285,14 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     # I need to fix i_ate_process logic first in the ReplacementChunk above.
     
     # Standardizing display
+    fiber_line = f"\n🥬 Клетчатка: <b>{fiber:.1f}</b>" if fiber else ""
     text = (
         f"🛡️ <b>Проверка данных</b>\n\n"
         f"🍽️ <b>{name}</b>\n\n"
         f"⚖️ Вес: <b>---</b> (текст)\n" # Hard to track weight separately if it's baked into name
         f"🔥 Ккал: <b>{int(calories)}</b>\n"
         f"🥩 Б: <b>{protein:.1f}</b> | 🥑 Ж: <b>{fat:.1f}</b> | 🍞 У: <b>{carbs:.1f}</b>"
+        f"{fiber_line}"
     )
     
     builder = InlineKeyboardBuilder()
@@ -278,12 +338,15 @@ async def process_confirm(callback: types.CallbackQuery, state: FSMContext):
     protein = product.get('protein100', 0)
     fat = product.get('fat100', 0)
     carbs = product.get('carbs100', 0)
+    fiber = product.get('fiber100', 0)
     
+    fiber_line = f"\n🥬 Клетчатка: {fiber:.1f}" if fiber else ""
     success_text = (
         f"✅ <b>Записано!</b>\n\n"
         f"🍽️ {product['name']}\n\n"
         f"🔥 <b>{int(calories)}</b> ккал\n"
         f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f}"
+        f"{fiber_line}"
     )
     
     await callback.message.edit_text(success_text, parse_mode="HTML")

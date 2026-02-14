@@ -155,20 +155,28 @@ async def curator_ward_list(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("curator_ward:"))
 async def curator_ward_detail(callback: types.CallbackQuery) -> None:
-    """Show detailed stats for a specific ward."""
-    ward_id = int(callback.data.split(":")[1])
+    """Show detailed stats for a specific ward with date navigation."""
+    parts = callback.data.split(":")
+    ward_id = int(parts[1])
     
+    # Check if date is provided
+    target_date = datetime.utcnow().date()
+    if len(parts) > 2:
+        try:
+            target_date = datetime.strptime(parts[2], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
     async for session in get_db():
         ward = await session.get(User, ward_id)
         if not ward:
             await callback.answer("Пользователь не найден", show_alert=True)
             return
         
-        # Get today's logs
-        today = datetime.utcnow().date()
+        # Get logs for TARGET date
         log_stmt = select(ConsumptionLog).where(
             ConsumptionLog.user_id == ward_id,
-            func.date(ConsumptionLog.date) == today
+            func.date(ConsumptionLog.date) == target_date
         ).order_by(ConsumptionLog.date.desc())
         logs = (await session.execute(log_stmt)).scalars().all()
         
@@ -181,51 +189,119 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     total_prot = sum(l.protein for l in logs)
     total_fat = sum(l.fat for l in logs)
     total_carbs = sum(l.carbs for l in logs)
+    total_fiber = sum(l.fiber for l in logs) # NEW: Fiber
     
     goal_cal = ward_settings.calorie_goal if ward_settings else 2000
     
     builder = InlineKeyboardBuilder()
+    
+    # 1. Navigation Row
+    prev_date = target_date - timedelta(days=1)
+    next_date = target_date + timedelta(days=1)
+    
+    today = datetime.utcnow().date()
+    is_today = (target_date == today)
+    
+    nav_row = []
+    prev_label = "⬅️ Вчера" if is_today else "⬅️"
+    nav_row.append(types.InlineKeyboardButton(text=prev_label, callback_data=f"curator_ward:{ward_id}:{prev_date}"))
+    
+    date_label = "Сегодня" if is_today else target_date.strftime("%d.%m")
+    nav_row.append(types.InlineKeyboardButton(text=f"📅 {date_label}", callback_data="noop"))
+    
+    if not is_today:
+        nav_row.append(types.InlineKeyboardButton(text="➡️", callback_data=f"curator_ward:{ward_id}:{next_date}"))
+        
+    builder.row(*nav_row)
+    
+    # 2. Action buttons
+    if logs:
+         builder.button(text="📜 Весь список", callback_data=f"curator_ward_logs:{ward_id}:0:{target_date}")
+
     builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
     builder.button(text="🔙 К списку", callback_data="curator_wards:0")
-    builder.adjust(2)
     
-    text = (
-        f"👤 <b>{get_user_display_long(ward)}</b>\n\n"
-        f"📅 <b>Сегодня:</b>\n"
-        f"🔥 Калории: <b>{int(total_cal)}</b> / {goal_cal}\n"
-        f"🥩 Белки: <b>{total_prot:.1f}</b>г\n"
-        f"🥑 Жиры: <b>{total_fat:.1f}</b>г\n"
-        f"🍞 Углеводы: <b>{total_carbs:.1f}</b>г\n\n"
+    # Adjust remaining rows (1 button per row basically)
+    builder.adjust(1) # This applies to buttons added via .button()
+    # But row() added buttons stay as is.
+    
+    # Generate Image
+    from services.image_renderer import draw_daily_card
+    
+    # Pack data for renderer
+    total_metrics = {
+        "calories": total_cal,
+        "protein": total_prot,
+        "fat": total_fat,
+        "carbs": total_carbs,
+        "fiber": total_fiber
+    }
+    goals = {"calories": goal_cal}
+    
+    # We need to run this in executor to avoid blocking event loop
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
+    # Run image gen in thread
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        bio = await loop.run_in_executor(
+            pool, 
+            draw_daily_card, 
+            get_user_display_name(ward), 
+            target_date, 
+            logs, 
+            total_metrics, 
+            goals
+        )
+    
+    from aiogram.types import BufferedInputFile, InputMediaPhoto
+    photo_file = BufferedInputFile(bio.getvalue(), filename="summary.png")
+    
+    caption = (
+        f"👤 <b>{get_user_display_long(ward)}</b>\n"
+        f"📅 <b>{target_date.strftime('%d.%m.%Y')}</b>"
     )
     
-    if logs:
-        text += "<b>Последние приёмы:</b>\n"
-        for log in logs[:5]:
-            time_str = log.date.strftime("%H:%M")
-            text += f"🕐 {time_str} — {log.product_name} ({int(log.calories)} ккал)\n"
-        
-        if len(logs) > 5:
-            builder.button(text="📜 Весь список", callback_data=f"curator_ward_logs:{ward_id}:0")
-    else:
-        text += "<i>Сегодня ничего не записывал</i>"
-    
-    builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
-    builder.button(text="🔙 К списку", callback_data="curator_wards:0")
-    builder.adjust(1) # List vertically for better UI
-    
     try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        # Try to edit existing photo
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=photo_file, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        # If text message, delete and send photo
+        try:
+            await callback.message.delete()
+        except:
+            pass
+        await callback.message.answer_photo(
+            photo=photo_file, 
+            caption=caption, 
+            parse_mode="HTML", 
+            reply_markup=builder.as_markup()
+        )
+    
+    await callback.answer()
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("curator_ward_logs:"))
 async def curator_ward_logs_list(callback: types.CallbackQuery) -> None:
-    """Show paginated list of all ward logs for today."""
+    """Show paginated list of ward logs for specific date."""
     parts = callback.data.split(":")
     ward_id = int(parts[1])
     page = int(parts[2])
+    
+    # Handle optional date
+    if len(parts) > 3:
+        try:
+            target_date = datetime.strptime(parts[3], "%Y-%m-%d").date()
+        except ValueError:
+            target_date = datetime.utcnow().date()
+    else:
+        target_date = datetime.utcnow().date()
+        
     page_size = 10
     
     async for session in get_db():
@@ -234,10 +310,9 @@ async def curator_ward_logs_list(callback: types.CallbackQuery) -> None:
             await callback.answer("Пользователь не найден")
             return
             
-        today = datetime.utcnow().date()
         log_stmt = select(ConsumptionLog).where(
             ConsumptionLog.user_id == ward_id,
-            func.date(ConsumptionLog.date) == today
+            func.date(ConsumptionLog.date) == target_date
         ).order_by(ConsumptionLog.date.desc())
         all_logs = (await session.execute(log_stmt)).scalars().all()
         
@@ -246,30 +321,33 @@ async def curator_ward_logs_list(callback: types.CallbackQuery) -> None:
     end = start + page_size
     page_logs = all_logs[start:end]
     
+    date_str = target_date.strftime('%d.%m.%Y')
+    
     text = (
-        f"📜 <b>Еда за сегодня: {get_user_display_name(ward)}</b>\n"
+        f"📜 <b>Еда за {date_str}: {get_user_display_name(ward)}</b>\n"
         f"Страница {page + 1}/{max(1, total_pages)}\n\n"
     )
     
     for log in page_logs:
         time_str = log.date.strftime("%H:%M")
         text += f"• <code>{time_str}</code> <b>{log.product_name}</b>\n"
-        text += f"  └ {int(log.calories)} ккал | Б:{log.protein:.1f} Ж:{log.fat:.1f} У:{log.carbs:.1f}\n"
+        fiber_str = f" Кл:{log.fiber:.1f}" if log.fiber else ""
+        text += f"  └ {int(log.calories)} ккал | Б:{log.protein:.1f} Ж:{log.fat:.1f} У:{log.carbs:.1f}{fiber_str}\n"
     
     builder = InlineKeyboardBuilder()
     
     # Pagination buttons
     nav_row = []
     if page > 0:
-        nav_row.append(types.InlineKeyboardButton(text="⬅️ Предыдущая", callback_data=f"curator_ward_logs:{ward_id}:{page-1}"))
+        nav_row.append(types.InlineKeyboardButton(text="⬅️", callback_data=f"curator_ward_logs:{ward_id}:{page-1}:{target_date}"))
     if page < total_pages - 1:
-        nav_row.append(types.InlineKeyboardButton(text="➡️ Следующая", callback_data=f"curator_ward_logs:{ward_id}:{page+1}"))
+        nav_row.append(types.InlineKeyboardButton(text="➡️", callback_data=f"curator_ward_logs:{ward_id}:{page+1}:{target_date}"))
     
     if nav_row:
         builder.row(*nav_row)
         
-    builder.button(text="🔙 К подопечному", callback_data=f"curator_ward:{ward_id}")
-    builder.adjust(1) if not nav_row else builder.adjust(len(nav_row), 1)
+    builder.button(text="🔙 К карточке", callback_data=f"curator_ward:{ward_id}:{target_date}")
+    # builder.adjust logic handled by explicit row() above and then add()
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
@@ -323,29 +401,40 @@ async def curator_generate_link(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("curator_nudge:"))
 async def curator_nudge(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Prepare to send a reminder/nudge to a specific ward."""
+    """Prepare to send a reminder/nudge to a specific ward (Chat Mode)."""
     ward_id = int(callback.data.split(":")[1])
+    
+    # Get ward info for display
+    async for session in get_db():
+        ward = await session.get(User, ward_id)
+        ward_name = get_user_display_name(ward) if ward else "Подопечным"
+
     await state.update_data(nudge_ward_id=ward_id)
     await state.set_state(CuratorStates.composing_nudge)
     
     builder = InlineKeyboardBuilder()
-    builder.button(text="❌ Отмена", callback_data="curator_wards:0")
+    builder.button(text="🛑 Завершить переписку", callback_data="curator_stop_nudge")
     
     text = (
-        "📩 <b>Написать подопечному</b>\n\n"
-        "Введите сообщение, которое будет отправлено от вашего имени:"
+        f"✏️ <b>Режим переписки: {ward_name}</b>\n\n"
+        f"⬇️ Все, что вы напишите ниже, будет мгновенно отправлено.\n"
+        f"⬆️ Лог еды остался сверху."
     )
     
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    # Send NEW message, do not edit the food log
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
     await callback.answer()
 
+@router.callback_query(F.data == "curator_stop_nudge")
+async def curator_stop_nudge(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Exit chat mode."""
+    await state.clear()
+    await callback.message.edit_text("✅ <b>Переписка завершена.</b>", parse_mode="HTML")
+    await callback.answer()
 
 @router.message(CuratorStates.composing_nudge)
 async def curator_send_nudge(message: types.Message, state: FSMContext) -> None:
-    """Send the nudge message to ward."""
+    """Send the nudge message to ward (Persistent). Supports Text, Voice, Photo."""
     data = await state.get_data()
     ward_id = data.get("nudge_ward_id")
     
@@ -360,18 +449,73 @@ async def curator_send_nudge(message: types.Message, state: FSMContext) -> None:
     try:
         from aiogram import Bot
         bot = Bot(token=settings.BOT_TOKEN)
-        await bot.send_message(
-            ward_id,
-            f"📩 <b>Сообщение от куратора @{curator_name}:</b>\n\n{message.text}",
-            parse_mode="HTML"
-        )
-        await bot.session.close()
         
-        await message.answer("✅ Сообщение отправлено!")
+        # Add Reply button for Ward
+        reply_markup = InlineKeyboardBuilder()
+        reply_markup.button(text="↩️ Ответить", callback_data=f"ward_reply:{message.from_user.id}")
+        
+        content_type = message.content_type
+        text_to_send = message.text
+        
+        if content_type == "voice":
+            status_msg = await message.answer("🎤 <i>Распознаю голос...</i>", parse_mode="HTML")
+            try:
+                from services.voice_stt import SpeechToText
+                import os
+                stt_engine = SpeechToText()
+                
+                file_info = await bot.get_file(message.voice.file_id)
+                temp_dir = "services/temp"
+                os.makedirs(temp_dir, exist_ok=True)
+                ogg_path = f"{temp_dir}/nudge_voice_{message.voice.file_id}.ogg"
+                
+                await bot.download_file(file_info.file_path, ogg_path)
+                text_to_send = await stt_engine.process_voice_message(ogg_path)
+                
+                try:
+                    os.remove(ogg_path)
+                except:
+                    pass
+                    
+                if not text_to_send:
+                    await status_msg.edit_text("❌ Не удалось распознать голос.")
+                    return
+                
+                await status_msg.delete()
+            except Exception as e:
+                await message.answer(f"❌ Ошибка STT: {e}")
+                return
+
+        if content_type in ["text", "voice"]:
+            # Send as text (either original or transcribed)
+            prefix = "🎤 " if content_type == "voice" else "📩 "
+            await bot.send_message(
+                ward_id,
+                f"{prefix}<b>Сообщение от куратора @{curator_name}:</b>\n\n{text_to_send}",
+                parse_mode="HTML",
+                reply_markup=reply_markup.as_markup()
+            )
+            await message.answer(f"✅ Отправлено: <i>{text_to_send}</i>", parse_mode="HTML")
+            
+        elif content_type == "photo":
+            photo = message.photo[-1].file_id
+            caption = f"📸 <b>Сообщение от куратора @{curator_name}:</b>\n\n{message.caption or ''}"
+            await bot.send_photo(
+                ward_id,
+                photo=photo,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=reply_markup.as_markup()
+            )
+            await message.answer("✅ Фото отправлено!")
+            
+        else:
+            await message.answer(f"⚠️ Тип сообщения {content_type} пока не поддерживается в режиме чата.")
+
+        await bot.session.close()
+        # Do NOT clear state!
     except Exception as e:
         await message.answer(f"❌ Не удалось отправить: {e}")
-    
-    await state.clear()
 
 
 @router.callback_query(F.data == "curator_broadcast_start")

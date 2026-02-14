@@ -41,6 +41,8 @@ class UniversalInputStates(StatesGroup):
     waiting_for_weight = State()  # Waiting for weight input
     waiting_for_product_name = State() # Waiting for product name clarification
     waiting_for_intent = State()   # Waiting for intent clarification
+    batch_confirmation = State()  # Viewing batch list
+    batch_editing = State()       # Editing individual item in batch
 
 # --- HANDLERS ---
 
@@ -155,26 +157,47 @@ async def process_universal_input(
         brain_result = await AIBrainService.analyze_text(content)
         is_herbalife = await herbalife_expert.find_product_by_alias(content)
         
-        # Safety check: brain_result must be a dict (AI sometimes returns list)
-        if brain_result and isinstance(brain_result, dict) and brain_result.get("intent") in ["log_consumption", "add_to_fridge"] and not is_herbalife:
-            intent = brain_result["intent"]
-            product = brain_result.get("product") or content
-            weight = brain_result.get("weight") # Float or null
+        # --- SMART FORK: Multi-item vs Single-item ---
+        if brain_result and not is_herbalife:
+            # Case 1: AI returned a dict with multi=true and items array
+            if isinstance(brain_result, dict) and brain_result.get("multi") and brain_result.get("items"):
+                items = brain_result["items"]
+                if len(items) > 1:
+                    await process_batch_food_logging(message, state, items, status_msg)
+                    return
+                # If somehow only 1 item in multi, treat as single
+                elif len(items) == 1:
+                    brain_result = {
+                        "intent": brain_result.get("intent", "log_consumption"),
+                        "product": items[0].get("product"),
+                        "weight": items[0].get("weight")
+                    }
             
-            # Convert weight to float if string
-            if weight:
-                try:
-                    weight = float(weight)
-                except:
-                    weight = None
+            # Case 2: AI returned a raw list (legacy bug) 
+            if isinstance(brain_result, list) and len(brain_result) > 1:
+                items = [{"product": item.get("product") or item.get("name", ""), "weight": item.get("weight")} for item in brain_result if isinstance(item, dict)]
+                if items:
+                    await process_batch_food_logging(message, state, items, status_msg)
+                    return
             
-            if intent == "log_consumption":
-                # Pass message as TARGET (for user_id) and status_msg as STATUS (to edit)
-                await process_text_food_logging(message, state, product, weight_override=weight, status_msg=status_msg)
-                return
-            elif intent == "add_to_fridge":
-                await process_text_fridge_add(message, state, product, weight_override=weight, status_msg=status_msg)
-                return
+            # Case 3: Normal single-item dict
+            if isinstance(brain_result, dict) and brain_result.get("intent") in ["log_consumption", "add_to_fridge"]:
+                intent = brain_result["intent"]
+                product = brain_result.get("product") or content
+                weight = brain_result.get("weight")
+                
+                if weight:
+                    try:
+                        weight = float(weight)
+                    except:
+                        weight = None
+                
+                if intent == "log_consumption":
+                    await process_text_food_logging(message, state, product, weight_override=weight, status_msg=status_msg)
+                    return
+                elif intent == "add_to_fridge":
+                    await process_text_fridge_add(message, state, product, weight_override=weight, status_msg=status_msg)
+                    return
 
     # Fallback to Menu (Classic Mode with Voice Support)
     
@@ -439,6 +462,30 @@ async def universal_action_pricetag(callback: types.CallbackQuery, state: FSMCon
     except Exception as e:
         logger.error(f"PriceTag Error: {e}")
         await callback.message.edit_text(f"❌ Ошибка: {e}")
+
+@router.callback_query(F.data.startswith("u_move_to_ate:"))
+async def move_from_fridge_to_ate(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Correct mistake: move product from fridge to consumption log."""
+    product_id = int(callback.data.split(":")[1])
+    
+    async for session in get_db():
+        product = await session.get(Product, product_id)
+        if not product:
+            await callback.answer("❌ Продукт не найден (возможно, уже удален).", show_alert=True)
+            return
+            
+        product_name = product.name
+        weight = product.weight_g
+        
+        # Delete from fridge
+        await session.delete(product)
+        await session.commit()
+    
+    await callback.answer("🔄 Переношу в лог питания...")
+    
+    # Redirect to food logging logic
+    # We use process_text_food_logging which will show KBJU confirmation
+    await process_text_food_logging(callback, state, product_name, weight_override=weight)
 
 
 # --- HELPERS --
@@ -743,15 +790,20 @@ async def process_text_fridge_add(
             )
             session.add(product)
             await session.commit()
+            product_id = product.id
             
         await state.clear()
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🍽️ Нет, я это съел(а)", callback_data=f"u_move_to_ate:{product_id}")
         
         await msg.edit_text(
             f"✅ <b>Добавлено в холодильник!</b>\n"
             f"📦 {name} ({weight_grams}г)\n"
             f"🔥 <b>{int(calories)}</b> ккал\n"
             f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f} | 🥬 {fiber:.1f}",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
         )
         
     except Exception as e:
@@ -938,16 +990,7 @@ async def handle_universal_weight(message: types.Message, state: FSMContext) -> 
                     user_id=message.from_user.id,
                     name=name, # Keep original name, weight is separate
                     category="Manual",
-                    calories=calories, # Total calories for this weight? Or per 100g?
-                    # Product model usually stores nutrient PER 100g or PER ITEM?
-                    # Let's check Product model. Usually it stores per unit or total?
-                    # In process_text_fridge_add original: calories=calories (which was from analyze_food_intake, usually per 100g or total?)
-                    # NormalizationService.analyze_food_intake returns total if weight provided, or per 100g if missing?
-                    # Let's assume Product stores values FOR THE QUANTITY/WEIGHT.
-                    # Wait, Product model usually has 'calories' field. Is it total or per 100g?
-                    # Looking at i_ate: logs total calories.
-                    # Looking at Product in receipt: stores total.
-                    # So yes, we store TOTAL calories for the item.
+                    calories=calories,
                     protein=protein,
                     fat=fat,
                     carbs=carbs,
@@ -958,12 +1001,21 @@ async def handle_universal_weight(message: types.Message, state: FSMContext) -> 
                     source="universal_input"
                 )
                 session.add(prod)
+                await session.commit()
+                product_id = prod.id
+                
+                await state.clear()
+                
+                builder = InlineKeyboardBuilder()
+                builder.button(text="🍽️ Нет, я это съел(а)", callback_data=f"u_move_to_ate:{product_id}")
+                
                 success_text = (
                     f"✅ <b>Добавлено в холодильник!</b>\n\n"
                     f"📦 {final_name}\n"
                     f"🔥 <b>{int(calories)}</b> ккал\n"
                     f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f} | 🥬 {fiber:.1f}"
                 )
+                await message.reply(success_text, parse_mode="HTML", reply_markup=builder.as_markup())
             else:
                 # Redirect to I Ate Confirmation
                 await state.update_data(
@@ -1108,3 +1160,296 @@ async def handle_clarification_photo(message: types.Message, bot: Bot, state: FS
     except Exception as e:
         logger.error(f"Clarification Photo Error: {e}")
         await status_msg.edit_text("❌ Ошибка обработки фото.")
+
+
+# --- BATCH (MULTI-ITEM) FOOD LOGGING ---
+
+async def process_batch_food_logging(
+    message: types.Message,
+    state: FSMContext,
+    items: list[dict],
+    status_msg: types.Message | None = None
+) -> None:
+    """Process multiple food items at once. Entry point for batch flow."""
+    
+    # Show loading
+    if status_msg:
+        await status_msg.edit_text(
+            f"🧠 <b>Анализирую {len(items)} продуктов...</b>",
+            parse_mode="HTML"
+        )
+    else:
+        status_msg = await message.reply(
+            f"🧠 <b>Анализирую {len(items)} продуктов...</b>",
+            parse_mode="HTML"
+        )
+    
+    try:
+        # Get KBJU for all items in one AI call
+        results = await NormalizationService.analyze_food_intake_batch(items)
+        
+        # Prepare batch_items for state
+        batch_items = []
+        for i, res in enumerate(results):
+            batch_items.append({
+                "name": res.get("name", items[i]["product"] if i < len(items) else "?"),
+                "base_name": res.get("base_name", res.get("name", "")),
+                "calories": float(res.get("calories", 0)),
+                "protein": float(res.get("protein", 0)),
+                "fat": float(res.get("fat", 0)),
+                "carbs": float(res.get("carbs", 0)),
+                "fiber": float(res.get("fiber", 0)),
+                "weight_grams": res.get("weight_grams"),
+                "selected": True  # All selected by default
+            })
+        
+        await state.update_data(batch_items=batch_items, batch_edit_index=0)
+        await state.set_state(UniversalInputStates.batch_confirmation)
+        
+        # Render the batch list
+        text, markup = _render_batch_list(batch_items)
+        await status_msg.edit_text(text, parse_mode="HTML", reply_markup=markup)
+        
+    except Exception as e:
+        logger.error(f"Batch processing error: {e}", exc_info=True)
+        await status_msg.edit_text(f"❌ Ошибка пакетной обработки: {e}")
+        await state.clear()
+
+
+def _render_batch_list(batch_items: list[dict]) -> tuple[str, types.InlineKeyboardMarkup]:
+    """Render the batch confirmation list UI."""
+    lines = []
+    total_cal = 0
+    total_p = 0
+    total_f = 0
+    total_c = 0
+    selected_count = 0
+    
+    for i, item in enumerate(batch_items, 1):
+        check = "✅" if item["selected"] else "⬜"
+        cal = int(item["calories"])
+        total_cal += cal if item["selected"] else 0
+        total_p += item["protein"] if item["selected"] else 0
+        total_f += item["fat"] if item["selected"] else 0
+        total_c += item["carbs"] if item["selected"] else 0
+        if item["selected"]:
+            selected_count += 1
+        lines.append(f"{check} {i}. {item['name']} — <b>{cal}</b> ккал")
+    
+    items_text = "\n".join(lines)
+    
+    text = (
+        f"📋 <b>Введено {len(batch_items)} продуктов:</b>\n\n"
+        f"{items_text}\n\n"
+        f"{'─' * 20}\n"
+        f"🔥 <b>Итого ({selected_count} шт):</b> {int(total_cal)} ккал\n"
+        f"🥩 Б: {total_p:.1f} | 🥑 Ж: {total_f:.1f} | 🍞 У: {total_c:.1f}"
+    )
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"✅ Записать всё ({selected_count})", callback_data="batch_confirm_all")
+    builder.button(text="✏️ Редактировать", callback_data="batch_edit_start")
+    builder.button(text="❌ Отмена", callback_data="batch_cancel")
+    builder.adjust(1, 2)
+    
+    return text, builder.as_markup()
+
+
+def _render_batch_edit_item(batch_items: list[dict], index: int) -> tuple[str, types.InlineKeyboardMarkup]:
+    """Render edit view for a single batch item."""
+    item = batch_items[index]
+    total = len(batch_items)
+    check = "✅" if item["selected"] else "⬜"
+    
+    text = (
+        f"✏️ <b>Продукт {index + 1}/{total}:</b>\n\n"
+        f"{check} <b>{item['name']}</b>\n\n"
+        f"🔥 Ккал: <b>{int(item['calories'])}</b>\n"
+        f"🥩 Б: <b>{item['protein']:.1f}</b> | "
+        f"🥑 Ж: <b>{item['fat']:.1f}</b> | "
+        f"🍞 У: <b>{item['carbs']:.1f}</b>"
+    )
+    
+    builder = InlineKeyboardBuilder()
+    
+    # Navigation
+    nav_buttons = []
+    if index > 0:
+        nav_buttons.append(types.InlineKeyboardButton(text="⬅️ Пред.", callback_data=f"batch_nav:{index - 1}"))
+    if index < total - 1:
+        nav_buttons.append(types.InlineKeyboardButton(text="➡️ След.", callback_data=f"batch_nav:{index + 1}"))
+    if nav_buttons:
+        builder.row(*nav_buttons)
+    
+    # Toggle selection / Delete
+    if item["selected"]:
+        builder.button(text="⬜ Убрать из записи", callback_data=f"batch_toggle:{index}")
+    else:
+        builder.button(text="✅ Вернуть в запись", callback_data=f"batch_toggle:{index}")
+    
+    builder.button(text="🗑️ Удалить совсем", callback_data=f"batch_delete:{index}")
+    builder.adjust(2 if nav_buttons else 1, 1, 1)
+    
+    # Back to list
+    builder.button(text="🔙 К списку", callback_data="batch_back_to_list")
+    
+    return text, builder.as_markup()
+
+
+# --- BATCH CALLBACKS ---
+
+@router.callback_query(F.data == "batch_confirm_all", UniversalInputStates.batch_confirmation)
+async def batch_confirm_all(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Save all selected batch items to DB."""
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    selected = [item for item in batch_items if item.get("selected", True)]
+    
+    if not selected:
+        await callback.answer("⚠️ Нет выбранных продуктов!", show_alert=True)
+        return
+    
+    user_id = callback.from_user.id
+    saved_count = 0
+    total_cal = 0
+    
+    async for session in get_db():
+        for item in selected:
+            log = ConsumptionLog(
+                user_id=user_id,
+                product_name=item["name"],
+                base_name=item.get("base_name"),
+                calories=item.get("calories", 0),
+                protein=item.get("protein", 0),
+                fat=item.get("fat", 0),
+                carbs=item.get("carbs", 0),
+                fiber=item.get("fiber", 0),
+                date=datetime.utcnow()
+            )
+            session.add(log)
+            saved_count += 1
+            total_cal += int(item.get("calories", 0))
+        await session.commit()
+    
+    await state.clear()
+    
+    # Build success message
+    names = [f"• {item['name']}" for item in selected]
+    names_text = "\n".join(names[:10])  # Limit to 10 lines
+    if len(names) > 10:
+        names_text += f"\n...и ещё {len(names) - 10}"
+    
+    success_text = (
+        f"✅ <b>Записано {saved_count} продуктов!</b>\n\n"
+        f"{names_text}\n\n"
+        f"🔥 <b>Итого: {total_cal} ккал</b>"
+    )
+    
+    await callback.message.edit_text(success_text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "batch_cancel", UniversalInputStates.batch_confirmation)
+async def batch_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel batch input."""
+    await state.clear()
+    await callback.message.edit_text("❌ Ввод отменен.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "batch_edit_start", UniversalInputStates.batch_confirmation)
+async def batch_edit_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Enter edit mode for batch items."""
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    
+    if not batch_items:
+        await callback.answer("⚠️ Список пуст!")
+        return
+    
+    await state.set_state(UniversalInputStates.batch_editing)
+    await state.update_data(batch_edit_index=0)
+    
+    text, markup = _render_batch_edit_item(batch_items, 0)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("batch_nav:"), UniversalInputStates.batch_editing)
+async def batch_nav(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Navigate between batch items in edit mode."""
+    index = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    
+    if 0 <= index < len(batch_items):
+        await state.update_data(batch_edit_index=index)
+        text, markup = _render_batch_edit_item(batch_items, index)
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("batch_toggle:"), UniversalInputStates.batch_editing)
+async def batch_toggle(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Toggle item selection (include/exclude from save)."""
+    index = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    
+    if 0 <= index < len(batch_items):
+        batch_items[index]["selected"] = not batch_items[index]["selected"]
+        await state.update_data(batch_items=batch_items)
+        
+        text, markup = _render_batch_edit_item(batch_items, index)
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("batch_delete:"), UniversalInputStates.batch_editing)
+async def batch_delete(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Delete item from batch entirely."""
+    index = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    
+    if 0 <= index < len(batch_items):
+        deleted_name = batch_items[index]["name"]
+        batch_items.pop(index)
+        await state.update_data(batch_items=batch_items)
+        
+        if not batch_items:
+            await state.clear()
+            await callback.message.edit_text("🗑️ Все продукты удалены. Ввод отменен.")
+            await callback.answer()
+            return
+        
+        # Adjust index if needed
+        new_index = min(index, len(batch_items) - 1)
+        await state.update_data(batch_edit_index=new_index)
+        
+        text, markup = _render_batch_edit_item(batch_items, new_index)
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+        await callback.answer(f"🗑️ Удалено: {deleted_name}")
+    else:
+        await callback.answer()
+
+
+@router.callback_query(F.data == "batch_back_to_list", UniversalInputStates.batch_editing)
+async def batch_back_to_list(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Return from edit mode to batch list."""
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    
+    await state.set_state(UniversalInputStates.batch_confirmation)
+    
+    text, markup = _render_batch_list(batch_items)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+# Also handle batch_confirm_all from editing state
+@router.callback_query(F.data == "batch_confirm_all", UniversalInputStates.batch_editing)
+async def batch_confirm_all_from_edit(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Redirect to main confirm handler."""
+    await state.set_state(UniversalInputStates.batch_confirmation)
+    await batch_confirm_all(callback, state)

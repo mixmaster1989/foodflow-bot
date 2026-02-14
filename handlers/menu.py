@@ -87,6 +87,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
     # Row 2: Core
     builder.button(text="📸 Загрузить чек", callback_data="menu_check")
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
+    builder.button(text="🌿 Herbalife", callback_data="menu_herbalife")
 
     # Row 3: Stats
     builder.button(text="📊 Статистика", callback_data="menu_stats")
@@ -96,7 +97,11 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
     
-    # Row 5: Contact
+    # Row 5: Web App
+    from aiogram.types import WebAppInfo
+    builder.button(text="📱 FoodFlow App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+
+    # Row 6: Contact
     builder.button(text="📩 Написать разработчику", callback_data="menu_contact_dev")
 
     # Row 6: Admin
@@ -107,9 +112,9 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
 
     # Layout depends on curator status
     if is_curator:
-        rows = [1, 1, 1, 2, 2, 2, 1]  # I ATE, Curator, Fridge, ...
+        rows = [1, 1, 1, 3, 2, 2, 1, 1]  # I ATE, Curator, Fridge, Core(3), Stats(2), System(2), WebApp(1), Contact(1)
     else:
-        rows = [1, 1, 2, 2, 2, 1]
+        rows = [1, 1, 3, 2, 2, 1, 1]  # I ATE, Fridge, Core(3), Stats(2), System(2), WebApp(1), Contact(1)
     if message.from_user.id in settings.ADMIN_IDS:
         rows.append(2)
         

@@ -263,6 +263,120 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
         }
 
     @classmethod
+    async def analyze_food_intake_batch(cls, items: list[dict]) -> list[dict]:
+        """Analyze multiple food items in one AI call.
+        
+        Args:
+            items: list of {"product": str, "weight": int|None}
+            
+        Returns:
+            list of dicts with name, base_name, calories, protein, fat, carbs, fiber, weight_grams
+        """
+        if not items:
+            return []
+            
+        # Build items description
+        lines = []
+        for i, item in enumerate(items, 1):
+            w = f" {item['weight']}г" if item.get('weight') else ""
+            lines.append(f"{i}. {item['product']}{w}")
+        items_text = "\n".join(lines)
+        
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+
+        prompt = f'''Analyze these food items and return KBJU for EACH:
+
+{items_text}
+
+RULES:
+- If weight is specified, calculate KBJU for that weight.
+- If weight is NOT specified, calculate for a standard portion and set weight_missing: true.
+- Return a JSON array (NOT object) with one entry per item.
+
+RETURN JSON ARRAY ONLY:
+[
+  {{
+    "name": "Помело 230г",
+    "base_name": "Помело",
+    "weight_grams": 230,
+    "weight_missing": false,
+    "calories": 68,
+    "protein": 0.6,
+    "fat": 0.04,
+    "carbs": 17.7,
+    "fiber": 1.8
+  }},
+  ...
+]
+
+CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
+
+        import asyncio
+        import aiohttp
+
+        for model in cls.MODELS[:3]:
+            for attempt in range(2):
+                try:
+                    payload = {
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1
+                    }
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                content = data["choices"][0]["message"]["content"].strip()
+                                
+                                # Clean JSON
+                                if content.startswith("```"):
+                                    content = content.split("```")[1]
+                                    if content.startswith("json"):
+                                        content = content[4:]
+                                content = content.strip()
+                                
+                                result = json.loads(content)
+                                
+                                # Ensure it's a list
+                                if isinstance(result, dict):
+                                    result = [result]
+                                    
+                                logger.info(f"Batch food analyzed: {len(result)} items")
+                                return result
+                except Exception as e:
+                    logger.error(f"analyze_food_intake_batch error ({model}): {e}")
+                    if attempt < 1:
+                        await asyncio.sleep(0.3)
+                        continue
+        
+        # Fallback: return basic data per item
+        fallback = []
+        for item in items:
+            fallback.append({
+                "name": f"{item['product']} {item.get('weight', '')}г".strip(),
+                "base_name": item['product'],
+                "weight_grams": item.get('weight'),
+                "weight_missing": item.get('weight') is None,
+                "calories": 100,
+                "protein": 5,
+                "fat": 3,
+                "carbs": 15,
+                "fiber": 1
+            })
+        return fallback
+
+    @classmethod
     async def suggest_dish_name(cls, ingredients: list[str]) -> str:
         """Suggest a culinary name for a list of ingredients."""
         if not ingredients:

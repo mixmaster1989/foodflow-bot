@@ -127,6 +127,7 @@ async def generate_detailed_report(user_id: int) -> str | None:
         total_prot = 0
         total_fat = 0
         total_carbs = 0
+        total_fiber = 0
         
         for log in logs:
             # Adjust for Moscow timezone (+3)
@@ -140,9 +141,11 @@ async def generate_detailed_report(user_id: int) -> str | None:
             total_prot += log.protein or 0
             total_fat += log.fat or 0
             total_carbs += log.carbs or 0
+            total_fiber += log.fiber or 0
         
         lines.append("\n━━━━━━━━━━━")
-        lines.append(f"<b>Итого:</b> {int(total_cal)} ккал | Б: {int(total_prot)}г | Ж: {int(total_fat)}г | У: {int(total_carbs)}г")
+        fiber_str = f" | Кл: {int(total_fiber)}г" if total_fiber else ""
+        lines.append(f"<b>Итого:</b> {int(total_cal)} ккал | Б: {int(total_prot)}г | Ж: {int(total_fat)}г | У: {int(total_carbs)}г{fiber_str}")
         
         return "\n".join(lines)
     

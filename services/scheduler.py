@@ -141,6 +141,16 @@ def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
     #     replace_existing=True
     # )
     
+from daily_nutrition_report import run_daily_report
+
+    # 3. Visual Nutrition Report (12:00 MSK)
+    scheduler.add_job(
+        run_daily_report,
+        CronTrigger(hour=12, minute=0),
+        id="visual_daily_report",
+        replace_existing=True
+    )
+    
     scheduler.start()
     logger.info("📅 Reminder scheduler started")
     

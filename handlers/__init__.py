@@ -18,8 +18,12 @@ from . import (
     errors,
     errors,
     global_input,
-    saved_dishes
+    saved_dishes,
+    herbalife,
+    # Marathon handlers
+    # Note: We import the sub-package or modules
 )
+from handlers.marathon import curator_menu
 
 __all__ = [
     "common",
@@ -41,6 +45,8 @@ __all__ = [
     "errors",
     "errors",
     "global_input",
-    "saved_dishes"
+    "saved_dishes",
+    "herbalife",
+    "curator_menu"
 ]
 

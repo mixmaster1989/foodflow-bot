@@ -223,6 +223,10 @@ class Marathon(Base):
     # Store wave configuration [start, end, label]
     waves_config = Column(JSON, nullable=True) 
     
+    # Points Customization
+    points_name = Column(String, default="Снежинки")
+    points_emoji = Column(String, default="❄️")
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     curator = relationship("User", backref="marathons", foreign_keys=[curator_id])
     participants = relationship("MarathonParticipant", back_populates="marathon")

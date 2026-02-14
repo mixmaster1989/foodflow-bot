@@ -30,6 +30,9 @@ class CuratorMarathonStates(StatesGroup):
     creating_wave_name = State() # Wave name input
     creating_wave_dates = State() # Wave dates input
     
+    creating_points_name = State() # Custom points name
+    creating_points_emoji = State() # Custom points emoji
+    
     awarding_snowflakes = State() # Selecting user to award
     entering_snowflake_amount = State() # Entering amount
     entering_snowflake_reason = State() # Entering reason
@@ -80,13 +83,17 @@ async def show_marathon_menu(callback: types.CallbackQuery) -> None:
             builder.button(text="🔗 Пригласить", callback_data=f"marathon_invite:{marathon.id}")
             builder.button(text=reg_action_text, callback_data=f"marathon_toggle_reg:{marathon.id}")
             
+            p_name = marathon.points_name or "Баллы"
+            p_emoji = marathon.points_emoji or "❄️"
+            
             builder.button(text="👥 Участники", callback_data=f"marathon_participants:{marathon.id}")
-            builder.button(text="❄️ Снежинки (Баллы)", callback_data=f"marathon_snowflakes:{marathon.id}")
+            builder.button(text=f"{p_emoji} {p_name}", callback_data=f"marathon_snowflakes:{marathon.id}")
+            builder.button(text="⚙️ Настройки Баллов", callback_data=f"marathon_edit_points:{marathon.id}")
             builder.button(text="📊 Рейтинг (Вес)", callback_data=f"marathon_leaderboard:{marathon.id}")
-            builder.button(text="⚙️ Настройки Волн", callback_data=f"marathon_waves:{marathon.id}")
+            builder.button(text="⚙️ Волны", callback_data=f"marathon_waves:{marathon.id}")
             builder.button(text="🛑 Завершить Марафон", callback_data=f"marathon_stop_confirm:{marathon.id}")
             builder.button(text="🔙 Назад", callback_data="main_menu")
-            builder.adjust(2, 2, 1, 1, 1, 1)
+            builder.adjust(2, 2, 2, 1, 1)
             
             # Determine status of waves
             waves = marathon.waves_config or {}
@@ -117,6 +124,25 @@ async def show_marathon_menu(callback: types.CallbackQuery) -> None:
              await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
         await callback.answer()
 
+
+@router.callback_query(F.data.startswith("marathon_edit_points:"))
+async def start_edit_points(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start points editing wizard."""
+    marathon_id = int(callback.data.split(":")[1])
+    await state.update_data(marathon_id=marathon_id, is_editing=True)
+    await state.set_state(CuratorMarathonStates.creating_points_name)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Отмена", callback_data="curator_marathon_menu")
+    
+    await callback.message.edit_text(
+        "⚙️ **Редактирование Баллов**\n\n"
+        "Введите новое **название** для баллов:\n"
+        "*(Например: Огоньки, Поинты, Звезды)*",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
 
 @router.callback_query(F.data == "marathon_create")
 async def start_create_marathon(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -152,14 +178,12 @@ async def process_marathon_name(message: types.Message, state: FSMContext) -> No
     
     await message.answer(text, parse_mode="Markdown")
 
-
 @router.message(CuratorMarathonStates.creating_dates)
 async def process_marathon_dates(message: types.Message, state: FSMContext) -> None:
-    """Parse dates and create marathon."""
+    """Parse dates and ask for points configuration."""
     try:
         raw = message.text.replace(",", " ").strip()
         parts = raw.split()
-        
         if len(parts) != 2:
             raise ValueError("Need 2 dates")
             
@@ -170,48 +194,98 @@ async def process_marathon_dates(message: types.Message, state: FSMContext) -> N
             await message.answer("❌ Дата конца должна быть позже даты начала.")
             return
 
-        data = await state.get_data()
-        name = data.get("name")
-        user_id = message.from_user.id
-        
-        async for session in get_db():
-            # Deactivate any existing active marathon (safety)
-            await session.execute(
-                update(Marathon)
-                .where(Marathon.curator_id == user_id, Marathon.is_active == True)
-                .values(is_active=False)
-            )
-            
-            # Create new
-            marathon = Marathon(
-                curator_id=user_id,
-                name=name,
-                start_date=start_date,
-                end_date=end_date,
-                is_active=True,
-                waves_config={} # Empty config initially
-            )
-            session.add(marathon)
-            await session.commit()
-            
-            # Auto-add wards? No, user requested Manual Selection.
-            # But we can prompt to add wards.
-        
-        await state.clear()
-        
-        builder = InlineKeyboardBuilder()
-        builder.button(text="👥 Добавить участников", callback_data="curator_marathon_menu") # Takes back to menu where they can click Participants
+        await state.update_data(start_date=start_date.isoformat(), end_date=end_date.isoformat())
+        await state.set_state(CuratorMarathonStates.creating_points_name)
         
         await message.answer(
-            f"🎉 **Марафон '{name}' создан!**\n\n"
-            f"📅 {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m')}\n\n"
-            "Теперь добавьте участников через меню.",
-            reply_markup=builder.as_markup(),
-            parse_mode="Markdown"
+            "🎨 **Настройка Баллов**\n\n"
+            "Как будут называться баллы в вашем марафоне?\n"
+            "*(Например: Снежинки, Огоньки, Поинты)*"
         )
         
     except ValueError:
-        await message.answer("❌ Ошибка формата. Попробуйте еще раз:\n`ДД.ММ.ГГГГ ДД.ММ.ГГГГ`")
+        await message.answer("❌ Ошибка формата. Пример: `01.03.2026 30.03.2026`")
+
+@router.message(CuratorMarathonStates.creating_points_name)
+async def process_points_name(message: types.Message, state: FSMContext) -> None:
+    """Save points name and ask for emoji."""
+    points_name = message.text.strip()
+    await state.update_data(points_name=points_name)
+    await state.set_state(CuratorMarathonStates.creating_points_emoji)
+    
+    await message.answer(
+        f"✅ Название: **{points_name}**\n\n"
+        "Теперь введите **Эмодзи** для этих баллов:\n"
+        "*(Например: ❄️, 🔥, ⭐, 💎)*"
+    )
+
+@router.message(CuratorMarathonStates.creating_points_emoji)
+async def process_points_emoji(message: types.Message, state: FSMContext) -> None:
+    """Finalize marathon creation or update."""
+    points_emoji = message.text.strip()
+    data = await state.get_data()
+    
+    is_editing = data.get("is_editing", False)
+    
+    if is_editing:
+        marathon_id = data.get("marathon_id")
+        points_name = data.get("points_name")
+        
+        async for session in get_db():
+            marathon = await session.get(Marathon, marathon_id)
+            if marathon:
+                marathon.points_name = points_name
+                marathon.points_emoji = points_emoji
+                await session.commit()
+        
+        await state.clear()
+        await message.answer(f"✅ Настройки баллов обновлены: {points_emoji} {points_name}!")
+        # Re-show menu (we need to trigger current dashboard)
+        # We can't easily trigger callback, but we can send a new menu
+        # For simplicity, just tell them to use the menu button
+        return
+
+    name = data.get("name")
+    start_date = datetime.fromisoformat(data.get("start_date"))
+    end_date = datetime.fromisoformat(data.get("end_date"))
+    points_name = data.get("points_name")
+    user_id = message.from_user.id
+    
+    async for session in get_db():
+        # Deactivate any existing active marathon
+        await session.execute(
+            update(Marathon)
+            .where(Marathon.curator_id == user_id, Marathon.is_active == True)
+            .values(is_active=False)
+        )
+        
+        # Create new
+        marathon = Marathon(
+            curator_id=user_id,
+            name=name,
+            start_date=start_date,
+            end_date=end_date,
+            points_name=points_name,
+            points_emoji=points_emoji,
+            is_active=True,
+            waves_config={}
+        )
+        session.add(marathon)
+        await session.commit()
+    
+    await state.clear()
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👥 Добавить участников", callback_data="curator_marathon_menu")
+    
+    await message.answer(
+        f"🎉 **Марафон '{name}' создан!**\n\n"
+        f"📅 {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m')}\n"
+        f"🏆 Баллы: {points_emoji} {points_name}\n\n"
+        "Теперь добавьте участников через меню.",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
 
 
 @router.callback_query(F.data.startswith("marathon_participants:"))
@@ -221,36 +295,45 @@ async def manage_participants_menu(callback: types.CallbackQuery, state: FSMCont
     user_id = callback.from_user.id
 
     async for session in get_db():
-        # Get all wards
-        wards_result = await session.execute(
-            select(User).where(User.curator_id == user_id)
+        # 1. Get all active participants (regardless if they are wards or not)
+        parts_stmt = select(User).join(
+            MarathonParticipant, User.id == MarathonParticipant.user_id
+        ).where(
+            MarathonParticipant.marathon_id == marathon_id,
+            MarathonParticipant.is_active == True
         )
-        wards = wards_result.scalars().all()
+        participants = (await session.execute(parts_stmt)).scalars().all()
         
-        # Get existing participants
-        participants_result = await session.execute(
-            select(MarathonParticipant.user_id)
-            .where(MarathonParticipant.marathon_id == marathon_id, MarathonParticipant.is_active == True)
-        )
-        existing_ids = {p for p in participants_result.scalars().all()} # Set for fast lookup
+        # 2. Get all wards of this curator (who might not be participants yet)
+        wards_stmt = select(User).where(User.curator_id == user_id)
+        wards = (await session.execute(wards_stmt)).scalars().all()
+        
+        # 3. Merge to get all potential users to manage
+        user_map = {u.id: u for u in (participants + wards)}
+        all_users = sorted(user_map.values(), key=lambda x: get_user_display_name(x))
+        
+        # Existing participants set for fast lookup in DB (not in FSM state)
+        existing_ids = {u.id for u in participants}
         
         # Build UI with Multi-Select Checkboxes
         builder = InlineKeyboardBuilder()
         
-        # Retrieve currently toggled state (if any) or existing db state
+        # Retrieve currently toggled state from FSM (or fallback to DB state)
         state_data = await state.get_data()
-        selected_ids = state_data.get("selected_participants", list(existing_ids))
+        selected_ids = set(state_data.get("selected_participants", list(existing_ids)))
         
-        for ward in wards:
-            is_selected = ward.id in selected_ids
+        for user in all_users:
+            is_selected = user.id in selected_ids
             mark = "✅" if is_selected else "⬜"
-            name = get_user_display_name(ward)
+            name = get_user_display_name(user)
+            # Add "(+) " prefix for those who joined via link but are not wards? 
+            # Or just show them.
             builder.button(
                 text=f"{mark} {name}", 
-                callback_data=f"toggle_part:{marathon_id}:{ward.id}"
+                callback_data=f"toggle_part:{marathon_id}:{user.id}"
             )
         
-        builder.adjust(1) # Column
+        builder.adjust(1)
         
         builder.button(text="💾 Сохранить список", callback_data=f"save_participants:{marathon_id}")
         builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
@@ -362,6 +445,11 @@ async def show_snowflakes_menu(callback: types.CallbackQuery, state: FSMContext)
     marathon_id = int(callback.data.split(":")[1])
     
     async for session in get_db():
+        # Get marathon to get customize labels
+        marathon = await session.get(Marathon, marathon_id)
+        p_name = getattr(marathon, "points_name", "Баллы")
+        p_emoji = getattr(marathon, "points_emoji", "❄️")
+        
         # Get active participants with user info
         result = await session.execute(
             select(MarathonParticipant, User)
@@ -375,7 +463,7 @@ async def show_snowflakes_menu(callback: types.CallbackQuery, state: FSMContext)
         for part, user in participants:
             name = get_user_display_name(user)
             builder.button(
-                text=f"❄️ {part.total_snowflakes} | {name}",
+                text=f"{p_emoji} {part.total_snowflakes} | {name}",
                 callback_data=f"snowflake_select:{marathon_id}:{part.id}"
             )
         
@@ -383,7 +471,7 @@ async def show_snowflakes_menu(callback: types.CallbackQuery, state: FSMContext)
         builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
         
         text = (
-            "❄️ **Начисление Снежинок**\n\n"
+            f"{p_emoji} **Начисление: {p_name}**\n\n"
             "Выберите участника для начисления баллов.\n"
             "Текущий счет отображается слева от имени."
         )
@@ -411,7 +499,12 @@ async def select_snowflake_amount(callback: types.CallbackQuery, state: FSMConte
     builder.button(text="🔙 Назад", callback_data=f"marathon_snowflakes:{marathon_id}")
     builder.adjust(5, 1, 1)
     
-    text = "❄️ Сколько снежинок начислить?"
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        p_name = marathon.points_name or "Баллы"
+        p_emoji = marathon.points_emoji or "❄️"
+        
+        text = f"{p_emoji} Сколько {p_name.lower()} начислить?"
     
     try:
         await callback.message.edit_text(text, reply_markup=builder.as_markup())
@@ -447,7 +540,7 @@ async def add_snowflakes(callback: types.CallbackQuery, state: FSMContext) -> No
             session.add(log)
             await session.commit()
     
-    await callback.answer(f"✅ +{amount} ❄️", show_alert=True)
+    await callback.answer(f"✅ Готово!", show_alert=True)
     
     # Go back to snowflakes menu
     callback.data = f"marathon_snowflakes:{marathon_id}"
@@ -498,14 +591,18 @@ async def process_custom_snowflakes(message: types.Message, state: FSMContext) -
             )
             session.add(log)
             await session.commit()
-    
-    await state.clear()
-    
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 В меню марафона", callback_data="curator_marathon_menu")
-    
-    sign = "+" if amount > 0 else ""
-    await message.answer(f"✅ {sign}{amount} ❄️ начислено!", reply_markup=builder.as_markup())
+            
+            # Get emoji for msg
+            marathon = await session.get(Marathon, part.marathon_id)
+            p_emoji = marathon.points_emoji or "❄️"
+            
+            await state.clear()
+            
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🔙 В меню марафона", callback_data="curator_marathon_menu")
+            
+            sign = "+" if amount > 0 else ""
+            await message.answer(f"✅ {sign}{amount} {p_emoji} начислено!", reply_markup=builder.as_markup())
 
 
 # ===================== LEADERBOARD =====================
@@ -518,6 +615,9 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
     from database.models import WeightLog
     
     async for session in get_db():
+        # Fetch marathon first for fallback logic
+        marathon = await session.get(Marathon, marathon_id)
+        
         # Get participants with their start weight
         result = await session.execute(
             select(MarathonParticipant, User)
@@ -538,7 +638,41 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
             )
             current_weight = await session.scalar(latest_weight_stmt)
             
-            start_w = part.start_weight or current_weight or 0
+            # Determine start weight with fallback logic
+            start_w = part.start_weight
+            
+            if not start_w:
+                # Fallback: find first weight log ON or AFTER marathon start
+                fallback_stmt = (
+                    select(WeightLog.weight)
+                    .where(
+                        WeightLog.user_id == user.id,
+                        WeightLog.recorded_at >= marathon.start_date
+                    )
+                    .order_by(WeightLog.recorded_at.asc()) # First one
+                    .limit(1)
+                )
+                start_w = await session.scalar(fallback_stmt)
+                
+                # If still no start weight, try LAST weight BEFORE start (approximate)
+                if not start_w:
+                     fallback_before_stmt = (
+                        select(WeightLog.weight)
+                        .where(
+                            WeightLog.user_id == user.id,
+                            WeightLog.recorded_at < marathon.start_date
+                        )
+                        .order_by(WeightLog.recorded_at.desc()) # Last one
+                        .limit(1)
+                    )
+                     start_w = await session.scalar(fallback_before_stmt)
+            
+            # Final fallback to current if nothing found (result 0 change)
+            if not start_w and current_weight:
+                 start_w = current_weight
+            elif not start_w:
+                 start_w = 0
+
             current_w = current_weight or start_w
             
             if start_w and start_w > 0:
@@ -558,6 +692,9 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
         # Sort by % loss (desc)
         leaderboard.sort(key=lambda x: x["loss_pct"], reverse=True)
         
+        p_name = marathon.points_name or "Баллы"
+        p_emoji = marathon.points_emoji or "❄️"
+
         # Build text
         lines = ["📊 **Рейтинг по Весу**\n"]
         for i, entry in enumerate(leaderboard[:10], 1):
@@ -566,10 +703,10 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
                 f"{medal} **{entry['name']}**: -{entry['loss_kg']:.1f} кг ({entry['loss_pct']:.1f}%)"
             )
         
-        lines.append("\n❄️ **Рейтинг по Снежинкам**\n")
+        lines.append(f"\n{p_emoji} **Рейтинг по: {p_name}**\n")
         snowflake_sorted = sorted(leaderboard, key=lambda x: x["snowflakes"], reverse=True)
         for i, entry in enumerate(snowflake_sorted[:5], 1):
-            lines.append(f"{i}. **{entry['name']}**: {entry['snowflakes']} ❄️")
+            lines.append(f"{i}. **{entry['name']}**: {entry['snowflakes']} {p_emoji}")
         
         text = "\n".join(lines)
         

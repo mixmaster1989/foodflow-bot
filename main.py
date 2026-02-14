@@ -30,6 +30,8 @@ from handlers import (
     admin,
     support,
     correction,
+    herbalife,
+    ward_interactions,
     # global_input,
 )
 from handlers.marathon import curator_menu
@@ -71,6 +73,7 @@ async def main():
     dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(menu.router)  # Central menu router
     dp.include_router(i_ate.router)  # Quick food logging
+    dp.include_router(herbalife.router) # Herbalife Expert
     dp.include_router(curator_menu.router) # Marathon Module
     dp.include_router(curator.router)  # Curator dashboard
     dp.include_router(shopping.router)  # Must be before receipt.router!
@@ -84,6 +87,7 @@ async def main():
     dp.include_router(weight.router)
     dp.include_router(correction.router)
     dp.include_router(saved_dishes.router)
+    dp.include_router(ward_interactions.router)
     # dp.include_router(global_input.router) # DEPRECATED
     dp.include_router(universal_input.router) # Universal Handler (Text/Voice/Photo)
 
@@ -91,18 +95,15 @@ async def main():
     from services.scheduler import start_scheduler
     start_scheduler(bot, dp)
 
-    # Set Global Menu Button to open Mini App
-    from aiogram.types import MenuButtonWebApp, WebAppInfo
+    # Reset Menu Button to Default (remove Web App from input field)
+    from aiogram.types import MenuButtonDefault
     try:
         await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="FoodFlow App 🚀",
-                web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/")
-            )
+            menu_button=MenuButtonDefault()
         )
-        logging.info("✅ Global Menu Button set to Mini App")
+        logging.info("✅ Global Menu Button reset to Default")
     except Exception as e:
-        logging.warning(f"⚠️ Failed to set Menu Button: {e}")
+        logging.warning(f"⚠️ Failed to reset Menu Button: {e}")
 
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

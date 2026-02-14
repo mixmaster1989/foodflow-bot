@@ -34,12 +34,6 @@ async def error_handler(event: ErrorEvent, bot: Bot):
         except Exception:
             pass
     
-    # Notify user to avoid "eternal spinner" or silence
-    try:
-        if event.update.callback_query:
-            await event.update.callback_query.answer("⚠️ Произошла ошибка. Мы уже чиним!", show_alert=True)
-        elif event.update.message:
-            await event.update.message.answer("⚠️ <b>Ой! Что-то пошло не так.</b>\nРазработчики уже получили отчет об ошибке.", parse_mode="HTML")
-    except Exception:
-        # If we can't notify user (e.g. blocked), just ignore
-        pass
+    # Optional: Notify user something went wrong (if possible)
+    # This is tricky because we don't always have a message to reply to easily in ErrorEvent generic handler without more parsing
+    # But usually aiogram logs it.
