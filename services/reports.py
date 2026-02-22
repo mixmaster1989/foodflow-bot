@@ -3,10 +3,13 @@
 Contains:
 - generate_daily_report: Creates a text summary of daily nutrition logs.
 """
-from datetime import datetime
+import logging
+from datetime import date, datetime
 from sqlalchemy import select, func
 from database.base import get_db
 from database.models import ConsumptionLog, UserSettings
+
+logger = logging.getLogger(__name__)
 
 # TODO [CURATOR-2.3]: Add generate_ward_report(ward_id) for curator to view ward's stats
 # TODO [CURATOR-3.1]: Add generate_curator_morning_summary(curator_id) for aggregate ward stats
@@ -102,26 +105,32 @@ async def generate_daily_report(user_id: int) -> str | None:
     return None
 
 
-async def generate_detailed_report(user_id: int) -> str | None:
+async def generate_detailed_report(user_id: int, target_date: date = None) -> str | None:
     """Generate detailed daily report with timestamps for each meal."""
-    today = datetime.utcnow().date()
+    if not target_date:
+        target_date = datetime.utcnow().date()
     
     async for session in get_db():
         stmt_logs = select(ConsumptionLog).where(
             ConsumptionLog.user_id == user_id,
-            func.date(ConsumptionLog.date) == today
+            func.date(ConsumptionLog.date) == target_date
         ).order_by(ConsumptionLog.date)
         logs = (await session.execute(stmt_logs)).scalars().all()
         
+        logger.info(f"📊 Detailed report generated for user {user_id} (date: {target_date}, items: {len(logs)})")
+        
+        date_str = target_date.strftime("%d.%m.%Y")
+        if target_date == datetime.utcnow().date():
+            date_str += " (Сегодня)"
+
         if not logs:
             return (
-                "📋 <b>Подробная сводка</b>\n\n"
-                "Сегодня пока ничего не записано.\n"
-                "Отправьте фото еды, чтобы начать! 📸"
+                f"📋 <b>Дневник за {date_str}</b>\n\n"
+                "Записей не обнаружено. Чистый холст! 🎨"
             )
         
         # Build detailed list
-        lines = ["📋 <b>Подробная сводка за сегодня</b>\n"]
+        lines = [f"📋 <b>Дневник за {date_str}</b>\n"]
         
         total_cal = 0
         total_prot = 0
@@ -131,11 +140,17 @@ async def generate_detailed_report(user_id: int) -> str | None:
         
         for log in logs:
             # Adjust for Moscow timezone (+3)
-            time_str = (log.date.hour + 3) % 24
-            time_formatted = f"{time_str:02d}:{log.date.minute:02d}"
+            time_h = (log.date.hour + 3) % 24
+            time_formatted = f"{time_h:02d}:{log.date.minute:02d}"
             
+            # Period emoji
+            if 5 <= time_h < 12: emoji = "🌅"
+            elif 12 <= time_h < 17: emoji = "☀️"
+            elif 17 <= time_h < 22: emoji = "🌆"
+            else: emoji = "🌙"
+
             cal = int(log.calories) if log.calories else 0
-            lines.append(f"🕐 <b>{time_formatted}</b> — {log.product_name} — {cal} ккал")
+            lines.append(f"{emoji} <code>{time_formatted}</code> — {log.product_name} — <b>{cal}</b> ккал")
             
             total_cal += log.calories or 0
             total_prot += log.protein or 0
@@ -143,10 +158,90 @@ async def generate_detailed_report(user_id: int) -> str | None:
             total_carbs += log.carbs or 0
             total_fiber += log.fiber or 0
         
-        lines.append("\n━━━━━━━━━━━")
-        fiber_str = f" | Кл: {int(total_fiber)}г" if total_fiber else ""
-        lines.append(f"<b>Итого:</b> {int(total_cal)} ккал | Б: {int(total_prot)}г | Ж: {int(total_fat)}г | У: {int(total_carbs)}г{fiber_str}")
+        lines.append("\n<b>Итого за день:</b>")
+        lines.append(f"🔥 <b>{int(total_cal)}</b> ккал")
+        
+        macros = [
+            f"🥩 Б: <b>{int(total_prot)}</b>г",
+            f"🥑 Ж: <b>{int(total_fat)}</b>г",
+            f"🍞 У: <b>{int(total_carbs)}</b>г"
+        ]
+        if total_fiber:
+            macros.append(f"🥬 Кл: <b>{int(total_fiber)}</b>г")
+            
+        lines.append(" | ".join(macros))
         
         return "\n".join(lines)
     
-    return None
+
+async def send_daily_visual_report(user_id: int, bot) -> bool:
+    """Generate and send visual daily report card."""
+    from services.image_renderer import draw_daily_card
+    from database.models import User
+    from aiogram.types import BufferedInputFile
+    import logging
+    
+    logger = logging.getLogger("reports.visual")
+    today = datetime.utcnow().date()
+    
+    try:
+        async for session in get_db():
+            # 1. Fetch User Data
+            user = await session.get(User, user_id)
+            user_name = user.first_name if user else "Пользователь"
+            
+            # 2. Fetch Settings (Goals)
+            stmt_settings = select(UserSettings).where(UserSettings.user_id == user_id)
+            settings = (await session.execute(stmt_settings)).scalar_one_or_none()
+            
+            goals = {
+                "calories": settings.calorie_goal if settings and settings.calorie_goal else 2000,
+                "protein": settings.protein_goal if settings and settings.protein_goal else 100,
+                "fat": settings.fat_goal if settings and settings.fat_goal else 70,
+                "carbs": settings.carb_goal if settings and settings.carb_goal else 250,
+                "fiber": settings.fiber_goal if settings and settings.fiber_goal else 30
+            }
+            
+            # 3. Fetch Logs for Today
+            stmt_logs = select(ConsumptionLog).where(
+                ConsumptionLog.user_id == user_id,
+                func.date(ConsumptionLog.date) == today
+            ).order_by(ConsumptionLog.date)
+            logs = (await session.execute(stmt_logs)).scalars().all()
+            
+            if not logs:
+                return False
+                
+            # 4. Calculate Totals
+            total_metrics = {
+                "calories": sum(l.calories or 0 for l in logs),
+                "protein": sum(l.protein or 0 for l in logs),
+                "fat": sum(l.fat or 0 for l in logs),
+                "carbs": sum(l.carbs or 0 for l in logs),
+                "fiber": sum(l.fiber or 0 for l in logs)
+            }
+            
+            # 5. Generate Image
+            image_bio = draw_daily_card(
+                user_name=user_name,
+                target_date=today,
+                logs=logs,
+                total_metrics=total_metrics,
+                goals=goals
+            )
+            
+            # 6. Send to Telegram
+            photo = BufferedInputFile(image_bio.getvalue(), filename="progress.png")
+            await bot.send_photo(
+                chat_id=user_id,
+                photo=photo,
+                caption="📈 <b>Ваш прогресс на текущий момент</b>",
+                parse_mode="HTML"
+            )
+            return True
+            
+    except Exception as e:
+        logger.error(f"Failed to send visual report to {user_id}: {e}", exc_info=True)
+        return False
+    
+    return False

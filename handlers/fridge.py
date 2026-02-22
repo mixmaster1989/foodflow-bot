@@ -89,7 +89,7 @@ async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext =
             f"📦 Всего товаров: <b>{total_items}</b>\n\n"
             f"🆕 <b>Недавно добавленные:</b>\n"
             f"{latest_text}\n\n"
-            f"<i>Нажми «Список продуктов», чтобы управлять запасами.</i>"
+            f"<blockquote>Нажми «Список продуктов», чтобы управлять запасами.</blockquote>"
         )
         try:
             await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -203,12 +203,12 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
 
         text = (
             f"📦 <b>{product.name}</b>\n\n"
-            f"💰 Цена: {product.price}₽\n"
-            f"⚖️ Кол-во: {product.quantity} шт\n"
-            f"🏷️ Категория: {product.category or 'Нет'}\n\n"
+            f"💰 Цена: <code>{product.price}₽</code>\n"
+            f"⚖️ Кол-во: <code>{product.quantity} шт</code>\n"
+            f"🏷️ Категория: <b>{product.category or 'Нет'}</b>\n\n"
             f"📊 <b>КБЖУ (на 100г):</b>\n"
-            f"🔥 {product.calories} | 🥩 {product.protein} | 🥑 {product.fat} | 🍞 {product.carbs}\n"
-            f"🥬 Клетчатка: {product.fiber}г"
+            f"🔥 <code>{product.calories}</code> | 🥩 <code>{product.protein}</code> | 🥑 <code>{product.fat}</code> | 🍞 <code>{product.carb_goal if hasattr(product, 'carb_goal') else product.carbs}</code>\n"
+            f"🥬 Клетчатка: <code>{product.fiber}г</code>"
         )
 
         builder = InlineKeyboardBuilder()
@@ -514,9 +514,9 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
         builder.adjust(1)
 
         await status_msg.edit_text(
-            f"✅ <b>Добавлено:</b> {product_data['name']}\n"
-            f"🔥 {product_data.get('calories')} ккал\n"
-            f"🥬 {product_data.get('fiber', 0)}г клетчатки",
+            f"✅ <b>Добавлено:</b> <b>{product_data['name']}</b>\n"
+            f"🔥 <code>{product_data.get('calories')} ккал</code>\n"
+            f"🥬 <code>{product_data.get('fiber', 0)}г клетчатки</code>",
             parse_mode="HTML",
             reply_markup=builder.as_markup()
         )
@@ -573,9 +573,9 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
         builder.adjust(1)
         
         await status_msg.edit_text(
-            f"✅ <b>Готовое блюдо добавлено:</b>\n{product_data['name']}\n"
-            f"🔥 {product_data.get('calories')} ккал\n"
-            f"🥬 {product_data.get('fiber', 0)}г клетчатки",
+            f"✅ <b>Готовое блюдо добавлено:</b>\n<b>{product_data['name']}</b>\n"
+            f"🔥 <code>{product_data.get('calories')} ккал</code>\n"
+            f"🥬 <code>{product_data.get('fiber', 0)}г клетчатки</code>",
             parse_mode="HTML",
             reply_markup=builder.as_markup()
         )

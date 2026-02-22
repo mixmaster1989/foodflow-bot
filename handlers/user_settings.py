@@ -69,7 +69,7 @@ async def show_settings(callback: types.CallbackQuery) -> None:
             gender_text = "👨 Мужской" if settings.gender == "male" else "👩 Женский"
             goal_text = {
                 "lose_weight": "📉 Похудеть",
-                "maintain": "⚖️ Не толстеть",
+                "maintain": "⚖️ Не набирать",
                 "healthy": "🥗 Здоровое питание",
                 "gain_mass": "💪 Набрать массу",
             }.get(settings.goal, "🥗 Здоровое питание")
@@ -77,21 +77,21 @@ async def show_settings(callback: types.CallbackQuery) -> None:
             text += (
                 "👤 <b>Профиль:</b>\n"
                 f"{gender_text}\n"
-                f"📏 Рост: <b>{settings.height}</b> см\n"
-                f"⚖️ Вес: <b>{settings.weight}</b> кг\n"
-                f"{goal_text}\n\n"
+                f"📏 Рост: <code>{settings.height}</code> см\n"
+                f"⚖️ Вес: <code>{settings.weight}</code> кг\n"
+                f"🎯 Цель: <b>{goal_text}</b>\n\n"
             )
 
         text += (
             "🎯 <b>Цели КБЖУ:</b>\n"
-            f"🔥 Калории: <b>{settings.calorie_goal}</b> ккал\n"
-            f"🥩 Белки: <b>{settings.protein_goal}</b> г\n"
-            f"🥑 Жиры: <b>{settings.fat_goal}</b> г\n"
-            f"🍞 Углеводы: <b>{settings.carb_goal}</b> г\n\n"
-            f"🚫 <b>Аллергии/Исключения:</b>\n"
-            f"{settings.allergies or 'Нет'}\n\n"
-            f"📊 <b>Время дневной сводки:</b> {getattr(settings, 'summary_time', '21:00')}\n"
-            f"⏰ <b>Напоминание о весе:</b> {getattr(settings, 'reminder_time', '09:00')}"
+            f"🔥 Калории: <code>{settings.calorie_goal}</code> ккал\n"
+            f"🥩 Белки: <code>{settings.protein_goal}</code> г\n"
+            f"🥑 Жиры: <code>{settings.fat_goal}</code> г\n"
+            f"🍞 Углеводы: <code>{settings.carb_goal}</code> г\n\n"
+            f"🚫 <b>Исключения:</b>\n"
+            f"<blockquote>{settings.allergies or 'Нет'}</blockquote>\n"
+            f"📊 <b>Сводка:</b> <code>{getattr(settings, 'summary_time', '21:00')}</code>\n"
+            f"⏰ <b>Напоминание:</b> <code>{getattr(settings, 'reminder_time', '09:00')}</code>"
         )
 
         builder = InlineKeyboardBuilder()
@@ -161,9 +161,9 @@ async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> 
 
         text = (
             "🎯 <b>Редактирование целей КБЖУ</b>\n\n"
-            f"Текущая цель: <b>{settings.calorie_goal}</b> ккал\n"
-            f"Рекомендуемая: <b>{targets['calories']}</b> ккал\n\n"
-            f"<i>Рекомендация рассчитана для ваших параметров ({settings.weight}кг, {settings.age} лет).</i>\n\n"
+            f"Текущая цель: <code>{settings.calorie_goal}</code> ккал\n"
+            f"Рекомендуемая: <code>{targets['calories']}</code> ккал\n\n"
+            f"<blockquote>Рекомендация рассчитана для ваших параметров ({settings.weight}кг, {settings.age} лет).</blockquote>\n"
             "Вы можете принять расчет или настроить вручную."
         )
 
@@ -273,8 +273,8 @@ async def set_calories(message: types.Message, state: FSMContext) -> None:
 
         await message.answer(
             f"✅ <b>Цели обновлены!</b>\n\n"
-            f"🔥 {calories} ккал\n"
-            f"🥩 {targets['protein']} / 🥑 {targets['fat']} / 🍞 {targets['carbs']}",
+            f"🔥 <code>{calories} ккал</code>\n"
+            f"🥩 <code>{targets['protein']}</code> | 🥑 <code>{targets['fat']}</code> | 🍞 <code>{targets['carbs']}</code>",
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )

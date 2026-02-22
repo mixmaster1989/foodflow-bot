@@ -32,12 +32,27 @@ class User(Base):
     role = Column(String, default="user")  # "user" | "curator" | "admin"
     curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # who curates this user
     referral_token = Column(String, unique=True, nullable=True)  # for invite links (curators only)
+    referral_token_expires_at = Column(DateTime, nullable=True)
     
     # Relationships
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
     wards = relationship("User", backref="curator", remote_side=[id], foreign_keys=[curator_id])
+    water_logs = relationship("WaterLog", back_populates="user")
+    subscription = relationship("Subscription", back_populates="user", uselist=False)
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, unique=True) # 1 to 1 
+    tier = Column(String, default="free") # "free", "basic", "pro"
+    starts_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True) # Если None - бесконечно
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("User", back_populates="subscription")
 
 class Receipt(Base):
     __tablename__ = "receipts"
@@ -150,6 +165,7 @@ class UserSettings(Base):
     fat_goal = Column(Integer, default=70)
     carb_goal = Column(Integer, default=250)
     fiber_goal = Column(Integer, default=30) # NEW: Fiber goal
+    water_goal = Column(Integer, default=2000) # NEW: Fiber goal
     allergies = Column(String, nullable=True)  # Comma-separated list
     gender = Column(String, nullable=True)  # "male" or "female"
     age = Column(Integer, nullable=True)  # User's age in years
@@ -199,6 +215,17 @@ class CachedRecipe(Base):
     )
 
 
+class WaterLog(Base):
+    __tablename__ = "water_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    amount_ml = Column(Integer, nullable=False)
+    date = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="water_logs")
+
+
 class WeightLog(Base):
     """Model for tracking user weight over time."""
     __tablename__ = "weight_logs"
@@ -219,6 +246,8 @@ class Marathon(Base):
     end_date = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
     is_registration_open = Column(Boolean, default=True) # Can users join via link?
+    invite_token = Column(String, unique=True, nullable=True)
+    invite_token_expires_at = Column(DateTime, nullable=True)
     
     # Store wave configuration [start, end, label]
     waves_config = Column(JSON, nullable=True) 

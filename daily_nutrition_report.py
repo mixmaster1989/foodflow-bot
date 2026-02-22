@@ -278,13 +278,33 @@ async def send_telegram_photo(user_id: int, image_bio: BytesIO, caption: str) ->
 # Main Logic
 # =====================================================
 
-async def get_users_with_yesterday_data() -> list[int]:
-    """Получает список user_id у кого есть данные за вчера."""
+async def get_users_with_daily_report_access() -> list[int]:
+    """Получает список user_id у кого есть данные за вчера и уровень подписки PRO."""
     yesterday = datetime.utcnow().date() - timedelta(days=1)
+    
+    # We need to consider IS_BETA_TESTING if we want it to work in testing
+    # But this script runs standalone, so let's use the DB state.
+    
     async for session in get_db():
         from sqlalchemy import distinct
+        from database.models import Subscription
+        
+        # Subquery to find users with PRO tier
+        pro_users_stmt = select(Subscription.user_id).where(
+            and_(
+                Subscription.tier == "pro",
+                Subscription.is_active == True
+            )
+        )
+        pro_user_ids = (await session.execute(pro_users_stmt)).scalars().all()
+        
+        # If we are in pre-launch mode, maybe we want all users? 
+        # The user said: "до дня запуска проекта в массы всем будет про по умолчанию".
+        # So we should probably ensure everyone HAS a subscription record.
+        
         stmt = select(distinct(ConsumptionLog.user_id)).where(
             and_(
+                ConsumptionLog.user_id.in_(pro_user_ids),
                 ConsumptionLog.date >= datetime.combine(yesterday, datetime.min.time()),
                 ConsumptionLog.date < datetime.combine(yesterday + timedelta(days=1), datetime.min.time())
             )
@@ -310,8 +330,8 @@ async def run_daily_report():
             if ADMIN_ID in all_users: user_ids = [ADMIN_ID]
             logger.info(f"TEST MODE: Targeting Admin {ADMIN_ID}")
     else:
-        user_ids = await get_users_with_yesterday_data()
-        logger.info(f"Found {len(user_ids)} users with data")
+        user_ids = await get_users_with_daily_report_access()
+        logger.info(f"Found {len(user_ids)} PRO users with data")
 
     if not user_ids:
         logger.info("No users found. Exiting.")

@@ -70,6 +70,23 @@ def _create_shopping_tables(cursor: sqlite3.Cursor):
         )
 
 
+def _create_subscription_table(cursor: sqlite3.Cursor):
+    if not _table_exists(cursor, "subscriptions"):
+        cursor.execute(
+            """
+            CREATE TABLE subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id BIGINT NOT NULL UNIQUE,
+                tier TEXT DEFAULT 'free',
+                starts_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+
 def _run_sqlite_migrations():
     db_path = _get_sqlite_path()
     if not db_path:
@@ -78,6 +95,8 @@ def _run_sqlite_migrations():
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
+
+        _create_subscription_table(cursor)
 
         if _table_exists(cursor, "products"):
             _ensure_columns(

@@ -10,35 +10,38 @@ Contains:
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters import Command
+from aiogram.types import Message
 
 router = Router()
 
 
+@router.message(Command("start"))
+async def command_start_handler(message: Message, user_tier: str = "free") -> None:
+    """Handle /start command.
+
+    Args:
+        message: Telegram message object
+    """
+    await show_main_menu(message, message.from_user.first_name, message.from_user.id, user_tier)
+
 
 @router.message(F.text.in_({"🏠 Главное меню", "Меню", "Главное меню", "menu", "Menu"}))
-async def menu_button_handler(message: types.Message, state: FSMContext) -> None:
+async def menu_button_handler(message: types.Message, state: FSMContext, user_tier: str = "free") -> None:
     """Handle persistent 'Main Menu' button click."""
     await state.clear()  # Clear any active state!
-    await show_main_menu(message, message.from_user.first_name, message.from_user.id)
+    await show_main_menu(message, message.from_user.first_name, message.from_user.id, user_tier)
 
 
 @router.callback_query(F.data == "main_menu")
-async def back_to_main(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Return to the main menu by editing the current message.
-
-    Args:
-        callback: Telegram callback query
-
-    Returns:
-        None
-
-    """
+async def main_menu_callback_handler(callback: types.CallbackQuery, state: FSMContext, user_tier: str = "free") -> None:
+    """Handle 'main_menu' callback to return to the dashboard."""
     await state.clear()  # Clear any active state!
-    await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id)
+    await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id, user_tier)
     await callback.answer()
 
 
-async def show_main_menu(message: types.Message, user_name: str, user_id: int) -> None:
+async def show_main_menu(message: types.Message, user_name: str, user_id: int, user_tier: str = "free") -> None:
     """Display the main menu with inline buttons.
 
     Shows all available bot features: shopping mode, receipt upload,
@@ -59,8 +62,9 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
     is_curator = False
     is_female = False
     from database.base import get_db
-    from database.models import User, UserSettings
-    from sqlalchemy import select
+    from database.models import User, UserSettings, ConsumptionLog, WaterLog
+    from sqlalchemy import select, and_, func
+    from datetime import datetime, date
     async for session in get_db():
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
@@ -73,9 +77,48 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
         if settings and settings.gender == "female":
             is_female = True
     
+        # Get daily metrics (calories, macros) for display
+        today = date.today()
+        metrics_stmt = select(
+            func.sum(ConsumptionLog.calories),
+            func.sum(ConsumptionLog.protein),
+            func.sum(ConsumptionLog.fat),
+            func.sum(ConsumptionLog.carbs),
+            func.sum(ConsumptionLog.fiber)
+        ).where(
+            and_(
+                ConsumptionLog.user_id == user_id,
+                func.date(ConsumptionLog.date) == today
+            )
+        )
+        row = (await session.execute(metrics_stmt)).fetchone()
+        
+        total_metrics = {
+            "calories": row[0] or 0,
+            "protein": row[1] or 0,
+            "fat": row[2] or 0,
+            "carbs": row[3] or 0,
+            "fiber": row[4] or 0
+        }
+        
+        # Get daily water
+        water_stmt = select(func.sum(WaterLog.amount_ml)).where(
+            and_(
+                WaterLog.user_id == user_id,
+                func.date(WaterLog.date) == today
+            )
+        )
+        water_total = (await session.execute(water_stmt)).scalar() or 0
+        
+        goals = {
+            "calories": settings.calorie_goal if settings else 2000,
+            "water": settings.water_goal if settings else 2000
+        }
+        
     # Row 0: BIG "I ATE" button - gender aware
     ate_text = "🍽️ Я СЪЕЛА!" if is_female else "🍽️ Я СЪЕЛ!"
     builder.button(text=ate_text, callback_data="menu_i_ate")
+    builder.button(text="💧 Вода", callback_data="menu_water")
     
     # Curator dashboard button (visible only for curators)
     if is_curator:
@@ -85,9 +128,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
     builder.button(text="🧊 Холодильник", callback_data="menu_fridge")
 
     # Row 2: Core
-    builder.button(text="📸 Загрузить чек", callback_data="menu_check")
     builder.button(text="👨‍🍳 Рецепты", callback_data="menu_recipes")
-    builder.button(text="🌿 Herbalife", callback_data="menu_herbalife")
 
     # Row 3: Stats
     builder.button(text="📊 Статистика", callback_data="menu_stats")
@@ -98,8 +139,9 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
     
     # Row 5: Web App
-    from aiogram.types import WebAppInfo
-    builder.button(text="📱 FoodFlow App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+    if user_tier != "free":
+        from aiogram.types import WebAppInfo
+        builder.button(text="📱 FoodFlow App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
 
     # Row 6: Contact
     builder.button(text="📩 Написать разработчику", callback_data="menu_contact_dev")
@@ -112,39 +154,56 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int) -
 
     # Layout depends on curator status
     if is_curator:
-        rows = [1, 1, 1, 3, 2, 2, 1, 1]  # I ATE, Curator, Fridge, Core(3), Stats(2), System(2), WebApp(1), Contact(1)
+        rows = [2, 1, 1, 1, 2, 2, 1, 1]  # I ATE/Water, Curator, Fridge, Recipes(1), Stats(2), System(2), WebApp(1), Contact(1)
     else:
-        rows = [1, 1, 3, 2, 2, 1, 1]  # I ATE, Fridge, Core(3), Stats(2), System(2), WebApp(1), Contact(1)
+        rows = [2, 1, 1, 2, 2, 1, 1]  # I ATE/Water, Fridge, Recipes(1), Stats(2), System(2), WebApp(1), Contact(1)
     if message.from_user.id in settings.ADMIN_IDS:
         rows.append(2)
         
     builder.adjust(*rows)
 
-
-    # Video path for main menu
-    video_path = types.FSInputFile("assets/grok-video-74406efc-afd9-467a-a40a-b9936f3beaf7.mp4")
+    # Get recent logs for the card
+    logs = []
+    async for session in get_db():
+        stmt = select(ConsumptionLog).where(
+            and_(
+                ConsumptionLog.user_id == user_id,
+                func.date(ConsumptionLog.date) == today
+            )
+        ).order_by(ConsumptionLog.date.desc()).limit(10)
+        logs = (await session.execute(stmt)).scalars().all()
+        
+    # Generate the dynamic dashboard card
+    from services.image_renderer import draw_daily_card
+    photo_bytes = draw_daily_card(user_name, today, logs, total_metrics, goals, water_total)
+    
+    # Use InputMediaPhoto instead of Animation
+    media_file = types.BufferedInputFile(photo_bytes.getvalue(), filename="dashboard.png")
 
     caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
-        f"Привет, {user_name}! 👋\n"
-        "Я помогу тебе следить за питанием и продуктами.\n\n"
+        f"Привет, <b>{user_name}</b>! 👋\n\n"
+        f"📊 <b>Показатели сегодня:</b>\n"
+        f"🔥 <code>{total_metrics['calories']:.0f} / {goals['calories']} ккал</code>\n"
+        f"💧 <code>{water_total} / {goals['water']} мл</code>\n"
+        f"🥦 БЖУ: <code>{total_metrics['protein']:.0f}|{total_metrics['fat']:.0f}|{total_metrics['carbs']:.0f}</code>\n\n"
         "<b>Что будем делать?</b>"
     )
 
-    # Try to edit if possible, otherwise send new video
+    # Try to edit if possible, otherwise send new photo
     try:
         await message.edit_media(
-            media=types.InputMediaAnimation(media=video_path, caption=caption, parse_mode="HTML"),
+            media=types.InputMediaPhoto(media=media_file, caption=caption, parse_mode="HTML"),
             reply_markup=builder.as_markup()
         )
     except Exception:
-        # If edit fails, delete and send new animation
+        # If edit fails, delete and send new photo
         try:
              await message.delete()
         except Exception:
             pass
-        await message.answer_animation(
-            animation=video_path,
+        await message.answer_photo(
+            photo=media_file,
             caption=caption,
             reply_markup=builder.as_markup(),
             parse_mode="HTML"

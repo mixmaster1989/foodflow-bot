@@ -36,6 +36,8 @@ class CuratorMarathonStates(StatesGroup):
     awarding_snowflakes = State() # Selecting user to award
     entering_snowflake_amount = State() # Entering amount
     entering_snowflake_reason = State() # Entering reason
+    
+    entering_invite_days = State() # Number of days for invite link
 
 
 @router.callback_query(F.data == "curator_marathon_menu")
@@ -707,6 +709,8 @@ async def show_leaderboard(callback: types.CallbackQuery) -> None:
         snowflake_sorted = sorted(leaderboard, key=lambda x: x["snowflakes"], reverse=True)
         for i, entry in enumerate(snowflake_sorted[:5], 1):
             lines.append(f"{i}. **{entry['name']}**: {entry['snowflakes']} {p_emoji}")
+
+        lines.append(f"\n_💡 Рейтинг по весу учитывает только похудение. Для участников с другими целями (набор массы, поддержка) используйте рейтинг по {p_name.lower()}._")
         
         text = "\n".join(lines)
         
@@ -760,24 +764,25 @@ async def stop_marathon(callback: types.CallbackQuery) -> None:
 # ===================== INVITES & REGISTRATION =====================
 
 @router.callback_query(F.data.startswith("marathon_invite:"))
-async def show_invite_link(callback: types.CallbackQuery) -> None:
-    """Generate and show invite link."""
+async def marathon_invite_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Prompt for marathon invite link expiration days."""
     marathon_id = int(callback.data.split(":")[1])
-    
-    # Get bot username for deep link
-    bot_user = await callback.bot.get_me()
-    username = bot_user.username
-    
-    link = f"https://t.me/{username}?start=m_{marathon_id}"
+    await state.update_data(invite_marathon_id=marathon_id)
+    await state.set_state(CuratorMarathonStates.entering_invite_days)
     
     builder = InlineKeyboardBuilder()
+    builder.button(text="1 день", callback_data="marathon_invite_days:1")
+    builder.button(text="7 дней", callback_data="marathon_invite_days:7")
+    builder.button(text="14 дней", callback_data="marathon_invite_days:14")
+    builder.button(text="30 дней", callback_data="marathon_invite_days:30")
+    builder.button(text="Безлимит", callback_data="marathon_invite_days:0")
     builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
+    builder.adjust(2, 2, 1, 1)
     
     text = (
-        "🔗 **Ссылка для приглашения**\n\n"
-        f"Отправьте эту ссылку участникам:\n\n"
-        f"`{link}`\n\n"
-        "_(Нажмите на ссылку, чтобы скопировать)_"
+        "🔗 **Генерация ссылки на марафон**\n\n"
+        "На сколько дней создать ссылку-приглашение?\n"
+        "После истечения срока регистрация по этой ссылке будет закрыта."
     )
     
     try:
@@ -785,6 +790,87 @@ async def show_invite_link(callback: types.CallbackQuery) -> None:
     except Exception:
         pass
     await callback.answer()
+
+@router.callback_query(F.data.startswith("marathon_invite_days:"))
+@router.message(CuratorMarathonStates.entering_invite_days)
+async def marathon_invite_generate(event, state: FSMContext) -> None:
+    """Generate and show invite link."""
+    data = await state.get_data()
+    marathon_id = data.get("invite_marathon_id")
+    await state.clear()
+    
+    if not marathon_id:
+        if isinstance(event, types.CallbackQuery):
+            await event.answer("Ошибка, повторите запрос", show_alert=True)
+        return
+        
+    days = 0
+    if isinstance(event, types.CallbackQuery):
+        days = int(event.data.split(":")[1])
+        callback = event
+    else:
+        try:
+            days = int(event.text)
+            if not (1 <= days <= 365):
+                raise ValueError
+        except ValueError:
+            await event.answer("⚠️ Пожалуйста, введите число от 1 до 365, или используйте кнопки выше.")
+            return
+        callback = None
+        
+    import uuid
+    async for session in get_db():
+        marathon = await session.get(Marathon, marathon_id)
+        if not marathon:
+            if callback:
+                await callback.answer("Марафон не найден", show_alert=True)
+            return
+            
+        # Generate new token
+        marathon.invite_token = str(uuid.uuid4())[:12]
+        
+        if days == 0:
+            marathon.invite_token_expires_at = None
+        else:
+            marathon.invite_token_expires_at = datetime.utcnow() + timedelta(days=days)
+            
+        await session.commit()
+        token = marathon.invite_token
+        expires = marathon.invite_token_expires_at
+    
+    # Get bot username for deep link
+    if callback:
+        bot_user = await callback.bot.get_me()
+    else:
+        bot_user = await event.bot.get_me()
+    username = bot_user.username
+    
+    link = f"https://t.me/{username}?start=m_{token}"
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="curator_marathon_menu")
+    
+    exp_text = "**Бессрочно**"
+    if expires:
+        # User local time approximation or just UTC label
+        exp_text = f"до **{expires.strftime('%d.%m.%Y %H:%M')} (UTC)**"
+        
+    text = (
+        "🔗 **Ссылка для приглашения**\n\n"
+        f"Действительна: {exp_text}\n\n"
+        f"Отправьте эту ссылку участникам:\n\n"
+        f"`{link}`\n\n"
+        "_(Нажмите на ссылку, чтобы скопировать)_"
+    )
+    
+    if callback:
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        except Exception:
+            pass
+        await callback.answer()
+    else:
+        await event.answer(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @router.callback_query(F.data.startswith("marathon_toggle_reg:"))

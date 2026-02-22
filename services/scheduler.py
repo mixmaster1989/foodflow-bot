@@ -18,6 +18,7 @@ from database.models import UserSettings
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.context import FSMContext
 from handlers.weight import WeightStates
+from daily_nutrition_report import run_daily_report
 from services.reports import generate_daily_report
 
 logger = logging.getLogger(__name__)
@@ -141,8 +142,6 @@ def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
     #     replace_existing=True
     # )
     
-from daily_nutrition_report import run_daily_report
-
     # 3. Visual Nutrition Report (12:00 MSK)
     scheduler.add_job(
         run_daily_report,

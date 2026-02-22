@@ -18,7 +18,7 @@ from sqlalchemy import select, func, desc
 
 from config import settings
 from database.base import get_db
-from database.models import User, ConsumptionLog, UserSettings
+from database.models import User, ConsumptionLog, UserSettings, WaterLog
 from utils.user import get_user_display_name, get_user_display_long
 
 router = Router()
@@ -29,6 +29,7 @@ class CuratorStates(StatesGroup):
     """FSM states for curator interactions."""
     composing_broadcast = State()
     composing_nudge = State()
+    entering_link_days = State()
 
 
 @router.callback_query(F.data == "curator_dashboard")
@@ -183,6 +184,13 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
         # Get user settings (goals)
         settings_stmt = select(UserSettings).where(UserSettings.user_id == ward_id)
         ward_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        
+        # Get water for TARGET date
+        water_stmt = select(func.sum(WaterLog.amount_ml)).where(
+            WaterLog.user_id == ward_id,
+            func.date(WaterLog.date) == target_date
+        )
+        water_total = (await session.execute(water_stmt)).scalar() or 0
     
     # Calculate totals
     total_cal = sum(l.calories for l in logs)
@@ -219,6 +227,7 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
          builder.button(text="📜 Весь список", callback_data=f"curator_ward_logs:{ward_id}:0:{target_date}")
 
     builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"curator_remove_ward:{ward_id}")
     builder.button(text="🔙 К списку", callback_data="curator_wards:0")
     
     # Adjust remaining rows (1 button per row basically)
@@ -236,7 +245,10 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
         "carbs": total_carbs,
         "fiber": total_fiber
     }
-    goals = {"calories": goal_cal}
+    goals = {
+        "calories": goal_cal,
+        "water": ward_settings.water_goal if ward_settings else 2000
+    }
     
     # We need to run this in executor to avoid blocking event loop
     import asyncio
@@ -252,7 +264,8 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
             target_date, 
             logs, 
             total_metrics, 
-            goals
+            goals,
+            water_total
         )
     
     from aiogram.types import BufferedInputFile, InputMediaPhoto
@@ -284,6 +297,58 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     
     await callback.answer()
     await callback.answer()
+
+@router.callback_query(F.data.startswith("curator_remove_ward:"))
+async def curator_remove_ward_confirm(callback: types.CallbackQuery) -> None:
+    """Show confirmation for removing a ward."""
+    ward_id = int(callback.data.split(":")[1])
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Да, удалить", callback_data=f"curator_do_remove_ward:{ward_id}")
+    builder.button(text="🔙 Отмена", callback_data=f"curator_ward:{ward_id}")
+    builder.adjust(1)
+    
+    text = (
+        "⚠️ <b>Вы уверены?</b>\n\n"
+        "Вы перестанете быть куратором этого пользователя. "
+        "Вся его история останется, но он станет обычным пользователем."
+    )
+    
+    try:
+         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception:
+         await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("curator_do_remove_ward:"))
+async def curator_do_remove_ward(callback: types.CallbackQuery) -> None:
+    """Execute ward removal."""
+    ward_id = int(callback.data.split(":")[1])
+    curator_name = callback.from_user.username or "Ваш куратор"
+    
+    async for session in get_db():
+        ward = await session.get(User, ward_id)
+        if ward:
+            ward.curator_id = None
+            await session.commit()
+    
+    # Notify ward
+    try:
+        from aiogram import Bot
+        bot = Bot(token=settings.BOT_TOKEN)
+        await bot.send_message(
+            ward_id,
+            f"ℹ️ Куратор @{curator_name} прекратил работу с вами.\nВы переведены в режим самостоятельного использования бота."
+        )
+        await bot.session.close()
+    except Exception as e:
+        logger.error(f"Failed to notify ward {ward_id} of removal: {e}")
+        
+    await callback.answer("✅ Подопечный удален.", show_alert=True)
+    # Go back to wards list
+    callback.data = "curator_wards:0"
+    await curator_ward_list(callback)
 
 
 @router.callback_query(F.data.startswith("curator_ward_logs:"))
@@ -356,47 +421,107 @@ async def curator_ward_logs_list(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 @router.callback_query(F.data == "curator_generate_link")
-async def curator_generate_link(callback: types.CallbackQuery) -> None:
-    """Generate and display unique referral link for curator."""
-    import uuid
-    user_id = callback.from_user.id
+async def curator_generate_link(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Prompt for referral link expiration days."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="1 день", callback_data="curator_link_days:1")
+    builder.button(text="7 дней", callback_data="curator_link_days:7")
+    builder.button(text="14 дней", callback_data="curator_link_days:14")
+    builder.button(text="30 дней", callback_data="curator_link_days:30")
+    builder.button(text="Безлимит", callback_data="curator_link_days:0")
+    builder.button(text="🔙 Назад", callback_data="curator_dashboard")
+    builder.adjust(2, 2, 1, 1)
     
+    await state.set_state(CuratorStates.entering_link_days)
+    
+    text = (
+        "🔗 <b>Генерация реферальной ссылки</b>\n\n"
+        "На сколько дней создать ссылку? После истечения срока "
+        "новые подопечные не смогут по ней зарегистрироваться."
+    )
+    
+    try:
+         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception:
+         await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("curator_link_days:"))
+@router.message(CuratorStates.entering_link_days)
+async def curator_link_custom_days(event, state: FSMContext) -> None:
+    """Handle custom days input or quick button for referral link."""
+    await state.clear()
+    
+    days = 0
+    if isinstance(event, types.CallbackQuery):
+        days = int(event.data.split(":")[1])
+        user_id = event.from_user.id
+        callback = event
+    else:
+        try:
+            days = int(event.text)
+            if not (1 <= days <= 365):
+                raise ValueError
+        except ValueError:
+            await event.answer("⚠️ Пожалуйста, введите число от 1 до 365, или используйте кнопки выше.")
+            return
+        user_id = event.from_user.id
+        callback = None
+        
+    import uuid
     async for session in get_db():
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
         
         if not user:
-            await callback.answer("Ошибка", show_alert=True)
+            if callback:
+                await callback.answer("Ошибка", show_alert=True)
             return
+            
+        # Always generate a NEW token and invalidate the old one
+        user.referral_token = str(uuid.uuid4())[:12]
         
-        # Generate token if not exists
-        if not user.referral_token:
-            user.referral_token = str(uuid.uuid4())[:8]
-            await session.commit()
-        
+        if days == 0:
+            user.referral_token_expires_at = None
+        else:
+            user.referral_token_expires_at = datetime.utcnow() + timedelta(days=days)
+            
+        await session.commit()
         token = user.referral_token
+        expires = user.referral_token_expires_at
     
     # Get bot username
-    bot_info = await callback.bot.get_me()
+    if callback:
+        bot_info = await callback.bot.get_me()
+    else:
+        bot_info = await event.bot.get_me()
+        
     bot_username = bot_info.username
-    
     link = f"https://t.me/{bot_username}?start=ref_{token}"
     
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="curator_dashboard")
     
+    exp_text = "<b>Бессрочно</b>"
+    if expires:
+        # User local time approximation or just UTC label
+        exp_text = f"до <b>{expires.strftime('%d.%m.%Y %H:%M')} (UTC)</b>"
+        
     text = (
-        f"🔗 <b>Ваша реферальная ссылка:</b>\n\n"
+        f"🔗 <b>Ваша реферальная ссылка:</b>\n"
+        f"Действительна: {exp_text}\n\n"
         f"<code>{link}</code>\n\n"
-        f"Отправьте эту ссылку вашим подопечным. "
-        f"Когда они зарегистрируются — автоматически станут вашими подопечными!"
+        f"Отправьте эту ссылку вашим подопечным. (Предыдущие ссылки больше недействительны)"
     )
     
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    await callback.answer()
+    if callback:
+        try:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        except Exception:
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        await callback.answer()
+    else:
+        await event.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 @router.callback_query(F.data.startswith("curator_nudge:"))

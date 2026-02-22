@@ -178,7 +178,6 @@ class AIService:
                     }
                 ],
             }
-
             for attempt in range(RETRY_ATTEMPTS):
                 async with aiohttp.ClientSession() as session:
                     try:
@@ -186,24 +185,47 @@ class AIService:
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
                             json=payload,
-                            timeout=25,
+                            timeout=35, # Moderate timeout for vision
                         ) as response:
                             if response.status == 200:
                                 result = await response.json()
+                                if not result or 'choices' not in result:
+                                    logger.warning(f"Empty AI result ({model}) attempt {attempt+1}")
+                                    continue
+
                                 content = result["choices"][0]["message"]["content"]
                                 content = content.replace("```json", "").replace("```", "").strip()
+                                
+                                # Robust JSON extraction
                                 json_match = re.search(r"\{.*\}", content, re.DOTALL)
                                 if json_match:
                                     content = json_match.group(0)
-                                data = json.loads(content)
-                                if data.get("name"):
-                                    return data
+                                
+                                try:
+                                    data = json.loads(content)
+                                    # SUCCESS CRITERIA: Must have a name and it shouldn't be null/empty
+                                    if data and data.get("name") and data.get("name") not in ["Неизвестное блюдо", "Неизвестно"]:
+                                        logger.info(f"✅ AI ({model}) recognized: {data.get('name')}")
+                                        return data
+                                    else:
+                                        logger.warning(f"AI ({model}) returned unknown/null result on attempt {attempt+1}: {content}")
+                                        # Force retry since it failed to identify properly
+                                        if attempt < RETRY_ATTEMPTS - 1:
+                                            await asyncio.sleep(RETRY_DELAY)
+                                            continue
+                                except json.JSONDecodeError as je:
+                                    logger.warning(f"JSON Parse Error ({model}) attempt {attempt+1}: {je}")
+                                    if attempt < RETRY_ATTEMPTS - 1:
+                                        await asyncio.sleep(RETRY_DELAY)
+                                        continue
                             else:
+                                error_text = await response.text()
+                                logger.warning(f"AI Error {response.status} ({model}) attempt {attempt+1}: {error_text}")
                                 if attempt < RETRY_ATTEMPTS - 1:
                                     await asyncio.sleep(RETRY_DELAY)
                                     continue
                     except Exception as e:
-                        logger.error(f"Error recognizing product ({model}) attempt {attempt+1}: {e}")
+                        logger.error(f"Exc in AI Vision ({model}) attempt {attempt+1}: {e}")
                         if attempt < RETRY_ATTEMPTS - 1:
                             await asyncio.sleep(RETRY_DELAY)
                         continue

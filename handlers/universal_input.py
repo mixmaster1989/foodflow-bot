@@ -41,14 +41,29 @@ class UniversalInputStates(StatesGroup):
     waiting_for_weight = State()  # Waiting for weight input
     waiting_for_product_name = State() # Waiting for product name clarification
     waiting_for_intent = State()   # Waiting for intent clarification
+    waiting_for_quantity = State() # NEW: Waiting for quantity (pieces) input
     batch_confirmation = State()  # Viewing batch list
     batch_editing = State()       # Editing individual item in batch
 
 # --- HANDLERS ---
 
 @router.message(F.voice)
-async def handle_voice(message: types.Message, bot: Bot, state: FSMContext) -> None:
+async def handle_voice(message: types.Message, bot: Bot, state: FSMContext, user_tier: str = "free") -> None:
     """Handle voice messages with STT."""
+    
+    if user_tier == "free":
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        builder = InlineKeyboardBuilder()
+        builder.button(text="💎 Подробнее о подписках", callback_data="show_subscriptions")
+        await message.reply(
+            "🎙️ <b>Голосовой ввод недоступен</b>\n\n"
+            "Функция доступна начиная с подписки <b>Basic</b>.\n"
+            "Оформите подписку, чтобы диктовать еду голосом и экономить время!", 
+            parse_mode="HTML", 
+            reply_markup=builder.as_markup()
+        )
+        return
+        
     current_state = await state.get_state()
     if current_state:
         # If in a specific state (e.g. adding receipt items), ignore voice or handle differently?
@@ -88,12 +103,25 @@ async def handle_voice(message: types.Message, bot: Bot, state: FSMContext) -> N
 
     except Exception as e:
         logger.error(f"Voice Error: {e}", exc_info=True)
-        await status_msg.edit_text(f"❌ Ошибка: {e}")
+        await status_msg.edit_text(f"<b>❌ Ошибка:</b> <code>{e}</code>")
 
 
 @router.message(F.photo, StateFilter(None))
-async def handle_photo(message: types.Message, state: FSMContext) -> None:
+async def handle_photo(message: types.Message, state: FSMContext, user_tier: str = "free") -> None:
     """Handle photos when no specific state is active. Auto-analyze content."""
+    
+    if user_tier in ["free", "basic"]:
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        builder = InlineKeyboardBuilder()
+        builder.button(text="💎 Подробнее о подписках", callback_data="show_subscriptions")
+        await message.reply(
+            "📸 <b>Распознавание фото недоступно</b>\n\n"
+            "Функция доступна только в подписке <b>Pro</b>.\n"
+            "Оформите подписку, чтобы ИИ распознавал еду и чеки по картинке!", 
+            parse_mode="HTML", 
+            reply_markup=builder.as_markup()
+        )
+        return
     
     status_msg = await message.reply("👀 <b>Смотрю, что на фото...</b>", parse_mode="HTML")
     
@@ -108,7 +136,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
              return
 
         # 2. Update status
-        await status_msg.edit_text(f"👀 Вижу: <i>{description[:50]}...</i>", parse_mode="HTML")
+        await status_msg.edit_text(f"👀 <b>Вижу:</b> <blockquote>{description[:50]}...</blockquote>", parse_mode="HTML")
         
         # 3. Process as text input
         # Combine caption if exists
@@ -120,7 +148,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         
     except Exception as e:
         logger.error(f"Photo Analysis Error: {e}", exc_info=True)
-        await status_msg.edit_text(f"❌ Ошибка анализа: {e}")
+        await status_msg.edit_text(f"<b>❌ Ошибка анализа:</b> <code>{e}</code>")
 
 
 @router.message(F.text, StateFilter(None))
@@ -150,9 +178,9 @@ async def process_universal_input(
     # AI BRAIN PROCESSOR (If text/voice detected)
     if input_type in ("text", "voice") and content and len(content) > 3:
         if status_msg:
-             await status_msg.edit_text(f"🧠 Думаю: <i>{content}</i>...", parse_mode="HTML")
+             await status_msg.edit_text(f"🧠 <b>Думаю:</b> <blockquote>{content}</blockquote>", parse_mode="HTML")
         else:
-             status_msg = await message.reply(f"🧠 Думаю: <i>{content}</i>...", parse_mode="HTML")
+             status_msg = await message.reply(f"🧠 <b>Думаю:</b> <blockquote>{content}</blockquote>", parse_mode="HTML")
              
         brain_result = await AIBrainService.analyze_text(content)
         is_herbalife = await herbalife_expert.find_product_by_alias(content)
@@ -238,7 +266,7 @@ async def process_universal_input(
     else:
         builder.adjust(2, 1, 1)    # Ate/Fridge, Herbalife, Cancel
 
-    text_preview = f"📝 <i>\"{content}\"</i>" if content else ""
+    text_preview = f"<blockquote>{content}</blockquote>" if content else ""
     header = "🤔 <b>Я не понял намерение.</b>\nСкажите: <i>\"Я съел\"</i> или <i>\"В холодильник\"</i>"
     
     if input_type == "voice":
@@ -250,7 +278,11 @@ async def process_universal_input(
     if input_type in ("text", "voice") and content:
          header = "🤔 <b>Я понял продукт, но не понял что сделать.</b>"
 
-    msg_text = f"{header}\n\n{text_preview}\n\n👇 <b>Выберите действие или скажите голосом:</b>"
+    msg_text = (
+        f"{header}\n\n"
+        f"{text_preview}\n\n"
+        "👇 <b>Выберите действие или скажите голосом:</b>"
+    )
 
     if status_msg:
         await status_msg.edit_text(msg_text, parse_mode="HTML", reply_markup=builder.as_markup())
@@ -313,7 +345,7 @@ async def handle_action_pending_voice(message: types.Message, bot: Bot, state: F
 
 # --- CALLBACKS ---
 
-@router.callback_query(UniversalInputStates.action_pending, F.data == "u_action_cancel")
+@router.callback_query(F.data == "u_action_cancel")
 async def universal_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await callback.message.delete()
@@ -463,6 +495,149 @@ async def universal_action_pricetag(callback: types.CallbackQuery, state: FSMCon
         logger.error(f"PriceTag Error: {e}")
         await callback.message.edit_text(f"❌ Ошибка: {e}")
 
+@router.callback_query(F.data == "u_mode_qty")
+async def switch_to_quantity_mode(callback: types.CallbackQuery, state: FSMContext):
+    """Switch input mode to Pieces (Quantity)."""
+    data = await state.get_data()
+    product = data.get("pending_product")
+    if not product:
+        await callback.answer("⚠️ Ошибка контекста", show_alert=True)
+        return
+
+    await state.set_state(UniversalInputStates.waiting_for_quantity)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⚖️ В граммы", callback_data="u_mode_weight")
+    builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+    builder.adjust(1, 1)
+    
+    await callback.message.edit_text(
+        f"📦 <b>{product['name']}</b>\n\n"
+        f"🔢 <b>Сколько штук?</b> (Напишите число)",
+        parse_mode="HTML",
+        reply_markup=builder.as_markup()
+    )
+
+@router.callback_query(F.data == "u_mode_weight")
+async def switch_to_weight_mode(callback: types.CallbackQuery, state: FSMContext):
+    """Switch input mode back to Grams (Weight)."""
+    data = await state.get_data()
+    product = data.get("pending_product")
+    if not product:
+        await callback.answer("⚠️ Ошибка контекста", show_alert=True)
+        return
+
+    await state.set_state(UniversalInputStates.waiting_for_weight)
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔢 В штуках", callback_data="u_mode_qty")
+    builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+    builder.adjust(1, 1)
+    
+    await callback.message.edit_text(
+        f"🧐 <b>{product['name']}</b>\n\n"
+        f"⚖️ <b>Сколько грамм?</b> (Напишите число)",
+        parse_mode="HTML",
+        reply_markup=builder.as_markup()
+    )
+
+@router.message(UniversalInputStates.waiting_for_quantity, F.text)
+async def handle_quantity_input(message: types.Message, state: FSMContext) -> None:
+    """Handle quantity input (e.g. '2') and convert to weight via AI."""
+    try:
+        # 1. Parse number
+        text = message.text.replace(',', '.').strip()
+        import re
+        match = re.search(r'(\d+(?:\.\d+)?)', text)
+        if not match:
+            await message.reply("⚠️ Пожалуйста, введите число (количество штук).")
+            return
+            
+        quantity = float(match.group(1))
+        
+        # 2. Get context
+        data = await state.get_data()
+        product = data.get("pending_product")
+        intent = data.get("intent", "log") # Default to log if missing
+        
+        status_msg = await message.answer(f"🔄 Считаю вес для <code>{quantity} шт</code>...")
+        
+        # 3. Ask AI to re-normalize "Quantity + Name"
+        # query = "2 Яйцо куриное"
+        query = f"{quantity} {product['base_name'] or product['name']}"
+        
+        # We reuse NormalizationService.analyze_food_intake
+        result = await NormalizationService.analyze_food_intake(query)
+        
+        # 4. Update Product Data
+        weight_grams = result.get("weight_grams")
+        
+        if not weight_grams:
+            await status_msg.edit_text("⚠️ Не удалось определить вес. Пожалуйста, введите вес в граммах вручную.")
+            await state.set_state(UniversalInputStates.waiting_for_weight)
+            return
+
+        # Update product with new calculated values
+        product['name'] = f"{product['base_name']} ({quantity} шт / ~{weight_grams}г)"
+        product['calories100'] = float(result.get("calories", 0))
+        product['protein100'] = float(result.get("protein", 0))
+        product['fat100'] = float(result.get("fat", 0))
+        product['carbs100'] = float(result.get("carbs", 0))
+        product['fiber100'] = float(result.get("fiber", 0))
+        
+        # IMPORTANT: Store calculated total weight too if needed, 
+        # but our DB model stores 'weight_g' for the product.
+        # The 'product' dict keys (calories100, etc) usually mean TOTAL in the final step 
+        # (see i_ate.py:195 -> show_confirmation_interface uses them as totals).
+        # Let's verify NormalizationService output.
+        # analyze_food_intake returns TOTAL KBJU for the weight.
+        # So we just drop them into the '100' keys (naming is legacy confusion, but logic holds).
+        
+        await state.update_data(pending_product=product)
+        
+        # 5. Route to Confirmation or Fridge
+        if intent == "fridge":
+            # For fridge we need to finalize the object
+            async for session in get_db():
+                db_product = Product(
+                    user_id=message.from_user.id,
+                    name=product['name'],
+                    category="Manual",
+                    calories=product['calories100'],
+                    protein=product['protein100'],
+                    fat=product['fat100'],
+                    carbs=product['carbs100'],
+                    fiber=product['fiber100'],
+                    price=0.0,
+                    quantity=quantity, # Store pieces count!
+                    weight_g=float(weight_grams),
+                    source="universal_qty"
+                )
+                session.add(db_product)
+                await session.commit()
+                product_id = db_product.id
+            
+            await state.clear()
+            
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🍽️ Нет, я это съел(а)", callback_data=f"u_move_to_ate:{product_id}")
+            
+            await status_msg.edit_text(
+                f"✅ <b>Добавлено в холодильник:</b>\n"
+                f"📦 {product['name']}\n"
+                f"⚖️ Вес: ~{weight_grams}г",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            
+        else:
+            # Intent is "log" (I ate)
+            await show_confirmation_interface(message, state, status_msg)
+
+    except Exception as e:
+        logger.error(f"Quantity Input Error: {e}", exc_info=True)
+        await message.reply(f"❌ Ошибка: {e}")
+
 @router.callback_query(F.data.startswith("u_move_to_ate:"))
 async def move_from_fridge_to_ate(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Correct mistake: move product from fridge to consumption log."""
@@ -487,6 +662,98 @@ async def move_from_fridge_to_ate(callback: types.CallbackQuery, state: FSMConte
     # We use process_text_food_logging which will show KBJU confirmation
     await process_text_food_logging(callback, state, product_name, weight_override=weight)
 
+
+@router.message(UniversalInputStates.waiting_for_weight, F.text)
+async def handle_universal_weight_input(message: types.Message, state: FSMContext) -> None:
+    """Handle weight input for Universal Input flows."""
+    try:
+        weight_text = message.text.replace(',', '.').strip()
+        import re
+        match = re.search(r'(\d+(?:\.\d+)?)', weight_text)
+        
+        if not match:
+            await message.reply("⚠️ Пожалуйста, введите только число (вес в граммах).")
+            return
+
+        weight = float(match.group(1))
+        
+        data = await state.get_data()
+        product = data.get("pending_product")
+        pending_water = data.get("pending_water")
+        intent = data.get("intent", "log")
+        
+        if pending_water:
+            amount_ml = int(weight)
+            from database.models import WaterLog
+            async for session in get_db():
+                log = WaterLog(
+                    user_id=message.from_user.id,
+                    amount_ml=amount_ml
+                )
+                session.add(log)
+                await session.commit()
+                
+            await message.answer(f"✅ Добавлено {amount_ml} мл воды!")
+            await state.clear()
+            
+            from handlers.menu import show_main_menu
+            await show_main_menu(message, message.from_user.first_name, message.from_user.id)
+            return
+            
+        if not product:
+            await message.reply("⚠️ Ошибка контекста.")
+            await state.clear()
+            return
+            
+        # Recalculate based on weight
+        factor = weight / 100.0
+        
+        product['name'] = f"{product['base_name']} ({int(weight)}г)"
+        product['calories100'] = product['calories100'] * factor
+        product['protein100'] = product['protein100'] * factor
+        product['fat100'] = product['fat100'] * factor
+        product['carbs100'] = product['carbs100'] * factor
+        product['fiber100'] = product['fiber100'] * factor
+        
+        await state.update_data(pending_product=product)
+        
+        if intent == "fridge":
+             async for session in get_db():
+                db_product = Product(
+                    user_id=message.from_user.id,
+                    name=product['name'],
+                    category="Manual",
+                    calories=product['calories100'],
+                    protein=product['protein100'],
+                    fat=product['fat100'],
+                    carbs=product['carbs100'],
+                    fiber=product['fiber100'],
+                    price=0.0,
+                    quantity=1.0, 
+                    weight_g=weight,
+                    source="universal_weight"
+                )
+                session.add(db_product)
+                await session.commit()
+                product_id = db_product.id
+            
+             await state.clear()
+             builder = InlineKeyboardBuilder()
+             builder.button(text="🍽️ Нет, я это съел(а)", callback_data=f"u_move_to_ate:{product_id}")
+             
+             await message.answer(
+                f"✅ <b>Добавлено в холодильник:</b>\n"
+                f"📦 {product['name']}",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+             )
+        else:
+             # Log intent
+             await show_confirmation_interface(message, state)
+             
+    except Exception as e:
+        logger.error(f"Universal Weight Input Error: {e}", exc_info=True)
+        await message.reply(f"❌ Ошибка: {e}")
 
 # --- HELPERS --
 
@@ -547,6 +814,51 @@ async def process_text_food_logging(
             fat = float(result.get("fat") or 0)
             carbs = float(result.get("carbs") or 0)
             fiber = float(result.get("fiber") or 0)
+            
+            # --- WATER INTERCEPTION ---
+            # If the user literally just drank water (or mineral water, hot water)
+            if name.lower() in ["вода", "минеральная вода", "кипяток", "water"]:
+                weight_grams = weight_override if weight_override else result.get("weight_grams")
+                
+                # If we don't know the amount, we should ask
+                if not weight_grams or result.get("weight_missing", True):
+                    await state.update_data(
+                        pending_water=True,
+                        intent="log"
+                    )
+                    await state.set_state(UniversalInputStates.waiting_for_weight)
+                    
+                    builder = InlineKeyboardBuilder()
+                    builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+                    
+                    await msg.edit_text(
+                        f"🧐 Вы сказали: {text}\n"
+                        f"Это похоже на: <b>{name}</b>\n\n"
+                        f"💧 <b>Сколько миллилитров?</b> (Напишите число)",
+                        parse_mode="HTML",
+                        reply_markup=builder.as_markup()
+                    )
+                    return
+                
+                # We have the amount, log it
+                amount_ml = int(weight_grams)
+                from database.models import WaterLog
+                async for session in get_db():
+                    log = WaterLog(
+                        user_id=user_id,
+                        amount_ml=amount_ml
+                    )
+                    session.add(log)
+                    await session.commit()
+                    
+                await target.answer(f"✅ Добавлено {amount_ml} мл воды!")
+                
+                # Show updated dashboard
+                from handlers.menu import show_main_menu
+                await show_main_menu(msg, target.from_user.first_name, user_id)
+                return
+            # --------------------------
+
             # Validate name quality
             invalid_names = ["не указано", "unknown", "продукт", "еда", "блюдо"]
             if name.lower() in invalid_names or len(name) < 2:
@@ -586,7 +898,9 @@ async def process_text_food_logging(
                 await state.set_state(UniversalInputStates.waiting_for_weight)
                 
                 builder = InlineKeyboardBuilder()
+                builder.button(text="🔢 В штуках", callback_data="u_mode_qty")
                 builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+                builder.adjust(1, 1)
                 
                 await msg.edit_text(
                     f"🧐 Вы сказали: <i>{text}</i>\n"
@@ -753,7 +1067,9 @@ async def process_text_fridge_add(
             await state.set_state(UniversalInputStates.waiting_for_weight)
             
             builder = InlineKeyboardBuilder()
+            builder.button(text="🔢 В штуках", callback_data="u_mode_qty")
             builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+            builder.adjust(1, 1)
             
             await msg.edit_text(
                 f"🧊 <b>В холодильник:</b>\n"
@@ -1346,6 +1662,11 @@ async def batch_confirm_all(callback: types.CallbackQuery, state: FSMContext) ->
     )
     
     await callback.message.edit_text(success_text, parse_mode="HTML")
+
+    # NEW: Send visual progress card
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(callback.from_user.id, callback.bot)
+
     await callback.answer()
 
 

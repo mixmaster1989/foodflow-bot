@@ -77,10 +77,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         if args.startswith("ref_"):
             referral_token = args[4:]
         elif args.startswith("m_"):
-            try:
-                marathon_invite_id = int(args[2:])
-            except ValueError:
-                pass
+            marathon_invite_id = args[2:]
     
     async for session in get_db():
         # Handle Marathon Invite
@@ -122,6 +119,10 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         if referral_token:
             curator_stmt = select(User).where(User.referral_token == referral_token)
             curator = (await session.execute(curator_stmt)).scalar_one_or_none()
+            if curator and curator.referral_token_expires_at:
+                if curator.referral_token_expires_at < datetime.utcnow():
+                    await message.answer("⚠️ <b>Ошибка:</b> Данная ссылка-приглашение истекла.", parse_mode="HTML")
+                    curator = None
         
         stmt = select(User).where(User.id == message.from_user.id)
         result = await session.execute(stmt)

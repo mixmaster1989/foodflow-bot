@@ -551,6 +551,11 @@ async def log_saved_dish(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
+    
+    # NEW: Send visual progress card
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(callback.from_user.id, callback.bot)
+    
     await callback.answer("✅ Записано!")
 
 # =====================================================
@@ -828,6 +833,11 @@ async def log_saved_meal(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
+    
+    # NEW: Send visual progress card
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(callback.from_user.id, callback.bot)
+    
     await callback.answer("✅ Записано!")
 
 @router.callback_query(F.data.startswith("saved_meal_delete:"))

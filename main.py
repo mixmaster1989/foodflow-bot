@@ -11,6 +11,7 @@ from handlers import (
     auth,
     onboarding,
     menu,
+    water,
     i_ate,
     receipt,
     shopping,
@@ -18,6 +19,7 @@ from handlers import (
     fridge,
     recipes,
     user_settings,
+    subscription,
     curator,
     saved_dishes,
     weight,
@@ -58,10 +60,15 @@ async def main():
     from handlers.auth import AuthMiddleware
     from middleware.admin_logger import AdminLoggerMiddleware
     from middleware.user_enrichment import UserEnrichmentMiddleware
+    from middleware.paywall import PaywallMiddleware
     
     dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
     dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
     dp.update.middleware(AuthMiddleware())
+    
+    # Paywall should intercept messages and callbacks
+    dp.message.middleware(PaywallMiddleware())
+    dp.callback_query.middleware(PaywallMiddleware())
 
     # Register Routers
     # IMPORTANT: shopping.router must be before receipt.router
@@ -71,7 +78,10 @@ async def main():
     dp.include_router(admin.router) # Admin commands
     dp.include_router(support.router) # Contact Dev
     dp.include_router(onboarding.router)  # Onboarding must be after common
-    dp.include_router(menu.router)  # Central menu router
+    dp.include_router(user_settings.router)
+    dp.include_router(subscription.router)
+    dp.include_router(menu.router)
+    dp.include_router(water.router)  # Central menu router
     dp.include_router(i_ate.router)  # Quick food logging
     dp.include_router(herbalife.router) # Herbalife Expert
     dp.include_router(curator_menu.router) # Marathon Module
@@ -82,7 +92,6 @@ async def main():
     dp.include_router(fridge_search.router) # New Smart Search
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
-    dp.include_router(user_settings.router)
     dp.include_router(shopping_list.router)
     dp.include_router(weight.router)
     dp.include_router(correction.router)

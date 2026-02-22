@@ -182,6 +182,7 @@ WEIGHT DETECTION RULES:
 - "тарелка борща" -> ~300g (estimate standard portion)
 - "банан" (no number) -> weight_missing: true (return per 100g)
 - ALWAYS extract the number if it appears after the name.
+- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'гречка', 'рис', 'овсянка', 'пшено' etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if the user explicitly specifies 'сухая' or 'сырая'.
 
 RETURN JSON ONLY:
 {{
@@ -296,6 +297,7 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
 RULES:
 - If weight is specified, calculate KBJU for that weight.
 - If weight is NOT specified, calculate for a standard portion and set weight_missing: true.
+- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'гречка', 'рис', 'овсянка', 'пшено' etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if explicitly specified as 'dry/raw'.
 - Return a JSON array (NOT object) with one entry per item.
 
 RETURN JSON ARRAY ONLY:

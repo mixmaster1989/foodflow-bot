@@ -58,17 +58,17 @@ async def show_shopping_list(callback: types.CallbackQuery) -> None:
         text = "📝 <b>Список покупок</b>\n\n"
 
         if not items:
-            text += "Список пуст. Добавь что-нибудь!"
+            text += "<blockquote>Список пуст. Добавь что-нибудь!</blockquote>"
         else:
             if active_items:
-                text += "<b>Нужно купить:</b>\n"
+                text += "🛒 <b>Нужно купить:</b>\n"
                 for item in active_items:
                     builder.button(text=f"⬜ {item.product_name}", callback_data=f"shop_buy:{item.id}")
 
             if bought_items:
-                text += "\n<b>Куплено:</b>\n"
+                text += "\n✅ <b>Куплено:</b>\n"
                 for item in bought_items:
-                    builder.button(text=f"✅ {item.product_name}", callback_data=f"shop_unbuy:{item.id}")
+                    builder.button(text=f"✔️ <s>{item.product_name}</s>", callback_data=f"shop_unbuy:{item.id}")
 
         builder.adjust(1)
 
@@ -209,7 +209,7 @@ async def add_item(message: types.Message, state: FSMContext) -> None:
     builder = InlineKeyboardBuilder()
     builder.button(text="📝 К списку покупок", callback_data="menu_shopping_list")
 
-    await message.answer(f"✅ Добавлено {len(items)} товаров!", reply_markup=builder.as_markup())
+    await message.answer(f"✅ <b>Добавлено {len(items)} товаров!</b>", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("shop_buy:"))
 async def mark_bought(callback: types.CallbackQuery) -> None:

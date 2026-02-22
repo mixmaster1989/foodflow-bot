@@ -897,7 +897,8 @@
       "standard_serving": {
         "amount": 1.7,
         "unit": "граммы",
-        "description": "½ чайной ложки"
+        "grams": 1.7,
+        "description": "½ чайной ложки (1.7г)"
       },
       "nutrition_per_100g": {
         "energy_kcal": 354,

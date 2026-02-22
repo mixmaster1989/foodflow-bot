@@ -6,12 +6,16 @@ Contains:
 """
 from datetime import date, datetime, timedelta
 
+import logging
+
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 
 from database.base import get_db
 from database.models import ConsumptionLog
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -84,14 +88,13 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
     builder.row(*nav_row)
 
     if logs:
-        builder.button(text="📋 Подробно", callback_data=f"stats_detailed:{target_date}")
         builder.button(text="📝 История", callback_data=f"stats_history:{target_date}")
     
     if target_date == today:
          builder.button(text="🗓️ Неделя", callback_data="stats_week")
          
     builder.button(text="🔙 Назад", callback_data="main_menu")
-    builder.adjust(1) # Apply to added buttons, row() stays as is
+    builder.adjust(1)
 
     # Image path
     photo_path = types.FSInputFile("assets/stats.png")
@@ -114,38 +117,6 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data == "stats_detailed")
-async def stats_detailed_handler(callback: types.CallbackQuery) -> None:
-    """Show detailed report with timestamps for each meal."""
-    from services.reports import generate_detailed_report
-    
-    user_id = callback.from_user.id
-    report = await generate_detailed_report(user_id)
-    
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="menu_stats")
-    
-    try:
-        await callback.message.edit_caption(
-            caption=report,
-            parse_mode="HTML",
-            reply_markup=builder.as_markup()
-        )
-    except Exception:
-        try:
-            await callback.message.edit_text(
-                report,
-                parse_mode="HTML",
-                reply_markup=builder.as_markup()
-            )
-        except Exception:
-            await callback.message.delete()
-            await callback.message.answer(
-                report,
-                parse_mode="HTML",
-                reply_markup=builder.as_markup()
-            )
-    await callback.answer()
 
 
 @router.callback_query(F.data.in_({"stats_day", "stats_week"}))
@@ -168,7 +139,14 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
             pass
             
     user_id = callback.from_user.id
+    logger.info(f"📝 User {user_id} requested sexy history for {target_date}")
     
+    from services.reports import generate_detailed_report
+    text = await generate_detailed_report(user_id, target_date)
+    
+    if not text:
+        text = f"📝 <b>История за {target_date.strftime('%d.%m.%Y')}</b>\n\nПока нет записей."
+
     async for session in get_db():
         stmt = select(ConsumptionLog).where(
             ConsumptionLog.user_id == user_id,
@@ -176,24 +154,14 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
         ).order_by(ConsumptionLog.date.desc())
         logs = (await session.execute(stmt)).scalars().all()
     
-    # Use timedelta to find prev/next day
-    from datetime import timedelta # Ensure import if needed locally or relying on module level
-    
     builder = InlineKeyboardBuilder()
     
-    date_label = target_date.strftime('%d.%m.%Y')
-    
-    if not logs:
-        text = f"📝 <b>История за {date_label}</b>\n\nПока нет записей."
-    else:
-        text = f"📝 <b>История за {date_label}</b>\n\n<i>Нажмите 🗑️ чтобы удалить:</i>\n"
+    if logs:
+        text += "\n\n<i>Нажми 🗑️ чтобы удалить запись:</i>"
         for log in logs:
-            time_str = (log.date.hour + 3) % 24 # Crude TZ adjustment, should use proper TZ
-            time_fmt = f"{time_str:02d}:{log.date.minute:02d}"
             cal = int(log.calories) if log.calories else 0
             # Pass date to delete handler so it returns to correct date
-            builder.button(text=f"🗑️ {log.product_name[:20]}", callback_data=f"delete_log:{log.id}:{target_date}")
-            text += f"\n🕐 {time_fmt} — {log.product_name} ({cal} ккал)"
+            builder.button(text=f"🗑️ {log.product_name[:20]} ({cal})", callback_data=f"delete_log:{log.id}:{target_date}")
         
         builder.adjust(1)
     

@@ -134,9 +134,9 @@ class ConsultantService:
         # Build user profile description
         gender_text = "мужской" if user_settings.gender == "male" else "женский"
         goal_text = {
-            "lose_weight": "похудеть",
-            "maintain": "не толстеть / поддерживать вес",
-            "healthy": "здоровое питание",
+            "lose_weight": "похудение / дефицит",
+            "maintain": "не набирать / поддерживать вес",
+            "healthy": "здоровое питание / баланс",
             "gain_mass": "набрать массу",
         }.get(user_settings.goal, "здоровое питание")
 
@@ -169,14 +169,11 @@ class ConsultantService:
             total = fridge_snapshot.get("totals", {})
             items = fridge_snapshot.get("items", [])
             snapshot_text = (
-                "\n<b>Текущее содержимое холодильника:</b>\n"
-                f"- Продуктов: {len(items)} (показаны последние)\n"
-                + ("\n".join(f"• {i}" for i in items) if items else "• Нет данных") +
-                "\n<b>Суммарно по добавленным продуктам:</b>\n"
-                f"  Калории: {total.get('calories', 0):.0f} ккал\n"
-                f"  Белки: {total.get('protein', 0):.1f} г\n"
-                f"  Жиры: {total.get('fat', 0):.1f} г\n"
-                f"  Углеводы: {total.get('carbs', 0):.1f} г\n"
+                "\n📊 <b>В холодильнике:</b>\n"
+                f"<blockquote>- Продуктов: <code>{len(items)}</code>\n"
+                + ("\n".join(f"• {i}" for i in items) if items else "• Нет данных") + "</blockquote>"
+                "\n🍱 <b>Итого КБЖУ:</b>\n"
+                f"<blockquote>🔥 <code>{total.get('calories', 0):.0f}</code> | 🥩 <code>{total.get('protein', 0):.1f}</code> | 🥑 <code>{total.get('fat', 0):.1f}</code> | 🍞 <code>{total.get('carbs', 0):.1f}</code></blockquote>\n"
             )
 
         # Build prompt without escaping hell: double braces for literal JSON braces

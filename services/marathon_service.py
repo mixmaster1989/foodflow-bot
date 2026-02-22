@@ -22,9 +22,9 @@ class MarathonService:
         return participant is not None
 
     @staticmethod
-    async def process_invite(session: Session, marathon_id: int, user_id: int, user_info: dict) -> dict:
+    async def process_invite(session: Session, marathon_invite: str | int, user_id: int, user_info: dict) -> dict:
         """
-        Process invite link m_{id}.
+        Process invite link m_{id} or m_{token}.
         
         Returns:
             dict: {
@@ -35,12 +35,26 @@ class MarathonService:
             }
         """
         # 1. Validate Marathon
-        marathon = await MarathonService.get_marathon_by_id(session, marathon_id)
+        marathon = None
+        try:
+            m_id = int(marathon_invite)
+            marathon = await MarathonService.get_marathon_by_id(session, m_id)
+        except ValueError:
+            # It's a string token
+            stmt = select(Marathon).where(Marathon.invite_token == str(marathon_invite))
+            marathon = (await session.execute(stmt)).scalar_one_or_none()
+            
+            if marathon and marathon.invite_token_expires_at:
+                if marathon.invite_token_expires_at < datetime.utcnow():
+                    return {"success": False, "message": "Эта ссылка-приглашение истекла."}
+
         if not marathon:
             return {"success": False, "message": "Марафон не найден."}
             
         if not marathon.is_active:
              return {"success": False, "message": "Этот марафон завершен."}
+
+        marathon_id = marathon.id
 
         # Check Registration Toggle
         if not getattr(marathon, "is_registration_open", True): # Safe getattr pending persistence

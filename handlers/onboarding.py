@@ -108,8 +108,8 @@ async def handle_gender_selection(callback: types.CallbackQuery, state: FSMConte
     builder.button(text="🔙 Назад", callback_data="onboarding_back:gender")
 
     text = (
-        "✅ Пол сохранен!\n\n"
-        "2️⃣ Введите свой возраст (полных лет):"
+        "<b>✅ Пол сохранен!</b>\n\n"
+        "2️⃣ Введите свой <b>возраст</b> (полных лет):"
     )
 
     try:
@@ -141,8 +141,8 @@ async def handle_age_input(message: types.Message, state: FSMContext) -> None:
         builder.button(text="🔙 Назад", callback_data="onboarding_back:age")
 
         text = (
-            "✅ Возраст сохранен!\n\n"
-            "3️⃣ Введите свой рост в сантиметрах (например: 175):"
+            "<b>✅ Возраст сохранен!</b>\n\n"
+            "3️⃣ Введите свой <b>рост</b> в сантиметрах (например: <code>175</code>):"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -175,8 +175,8 @@ async def handle_height_input(message: types.Message, state: FSMContext) -> None
         builder.button(text="🔙 Назад", callback_data="onboarding_back:height")
 
         text = (
-            "✅ Рост сохранен!\n\n"
-            "4️⃣ Введите свой вес в килограммах (например: 70.5):"
+            "<b>✅ Рост сохранен!</b>\n\n"
+            "4️⃣ Введите свой <b>вес</b> в килограммах (например: <code>70.5</code>):"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -207,14 +207,14 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
 
         builder = InlineKeyboardBuilder()
         builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
-        builder.button(text="⚖️ Не толстеть", callback_data="onboarding_goal:maintain")
+        builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
         builder.button(text="🥗 Здоровое питание", callback_data="onboarding_goal:healthy")
         builder.button(text="💪 Набрать массу", callback_data="onboarding_goal:gain_mass")
         builder.adjust(2)
 
         text = (
-            "✅ Вес сохранен!\n\n"
-            "5️⃣ Выбери свою цель:"
+            "<b>✅ Вес сохранен!</b>\n\n"
+            "5️⃣ Выбери свою <b>цель</b>:"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -269,11 +269,11 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
     text = (
         f"🎯 <b>Цель: {goal_names.get(goal, 'Здоровье')}</b>\n\n"
         f"Исходя из твоих параметров, я рассчитал рекомендуемые нормы:\n\n"
-        f"🔥 <b>Калории: {targets['calories']} ккал</b>\n"
-        f"🥩 Белки: {targets['protein']} г\n"
-        f"🥑 Жиры: {targets['fat']} г\n"
-        f"🍞 Углеводы: {targets['carbs']} г\n\n"
-        "Согласен с этим расчетом?"
+        f"🔥 <b>Калории: <code>{targets['calories']} ккал</code></b>\n"
+        f"🥩 Белки: <code>{targets['protein']} г</code>\n"
+        f"🥑 Жиры: <code>{targets['fat']} г</code>\n"
+        f"🍞 Углеводы: <code>{targets['carbs']} г</code>\n\n"
+        "<b>Согласен с этим расчетом?</b>"
     )
     
     try:
@@ -307,8 +307,8 @@ async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMCont
     builder.button(text="🔙 Назад", callback_data="onboarding_back:goals") # We need to handle this back
     
     text = (
-        "✏️ <b>Ввод своей нормы</b>\n\n"
-        "Введите желаемое количество калорий в день (например: 1800).\n"
+        "<b>✏️ Ввод своей нормы</b>\n\n"
+        "Введите желаемое количество калорий в день (например: <code>1800</code>).\n"
         "Я автоматически пересчитаю БЖУ под твою цель."
     )
     
@@ -352,6 +352,11 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
         height = data.get("height", 170)
         weight = data.get("weight", 70)
         goal = data.get("goal", "healthy")
+        
+        # Calculate water goal
+        water_goal = int(weight * 30)
+        if goal in ["lose_weight", "gain_mass"]:
+            water_goal += 500
 
         if settings:
             settings.gender = gender
@@ -364,6 +369,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
             settings.fat_goal = targets["fat"]
             settings.carb_goal = targets["carbs"]
             settings.fiber_goal = targets.get("fiber", 30)
+            settings.water_goal = water_goal
             settings.is_initialized = True
         else:
             settings = UserSettings(
@@ -378,9 +384,28 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 fat_goal=targets["fat"],
                 carb_goal=targets["carbs"],
                 fiber_goal=targets.get("fiber", 30),
+                water_goal=water_goal,
                 is_initialized=True,
             )
             session.add(settings)
+            
+        # --- NEW: TRIAL LOGIC ---
+        from database.models import Subscription
+        from datetime import datetime, timedelta
+        
+        # Check if they already have one
+        stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
+        sub = (await session.execute(stmt_sub)).scalar_one_or_none()
+        
+        if not sub:
+            # Grant 3 days of PRO by default for new users
+            sub = Subscription(
+                user_id=user_id,
+                tier="pro",
+                expires_at=datetime.utcnow() + timedelta(days=3),
+                is_active=True
+            )
+            session.add(sub)
             
         await session.commit()
             
@@ -388,7 +413,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
 
     goal_text = {
         "lose_weight": "похудеть",
-        "maintain": "не толстеть",
+        "maintain": "не набирать",
         "healthy": "здоровое питание",
         "gain_mass": "набрать массу",
     }.get(goal, "здоровое питание")
@@ -400,13 +425,13 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
 
     finish_text = (
         "🎉 <b>Отлично! Настройка завершена!</b>\n\n"
-        f"📋 Твой профиль:\n"
-        f"👤 Пол: {'Мужской' if data.get('gender') == 'male' else 'Женский'}\n"
-        f"🎂 Возраст: {data.get('age')} лет\n"
-        f"📏 Рост: {data.get('height')} см\n"
-        f"⚖️ Вес: {data.get('weight')} кг\n"
-        f"🎯 Цель: {goal_text}\n\n"
-        "Теперь я буду давать тебе персональные рекомендации по продуктам!"
+        f"📋 <b>Твой профиль:</b>\n"
+        f"👤 Пол: <b>{'Мужской' if data.get('gender') == 'male' else 'Женский'}</b>\n"
+        f"🎂 Возраст: <code>{data.get('age')}</code> лет\n"
+        f"📏 Рост: <code>{data.get('height')}</code> см\n"
+        f"⚖️ Вес: <code>{data.get('weight')}</code> кг\n"
+        f"🎯 Цель: <b>{goal_text}</b>\n\n"
+        "<blockquote>Теперь я буду давать тебе персональные рекомендации по продуктам!</blockquote>"
     )
 
     builder = InlineKeyboardBuilder()
@@ -594,13 +619,14 @@ async def process_single_photo(message: types.Message, bot: Bot, state: FSMConte
                 missing = recommendations.get("missing", [])
 
                 if warnings or recs or missing:
-                    recommendation_text = "\n\n💡 <b>Рекомендации:</b>\n"
+                    recommendation_text = "\n\n💡 <b>Рекомендации:</b>\n<blockquote>"
                     if warnings:
                         recommendation_text += "\n".join(warnings) + "\n"
                     if recs:
                         recommendation_text += "\n".join(recs) + "\n"
                     if missing:
                         recommendation_text += "\n".join(missing)
+                    recommendation_text += "</blockquote>"
 
             break
 

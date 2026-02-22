@@ -29,7 +29,8 @@ def draw_daily_card(
     target_date: date,
     logs: list, # List of ConsumptionLog
     total_metrics: dict, # {calories, protein, fat, carbs}
-    goals: dict # {calories}
+    goals: dict, # {calories}
+    water_total: int = 0
 ) -> BytesIO:
     """Generate a visual daily summary card."""
     
@@ -100,17 +101,37 @@ def draw_daily_card(
 
     p = total_metrics.get("protein", 0)
     f = total_metrics.get("fat", 0)
-    c = total_metrics.get("carbs", 0)
-    fib = total_metrics.get("fiber", 0)
+    carbs = total_metrics.get("carbs", 0) # Renamed c to carbs for clarity with the edit
+    fiber = total_metrics.get("fiber", 0) # Renamed fib to fiber for clarity with the edit
     
     draw_macro_line("Белки", p, (255, 99, 71), macro_y)
     draw_macro_line("Жиры", f, (255, 215, 0), macro_y + 60)
-    draw_macro_line("Углеводы", c, (100, 149, 237), macro_y + 120)
-    if fib > 0:
-        draw_macro_line("Клетчатка", fib, (50, 205, 50), macro_y + 180) # Lime Green
+    draw_macro_line("Углеводы", carbs, (100, 149, 237), macro_y + 120) # Used existing color
+    if fiber > 0: # Kept the conditional check
+        draw_macro_line("Клетчатка", fiber, (50, 205, 50), macro_y + 180) # Lime Green
 
-    # 3. Food List
-    list_y = card_y + card_h + 40
+    # 3. Water Progress Bar
+    water_y = macro_y + 250
+    # Label and Icon
+    draw.text((30, water_y), "💦 Вода", font=load_font(24), fill=TEXT_COLOR)
+    # Value vs Goal
+    water_goal = goals.get("water", 2000)
+    draw.text((macro_start_x + 100, water_y), f"{water_total}/{water_goal} мл", font=load_font(24, True), fill=TEXT_COLOR)
+    
+    # Water bar 
+    bar_x = 30
+    bar_y = water_y + 40
+    bar_w = WIDTH - 60
+    bar_h = 15
+    draw.rounded_rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], radius=7, fill=(60, 60, 60))
+    if water_goal > 0:
+        water_pct = min(1.0, water_total / water_goal)
+        if water_pct > 0:
+            draw.rounded_rectangle([bar_x, bar_y, bar_x+(bar_w*water_pct), bar_y+bar_h], radius=7, fill=(64, 164, 255)) # Blue color
+
+    
+    # 4. Item List
+    list_y = card_y + card_h + 30 # Adjusted list_y to account for water bar
     # ... rest of list drawing ...
     draw.text((40, list_y), "Приемы пищи:", font=load_font(32, True), fill=TEXT_COLOR)
     list_y += 60

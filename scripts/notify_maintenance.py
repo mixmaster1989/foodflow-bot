@@ -18,10 +18,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MAINTENANCE_MESSAGE = """
-✅ <b>Технические работы завершены!</b>
+🚧 <b>Внимание: Технические работы</b>
 
-Бот снова работает в штатном режиме. 🚀
-Спасибо за ожидание!
+Мы обновляем бота, чтобы сделать его еще лучше! 
+В ближайшие 15-20 минут бот может не отвечать или работать с перебоями.
+
+Спасибо за понимание! 🔧
 """
 
 async def main():
@@ -33,6 +35,9 @@ async def main():
     fail_count = 0
     block_count = 0
     
+    # Use a set to avoid duplicates if user has multiple entries for some reason
+    notified_users = set()
+    
     async for session in get_db():
         # Get all users
         result = await session.execute(select(User.id))
@@ -42,9 +47,14 @@ async def main():
         logger.info(f"Found {total_users} users to notify.")
         
         for i, user_id in enumerate(user_ids):
+            if user_id in notified_users:
+                continue
+                
             try:
                 await bot.send_message(user_id, MAINTENANCE_MESSAGE, parse_mode="HTML")
                 success_count += 1
+                notified_users.add(user_id)
+                
                 if i % 10 == 0:
                     logger.info(f"Sent: {i}/{total_users}")
                 await asyncio.sleep(0.05) # 20 messages per second limit
@@ -57,14 +67,17 @@ async def main():
                 try:
                     await bot.send_message(user_id, MAINTENANCE_MESSAGE, parse_mode="HTML")
                     success_count += 1
+                    notified_users.add(user_id)
                 except:
                     fail_count += 1
             except Exception as e:
                 logger.error(f"Failed to send to {user_id}: {e}")
                 fail_count += 1
-        
-    logger.info(f"Broadcast finished. Success: {success_count}, Blocked: {block_count}, Failed: {fail_count}")
+    
+    await session.close()
     await bot.session.close()
+    
+    logger.info(f"Broadcast finished. Success: {success_count}, Blocked: {block_count}, Failed: {fail_count}")
 
 if __name__ == "__main__":
     asyncio.run(main())

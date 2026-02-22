@@ -30,11 +30,11 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
-    builder.button(text="🍽️ Приёмы пищи", callback_data="menu_saved_meals")
+    # builder.button(text="🍽️ Приёмы пищи", callback_data="menu_saved_meals")
     builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
-    builder.button(text="🍳 Собрать приём", callback_data="menu_build_meal")
+    # builder.button(text="🍳 Собрать приём", callback_data="menu_build_meal")
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    builder.adjust(2, 2, 1)
+    builder.adjust(2, 1)
     
     caption = (
         "🍽️ <b>Что съели?</b>\n\n"
@@ -100,7 +100,7 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 await status_msg.edit_text("❌ Не удалось распознать голос. Попробуйте ещё раз или напишите текстом.")
                 return
             
-            await status_msg.edit_text(f"🎤 <i>Распознано:</i> {description}", parse_mode="HTML")
+            await status_msg.edit_text(f"🎤 <b>Распознано:</b> <blockquote>{description}</blockquote>", parse_mode="HTML")
             logger.info(f"🎤 I_ATE STT: {description}")
         except Exception as e:
             logger.error(f"I_ATE STT Error: {e}")
@@ -114,7 +114,7 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
     description = description.strip()
     user_id = message.from_user.id
     
-    status_msg = await message.answer("🔄 Анализирую...")
+    status_msg = await message.answer("🔄 <b>Анализирую информацию...</b>", parse_mode="HTML")
     
     try:
         # Check if multi-item input via AI Brain
@@ -170,9 +170,9 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
             builder.button(text="❌ Отмена", callback_data="main_menu")
             
             await status_msg.edit_text(
-                f"🧐 Вы сказали: <i>{description}</i>\n"
+                f"🧐 Вы сказали: <blockquote>{description}</blockquote>\n"
                 f"Это похоже на: <b>{name}</b>\n\n"
-                f"⚖️ <b>Сколько грамм?</b> (Напишите число, например: 55)",
+                f"⚖️ <b>Сколько грамм?</b>\n(Введите число, например: <code>150</code>)",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup()
             )
@@ -285,14 +285,14 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     # I need to fix i_ate_process logic first in the ReplacementChunk above.
     
     # Standardizing display
-    fiber_line = f"\n🥬 Клетчатка: <b>{fiber:.1f}</b>" if fiber else ""
+    fiber_line = f"\n🥬 Клетчатка: <code>{fiber:.1f}</code>" if fiber else ""
     text = (
-        f"🛡️ <b>Проверка данных</b>\n\n"
+        f"<b>🛡️ Проверка данных</b>\n\n"
         f"🍽️ <b>{name}</b>\n\n"
-        f"⚖️ Вес: <b>---</b> (текст)\n" # Hard to track weight separately if it's baked into name
-        f"🔥 Ккал: <b>{int(calories)}</b>\n"
-        f"🥩 Б: <b>{protein:.1f}</b> | 🥑 Ж: <b>{fat:.1f}</b> | 🍞 У: <b>{carbs:.1f}</b>"
-        f"{fiber_line}"
+        f"🔥 Ккал: <code>{int(calories)}</code>\n"
+        f"🥩 Б: <code>{protein:.1f}</code> | 🥑 Ж: <code>{fat:.1f}</code> | 🍞 У: <code>{carbs:.1f}</code>"
+        f"{fiber_line}\n\n"
+        f"<blockquote>Всё верно? Нажми «Записать» или отредактируй значения.</blockquote>"
     )
     
     builder = InlineKeyboardBuilder()
@@ -343,14 +343,19 @@ async def process_confirm(callback: types.CallbackQuery, state: FSMContext):
     fiber_line = f"\n🥬 Клетчатка: {fiber:.1f}" if fiber else ""
     success_text = (
         f"✅ <b>Записано!</b>\n\n"
-        f"🍽️ {product['name']}\n\n"
-        f"🔥 <b>{int(calories)}</b> ккал\n"
-        f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f}"
+        f"🍽️ <b>{product['name']}</b>\n\n"
+        f"🔥 <code>{int(calories)}</code> ккал\n"
+        f"🥩 <code>{protein:.1f}</code> | 🥑 <code>{fat:.1f}</code> | 🍞 <code>{carbs:.1f}</code>"
         f"{fiber_line}"
     )
     
     await callback.message.edit_text(success_text, parse_mode="HTML")
-    # Show menu options again? Maybe just toast.
+    
+    # NEW: Send visual progress card
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(callback.from_user.id, callback.bot)
+    
+    await callback.answer()
 
 @router.callback_query(F.data == "edit_field_weight", IAteStates.waiting_for_confirmation)
 async def start_edit_weight(callback: types.CallbackQuery, state: FSMContext):
