@@ -9,7 +9,6 @@ This test suite creates REAL test data in the database:
 NO MOCKING - all operations hit the actual database.
 """
 
-import asyncio
 import os
 import sys
 from datetime import datetime, timedelta
@@ -17,11 +16,11 @@ from datetime import datetime, timedelta
 # Add parent to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 import pytest
-from unittest.mock import AsyncMock, patch
 from sqlalchemy import delete, select
 
-from database.base import async_session, init_db
+from database.base import async_session
 from database.models import Marathon, MarathonParticipant, SnowflakeLog, User, WeightLog
 
 # =============== TEST CONSTANTS ===============
@@ -150,10 +149,10 @@ async def test_marathon_full_integration(db_session):
     print(f"\n{'='*60}")
     print(f"{Colors.BOLD}🏃 MARATHON MODULE INTEGRATION TESTS{Colors.RESET}")
     print(f"{'='*60}")
-    
+
     # 1. Setup (using the db_session instead of manual async_session)
     print(f"\n{Colors.BOLD}📦 SETUP: Creating test users...{Colors.RESET}")
-    
+
     # Create curator
     curator = User(
         id=TEST_CURATOR_ID,
@@ -220,9 +219,9 @@ async def test_marathon_full_integration(db_session):
             is_active=True
         )
         db_session.add(participant)
-    
+
     await db_session.commit()
-    
+
     stmt = select(MarathonParticipant).where(
         MarathonParticipant.marathon_id == marathon_id,
         MarathonParticipant.is_active
@@ -294,6 +293,4 @@ async def test_marathon_full_integration(db_session):
     log_test("Marathon stopped", True)
 
 
-if __name__ == "__main__":
-    exit_code = asyncio.run(run_all_tests())
-    sys.exit(exit_code)
+

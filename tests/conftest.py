@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aioresponses import aioresponses
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Set test environment variables before importing modules
 os.environ['DATABASE_URL'] = "sqlite+aiosqlite:///:memory:"
@@ -17,24 +17,16 @@ os.environ['OPENROUTER_API_KEY'] = "test-key"
 # Import engine from database.base once it's configured
 from database.base import Base, engine
 from database.models import (
-    ConsumptionLog,
-    Marathon,
-    MarathonParticipant,
     Product,
     Receipt,
-    SavedDish,
-    ShoppingSession,
     User,
     UserSettings,
-    WaterLog,
-    WeightLog,
 )
 
 
 @pytest.fixture(scope="function")
 async def db_session():
     """Create a database session using the shared test engine."""
-    from database.base import async_session
     async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
     # Create all tables - ensure all models are imported first

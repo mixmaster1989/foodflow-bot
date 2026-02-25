@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 from datetime import datetime, timedelta
@@ -11,7 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sqlalchemy import select
 
-from database.base import get_db
 from database.models import ConsumptionLog
 
 

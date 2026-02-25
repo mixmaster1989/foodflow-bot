@@ -49,7 +49,7 @@ class TestCommonHandler:
     ):
         """Test /start command with existing user shows main menu."""
         mock_telegram_message.text = "/start"
-        
+
         # Setup initialized settings
         settings = UserSettings(user_id=sample_user.id, is_initialized=True)
         db_session.add(settings)
@@ -487,7 +487,7 @@ class TestUserSettingsHandler:
             mock_get_db.return_value = db_generator()
 
             mock_telegram_message.from_user.id = sample_user.id
-            
+
             # Ensure settings exist
             settings = UserSettings(user_id=sample_user.id)
             db_session.add(settings)
