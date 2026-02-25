@@ -1,6 +1,12 @@
+"""Module for product label OCR processing.
+
+Contains:
+- LabelOCRService: Extract product name, brand, weight, and nutrition info from label images
+"""
 import base64
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -10,34 +16,27 @@ logger = logging.getLogger(__name__)
 
 
 class LabelOCRService:
-    MODELS = [
-        # Free models (try first)
-        "qwen/qwen2.5-vl-32b-instruct:free",          # Top 1: Best quality
-        "google/gemini-2.0-flash-exp:free",           # Top 2: Fast & Smart
-        "mistralai/mistral-small-3.2-24b-instruct:free", # Top 3: Working & Multimodal
-        "nvidia/nemotron-nano-12b-v2-vl:free",        # Top 4: Working Fallback
+    """Extract product information from food label photos.
 
-        # Paid models (fallback when free models are rate-limited)
-        "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
-        "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
-        "qwen/qwen-vl-plus",                          # Paid 3: Best accuracy ($0.21/$0.63)
+    Uses multiple AI models to extract product name, brand, weight,
+    and nutrition values (calories, protein, fat, carbs) from label images.
+    """
+
+    MODELS: list[str] = [
+        # Free first, but retry quickly then jump to paid
+        "qwen/qwen2.5-vl-32b-instruct:free",
+        # Paid earlier to avoid long stalls on free limits
+        "google/gemini-2.5-flash-lite",
+        # Remaining fallbacks
+        "google/gemini-2.0-flash-exp:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free",
+        "mistralai/pixtral-12b",
+        "qwen/qwen-vl-plus",
     ]
 
     @classmethod
-    async def parse_label(cls, image_bytes: bytes) -> dict | None:
-        """
-        Extracts product information from a label photo.
-        Expected JSON structure:
-        {
-            "name": "Полное название",
-            "brand": "Бренд",
-            "weight": "500 г",
-            "calories": 250,
-            "protein": 12.5,
-            "fat": 10.2,
-            "carbs": 30.1
-        }
-        """
+    async def parse_label(cls, image_bytes: bytes) -> dict[str, Any] | None:
+        """Parse label image and extract product information."""
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -56,12 +55,16 @@ class LabelOCRService:
             "\"calories\": 0, "
             "\"protein\": 0, "
             "\"fat\": 0, "
-            "\"carbs\": 0}. "
-            "Calories should be per 100g/ml if available. "
-            "If data is missing, set the value to null."
+            "\"carbs\": 0, "
+            "\"fiber\": 0}. "
+            "Calories/Macros should be per 100g/ml if available. "
+            "Look for 'Клетчатка', 'Пищевые волокна', 'Fiber' for the fiber field. "
+            "If data is missing, set the value to 0 if reasonable (e.g. fiber in oil), or null if unsure."
         )
 
         import asyncio
+        RETRY_ATTEMPTS = 3
+        RETRY_DELAY = 1.0  # seconds
 
         for model in cls.MODELS:
             payload = {
@@ -82,8 +85,8 @@ class LabelOCRService:
                 ]
             }
 
-            # Retry logic: 3 attempts with 0.5s delay
-            for attempt in range(3):
+            # Retry logic: 3 attempts with 1s delay
+            for attempt in range(RETRY_ATTEMPTS):
                 async with aiohttp.ClientSession() as session:
                     try:
                         async with session.post(
@@ -96,21 +99,21 @@ class LabelOCRService:
                                 result = await response.json()
                                 content = result["choices"][0]["message"]["content"]
                                 content = content.replace("```json", "").replace("```", "").strip()
-                                return json.loads(content)
+                                parsed_data = json.loads(content)
+                                logger.info(f"Label OCR ({model}) successfully parsed label: {parsed_data.get('name', 'Unknown')}")
+                                return parsed_data
 
                             logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
-                            if attempt < 2:
-                                await asyncio.sleep(0.5)
+                            if attempt < RETRY_ATTEMPTS - 1:
+                                await asyncio.sleep(RETRY_DELAY)
                                 continue
                     except Exception as exc:
                         logger.error(f"Label OCR exception ({model}) attempt {attempt+1}/3: {exc}")
-                        if attempt < 2:
-                            await asyncio.sleep(0.5)
+                        if attempt < RETRY_ATTEMPTS - 1:
+                            await asyncio.sleep(RETRY_DELAY)
                             continue
 
             # If we get here, this model failed 3 times, try next model
             logger.warning(f"Model {model} failed all attempts, switching to next...")
 
         return None
-
-

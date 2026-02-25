@@ -1,5 +1,4 @@
-"""
-Module for structured logging of recipe generation requests.
+"""Module for structured logging of recipe generation requests.
 
 Contains:
 - Logger configuration with file and console handlers
@@ -31,14 +30,14 @@ logger.addHandler(console_handler)
 
 
 def log_request(user_id: int, ingredients: list[str], category: str, prompt: str) -> None:
-    """
-    Log recipe generation request.
+    """Log recipe generation request.
 
     Args:
         user_id: Telegram user ID
         ingredients: List of ingredient names
         category: Recipe category
         prompt: Full prompt sent to AI
+
     """
     logger.info(
         f"User {user_id} | Category: {category} | Ingredients: {ingredients} | Prompt: {prompt}"
@@ -46,13 +45,13 @@ def log_request(user_id: int, ingredients: list[str], category: str, prompt: str
 
 
 def log_response(user_id: int, response_json: dict[str, Any], from_cache: bool) -> None:
-    """
-    Log recipe generation response.
+    """Log recipe generation response.
 
     Args:
         user_id: Telegram user ID
         response_json: Response dictionary from AI or cache
         from_cache: True if response came from cache, False if from AI
+
     """
     source = "CACHE" if from_cache else "AI"
     logger.info(
@@ -61,11 +60,11 @@ def log_response(user_id: int, response_json: dict[str, Any], from_cache: bool) 
 
 
 def log_error(user_id: int, error: Exception) -> None:
-    """
-    Log error during recipe generation.
+    """Log error during recipe generation.
 
     Args:
         user_id: Telegram user ID
         error: Exception object
+
     """
     logger.error(f"User {user_id} | Error: {error}")

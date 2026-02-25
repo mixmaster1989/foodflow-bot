@@ -19,6 +19,7 @@ from database.models import (
     Product,
     Receipt,
     User,
+    UserSettings,
 )
 
 # In-memory SQLite database for tests
@@ -224,4 +225,25 @@ async def sample_product(db_session, sample_receipt, sample_product_data):
     await db_session.commit()
     await db_session.refresh(product)
     return product
+
+
+@pytest.fixture
+async def sample_user_settings(db_session, sample_user):
+    """Create a sample user settings with full profile."""
+    settings = UserSettings(
+        user_id=sample_user.id,
+        gender="male",
+        height=180,
+        weight=80.0,
+        goal="lose_weight",
+        calorie_goal=2000,
+        protein_goal=150,
+        fat_goal=70,
+        carb_goal=250,
+        is_initialized=True,
+    )
+    db_session.add(settings)
+    await db_session.commit()
+    await db_session.refresh(settings)
+    return settings
 

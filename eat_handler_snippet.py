@@ -26,7 +26,7 @@ async def eat_product(callback: types.CallbackQuery):
             protein=product.protein,
             fat=product.fat,
             carbs=product.carbs,
-            date=datetime.utcnow()
+            date=datetime.now()
         )
         session.add(log)
 

@@ -20,10 +20,39 @@ class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True)  # Telegram ID
     username = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    first_name = Column(String, nullable=True)  # Telegram first name
+    last_name = Column(String, nullable=True)   # Telegram last name
+    language_code = Column(String, nullable=True)  # e.g. "ru", "en"
+    is_premium = Column(Boolean, default=False)  # Telegram Premium
+    created_at = Column(DateTime, default=datetime.now)
+    last_activity = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    is_verified = Column(Boolean, default=False)  # User auth status
+    
+    # Curator system fields
+    role = Column(String, default="user")  # "user" | "curator" | "admin"
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # who curates this user
+    referral_token = Column(String, unique=True, nullable=True)  # for invite links (curators only)
+    referral_token_expires_at = Column(DateTime, nullable=True)
+    
+    # Relationships
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
+    wards = relationship("User", backref="curator", remote_side=[id], foreign_keys=[curator_id])
+    water_logs = relationship("WaterLog", back_populates="user")
+    subscription = relationship("Subscription", back_populates="user", uselist=False)
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, unique=True) # 1 to 1 
+    tier = Column(String, default="free") # "free", "basic", "pro"
+    starts_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=True) # Если None - бесконечно
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("User", back_populates="subscription")
 
 class Receipt(Base):
     __tablename__ = "receipts"
@@ -31,23 +60,28 @@ class Receipt(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"))
     raw_text = Column(String, nullable=True)
     total_amount = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", back_populates="receipts")
     products = relationship("Product", back_populates="receipt")
 
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    receipt_id = Column(Integer, ForeignKey("receipts.id"))
+    receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True, index=True)  # INDEX for fridge queries
     name = Column(String, nullable=False)
     quantity = Column(Float, default=1.0)
     price = Column(Float, nullable=False)
+    weight_g = Column(Float, nullable=True)  # Total weight in grams (if applicable)
     category = Column(String, nullable=True)
     calories = Column(Float, default=0.0)
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
+    source = Column(String, default="receipt")  # receipt | fridge_init | manual | other
     receipt = relationship("Receipt", back_populates="products")
+    user = relationship("User", backref="products")
     label_scans = relationship("LabelScan", back_populates="matched_product")
 
 class ConsumptionLog(Base):
@@ -59,14 +93,34 @@ class ConsumptionLog(Base):
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
-    date = Column(DateTime, default=datetime.utcnow)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
+    base_name = Column(String, nullable=True) # NEW: Normalized name for history grouping
+    date = Column(DateTime, default=datetime.now)
     user = relationship("User", back_populates="consumption_logs")
+
+class SavedDish(Base):
+    __tablename__ = "saved_dishes"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    dish_type = Column(String, default="dish")  # "dish" or "meal"
+    components = Column(JSON, nullable=False) # List of dicts: [{name, weight, calories...}]
+    
+    # Pre-calculated totals for quick logging
+    total_calories = Column(Float, default=0.0)
+    total_protein = Column(Float, default=0.0)
+    total_fat = Column(Float, default=0.0)
+    total_carbs = Column(Float, default=0.0)
+    total_fiber = Column(Float, default=0.0)
+    
+    created_at = Column(DateTime, default=datetime.now)
+    user = relationship("User", backref="saved_dishes")
 
 class ShoppingSession(Base):
     __tablename__ = "shopping_sessions"
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=datetime.now)
     finished_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     user = relationship("User", back_populates="shopping_sessions")
@@ -83,8 +137,9 @@ class LabelScan(Base):
     protein = Column(Float, nullable=True)
     fat = Column(Float, nullable=True)
     carbs = Column(Float, nullable=True)
+    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
     matched_product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     session = relationship("ShoppingSession", back_populates="label_scans")
     matched_product = relationship("Product", back_populates="label_scans")
 
@@ -98,7 +153,7 @@ class PriceTag(Base):
     store_name = Column(String, nullable=True)
     location = Column(String, nullable=True)  # для будущей геолокации
     photo_date = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", backref="price_tags")
 
 class UserSettings(Base):
@@ -109,7 +164,22 @@ class UserSettings(Base):
     protein_goal = Column(Integer, default=150)
     fat_goal = Column(Integer, default=70)
     carb_goal = Column(Integer, default=250)
+    fiber_goal = Column(Integer, default=30) # NEW: Fiber goal
+    water_goal = Column(Integer, default=2000) # NEW: Fiber goal
     allergies = Column(String, nullable=True)  # Comma-separated list
+    gender = Column(String, nullable=True)  # "male" or "female"
+    age = Column(Integer, nullable=True)  # User's age in years
+    height = Column(Integer, nullable=True)  # height in cm
+    weight = Column(Float, nullable=True)  # weight in kg
+    goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
+    is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
+    reminder_time = Column(String, default="09:00")  # HH:MM for weight reminders
+    summary_time = Column(String, default="21:00")
+    reminders_enabled = Column(Boolean, default=True)
+    
+    # Fridge Summary Cache (24h)
+    fridge_summary_cache = Column(String, nullable=True) # Text
+    fridge_summary_date = Column(DateTime, nullable=True) # Timestamp of last generation
     user = relationship("User", backref="settings")
 
 class ShoppingListItem(Base):
@@ -118,7 +188,7 @@ class ShoppingListItem(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     product_name = Column(String, nullable=False)
     is_bought = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", backref="shopping_list")
 
 # NEW: Cached recipes for recipe bot
@@ -133,7 +203,7 @@ class CachedRecipe(Base):
     calories = Column(Float, nullable=True)
     ingredients = Column(JSON, nullable=False)  # list of {name, amount}
     steps = Column(JSON, nullable=False)       # list of strings
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
     __table_args__ = (
         # Ensure uniqueness per user+hash+title to avoid duplicate entries
@@ -143,3 +213,83 @@ class CachedRecipe(Base):
         # If you need it, uncomment the line below.
         # UniqueConstraint('user_id', 'ingredients_hash', 'title', name='uq_cached_recipe'),
     )
+
+
+class WaterLog(Base):
+    __tablename__ = "water_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    amount_ml = Column(Integer, nullable=False)
+    date = Column(DateTime, default=datetime.now)
+
+    user = relationship("User", back_populates="water_logs")
+
+
+class WeightLog(Base):
+    """Model for tracking user weight over time."""
+    __tablename__ = "weight_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    weight = Column(Float, nullable=False)
+    recorded_at = Column(DateTime, default=datetime.now)
+    user = relationship("User", backref="weight_logs")
+
+
+class Marathon(Base):
+    """Marathon managed by a curator."""
+    __tablename__ = "marathons"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_registration_open = Column(Boolean, default=True) # Can users join via link?
+    invite_token = Column(String, unique=True, nullable=True)
+    invite_token_expires_at = Column(DateTime, nullable=True)
+    
+    # Store wave configuration [start, end, label]
+    waves_config = Column(JSON, nullable=True) 
+    
+    # Points Customization
+    points_name = Column(String, default="Снежинки")
+    points_emoji = Column(String, default="❄️")
+    
+    created_at = Column(DateTime, default=datetime.now)
+    curator = relationship("User", backref="marathons", foreign_keys=[curator_id])
+    participants = relationship("MarathonParticipant", back_populates="marathon")
+
+
+class MarathonParticipant(Base):
+    """Participant in a specific marathon."""
+    __tablename__ = "marathon_participants"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    marathon_id = Column(Integer, ForeignKey("marathons.id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    
+    start_weight = Column(Float, nullable=True) # Weight at entry
+    final_weight = Column(Float, nullable=True) # Weight at exit/finish
+    
+    # Cached totals for quick leadership board
+    total_snowflakes = Column(Integer, default=0)
+    
+    is_active = Column(Boolean, default=True) # If kicked -> False
+    joined_at = Column(DateTime, default=datetime.now)
+    
+    marathon = relationship("Marathon", back_populates="participants")
+    user = relationship("User", backref="marathon_participations")
+    snowflake_logs = relationship("SnowflakeLog", back_populates="participant")
+
+
+class SnowflakeLog(Base):
+    """Log of activity points (snowflakes) assigned by curator."""
+    __tablename__ = "snowflake_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    participant_id = Column(Integer, ForeignKey("marathon_participants.id"), nullable=False)
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=False) # Audit who gave points
+    amount = Column(Integer, nullable=False) # Can be negative
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    participant = relationship("MarathonParticipant", back_populates="snowflake_logs")

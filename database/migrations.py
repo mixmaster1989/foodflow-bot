@@ -70,6 +70,23 @@ def _create_shopping_tables(cursor: sqlite3.Cursor):
         )
 
 
+def _create_subscription_table(cursor: sqlite3.Cursor):
+    if not _table_exists(cursor, "subscriptions"):
+        cursor.execute(
+            """
+            CREATE TABLE subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id BIGINT NOT NULL UNIQUE,
+                tier TEXT DEFAULT 'free',
+                starts_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+
 def _run_sqlite_migrations():
     db_path = _get_sqlite_path()
     if not db_path:
@@ -78,6 +95,8 @@ def _run_sqlite_migrations():
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
+
+        _create_subscription_table(cursor)
 
         if _table_exists(cursor, "products"):
             _ensure_columns(
@@ -88,10 +107,80 @@ def _run_sqlite_migrations():
                     ("protein", "FLOAT DEFAULT 0.0"),
                     ("fat", "FLOAT DEFAULT 0.0"),
                     ("carbs", "FLOAT DEFAULT 0.0"),
+                    ("user_id", "BIGINT"),
+                    ("source", "TEXT DEFAULT 'receipt'"),
                 ]
             )
 
         _create_shopping_tables(cursor)
+
+        # Add onboarding fields to user_settings
+        if _table_exists(cursor, "user_settings"):
+            _ensure_columns(
+                cursor,
+                "user_settings",
+                [
+                    ("gender", "TEXT"),
+                    ("height", "INTEGER"),
+                    ("weight", "REAL"),
+                    ("goal", "TEXT"),
+                    ("is_initialized", "BOOLEAN DEFAULT 0"),
+                    ("fridge_summary_cache", "TEXT"),
+                    ("fridge_summary_date", "DATETIME"),
+                ]
+            )
+
+        # Add auth field to users
+        if _table_exists(cursor, "users"):
+            _ensure_columns(
+                cursor,
+                "users",
+                [
+                    ("is_verified", "BOOLEAN DEFAULT 0"),
+                    # Curator system columns
+                    ("role", "TEXT DEFAULT 'user'"),
+                    ("curator_id", "BIGINT"),
+                    ("referral_token", "TEXT"),
+                ]
+            )
+
+        # Add base_name to consumption_logs
+        if _table_exists(cursor, "consumption_logs"):
+            _ensure_columns(
+                cursor,
+                "consumption_logs",
+                [
+                    ("base_name", "TEXT"),
+                ]
+            )
+
+        # Add dish_type to saved_dishes
+        if _table_exists(cursor, "saved_dishes"):
+            _ensure_columns(
+                cursor,
+                "saved_dishes",
+                [
+                    ("dish_type", "TEXT DEFAULT 'dish'"),
+                ]
+            )
+
+        # Create saved_dishes table if not exists
+        if not _table_exists(cursor, "saved_dishes"):
+            cursor.execute("""
+                CREATE TABLE saved_dishes (
+                    id INTEGER PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    name VARCHAR NOT NULL,
+                    components JSON NOT NULL,
+                    total_calories FLOAT DEFAULT 0.0,
+                    total_protein FLOAT DEFAULT 0.0,
+                    total_fat FLOAT DEFAULT 0.0,
+                    total_carbs FLOAT DEFAULT 0.0,
+                    total_fiber FLOAT DEFAULT 0.0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+            """)
 
         conn.commit()
     finally:

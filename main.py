@@ -8,15 +8,35 @@ from database import migrations
 from database.base import init_db
 from handlers import (
     common,
-    fridge,
+    auth,
+    onboarding,
     menu,
+    water,
+    i_ate,
     receipt,
-    recipes,
     shopping,
-    shopping_list,
     stats,
+    fridge,
+    recipes,
     user_settings,
+    subscription,
+    curator,
+    saved_dishes,
+    weight,
+    weight,
+    base,
+    universal_input,
+    fridge_search,
+    errors, 
+    shopping_list,
+    admin,
+    support,
+    correction,
+    herbalife,
+    ward_interactions,
+    # global_input,
 )
+from handlers.marathon import curator_menu
 
 
 async def main():
@@ -36,16 +56,63 @@ async def main():
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
 
+    # Register Middleware
+    from handlers.auth import AuthMiddleware
+    from middleware.admin_logger import AdminLoggerMiddleware
+    from middleware.user_enrichment import UserEnrichmentMiddleware
+    from middleware.paywall import PaywallMiddleware
+    
+    dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
+    dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
+    dp.update.middleware(AuthMiddleware())
+    
+    # Paywall should intercept messages and callbacks
+    dp.message.middleware(PaywallMiddleware())
+    dp.callback_query.middleware(PaywallMiddleware())
+
     # Register Routers
+    # IMPORTANT: shopping.router must be before receipt.router
+    # to handle photos in scanning_labels state first
+    dp.include_router(errors.router) # Catch errors globally
     dp.include_router(common.router)
-    dp.include_router(menu.router)  # Central menu router
+    dp.include_router(admin.router) # Admin commands
+    dp.include_router(support.router) # Contact Dev
+    dp.include_router(onboarding.router)  # Onboarding must be after common
+    dp.include_router(user_settings.router)
+    dp.include_router(subscription.router)
+    dp.include_router(menu.router)
+    dp.include_router(water.router)  # Central menu router
+    dp.include_router(i_ate.router)  # Quick food logging
+    dp.include_router(herbalife.router) # Herbalife Expert
+    dp.include_router(curator_menu.router) # Marathon Module
+    dp.include_router(curator.router)  # Curator dashboard
+    dp.include_router(shopping.router)  # Must be before receipt.router!
     dp.include_router(receipt.router)
     dp.include_router(fridge.router)
+    dp.include_router(fridge_search.router) # New Smart Search
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
-    dp.include_router(shopping.router)
-    dp.include_router(user_settings.router)
     dp.include_router(shopping_list.router)
+    dp.include_router(weight.router)
+    dp.include_router(correction.router)
+    dp.include_router(saved_dishes.router)
+    dp.include_router(ward_interactions.router)
+    # dp.include_router(global_input.router) # DEPRECATED
+    dp.include_router(universal_input.router) # Universal Handler (Text/Voice/Photo)
+
+    # Start reminder scheduler
+    from services.scheduler import start_scheduler
+    start_scheduler(bot, dp)
+
+    # Reset Menu Button to Default (remove Web App from input field)
+    from aiogram.types import MenuButtonDefault
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonDefault()
+        )
+        logging.info("✅ Global Menu Button reset to Default")
+    except Exception as e:
+        logging.warning(f"⚠️ Failed to reset Menu Button: {e}")
 
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)

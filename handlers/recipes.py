@@ -1,5 +1,4 @@
-"""
-Module for recipe generation and display handlers.
+"""Module for recipe generation and display handlers.
 
 Contains handlers for:
 - Recipe category selection
@@ -10,6 +9,7 @@ from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy import or_
 from sqlalchemy.future import select
 
 from database.base import get_db
@@ -25,8 +25,7 @@ MAX_MESSAGE_LENGTH: int = 4096
 
 
 def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
-    """
-    Split long message into chunks that fit Telegram limit.
+    """Split long message into chunks that fit Telegram limit.
 
     Args:
         text: Message text to split
@@ -34,6 +33,7 @@ def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[
 
     Returns:
         List of message chunks
+
     """
     if len(text) <= max_length:
         return [text]
@@ -58,11 +58,11 @@ def split_long_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[
 # --- Level 3.1: Categories ---
 @router.callback_query(F.data == "menu_recipes")
 async def show_recipe_categories(callback: types.CallbackQuery) -> None:
-    """
-    Show recipe category selection menu.
+    """Show recipe category selection menu.
 
     Args:
         callback: Telegram callback query
+
     """
     builder = InlineKeyboardBuilder()
     builder.button(text="🥗 Салаты", callback_data="recipes_cat:Salads")
@@ -73,7 +73,7 @@ async def show_recipe_categories(callback: types.CallbackQuery) -> None:
     builder.adjust(2, 2, 1)
 
     # Image path
-    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    photo_path = types.FSInputFile("assets/recipes.png")
 
     caption = (
         "👨‍🍳 <b>Шеф-повар на связи!</b>\n\n"
@@ -101,19 +101,22 @@ async def show_recipe_categories(callback: types.CallbackQuery) -> None:
 # --- Level 3.2: Generate & List ---
 @router.callback_query(F.data.startswith("recipes_cat:"))
 async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
-    """
-    Generate recipes for selected category or show cached results.
+    """Generate recipes for selected category or show cached results.
 
     Args:
         callback: Telegram callback query with data format "recipes_cat:Category" or "recipes_cat:Category:refresh"
+
     """
+    # Answer callback IMMEDIATELY to prevent timeout on long AI operations
+    await callback.answer()
+    
     # callback data can be 'recipes_cat:Category' or 'recipes_cat:Category:refresh'
     parts = callback.data.split(":")
     category = parts[1]
     refresh_requested = len(parts) > 2 and parts[2] == "refresh"
 
     # Edit photo message with status, keep the image
-    photo_path = types.FSInputFile("FoodFlow/assets/recipes.png")
+    photo_path = types.FSInputFile("assets/recipes.png")
     status_caption = f"👨‍🍳 Думаю над рецептами ({category})..."
 
     try:
@@ -131,10 +134,23 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
     # 1. Get ingredients
     ingredients = []
     async for session in get_db():
-        stmt = select(Product).join(Receipt).where(Receipt.user_id == callback.from_user.id)
+        stmt = (
+            select(Product)
+            .outerjoin(Receipt)
+            .where(
+                (Receipt.user_id == callback.from_user.id)
+                | (Product.user_id == callback.from_user.id)
+            )
+        )
         result = await session.execute(stmt)
         products = result.scalars().all()
         ingredients = [p.name for p in products]
+
+        # Get user settings
+        from database.models import UserSettings
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings_res = await session.execute(settings_stmt)
+        user_settings = settings_res.scalar_one_or_none()
 
     # Log request details
     log_request(callback.from_user.id, ingredients, category, f"Requesting recipes for category {category}")
@@ -161,7 +177,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
     if not refresh_requested:
         cached = await get_cached_recipes(callback.from_user.id, ingredients_hash, category)
         # Filter recent entries (younger than 5 minutes)
-        recent = [c for c in cached if (datetime.utcnow() - c.created_at).total_seconds() < 300]
+        recent = [c for c in cached if (datetime.now() - c.created_at).total_seconds() < 300]
         if recent:
             # Build response from cached recipes
             response_text = f"👨‍🍳 <b>Рецепты: {category}</b>\n\n"
@@ -201,14 +217,13 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
                 for chunk in message_chunks:
                     await callback.message.answer(chunk, parse_mode="HTML")
             log_response(callback.from_user.id, {"cached": True, "count": len(recent)}, True)
-            await callback.answer()
             return
 
     # If we reach here, we need to call AI (no cache or refresh requested)
 
     # 2. Call AI with category to get appropriate recipes
     try:
-        data = await AIService.generate_recipes(ingredients, category)
+        data = await AIService.generate_recipes(ingredients, category, user_settings)
 
         if not data or "recipes" not in data:
             raise ValueError("No recipes generated")
@@ -291,5 +306,3 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
             )
         except Exception:
             await status_msg.edit_text(error_caption, reply_markup=builder.as_markup())
-
-    await callback.answer()

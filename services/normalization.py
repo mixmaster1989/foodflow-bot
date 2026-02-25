@@ -1,11 +1,11 @@
-"""
-Module for product name normalization and categorization.
+"""Module for product name normalization and categorization.
 
 Contains:
 - NormalizationService: Normalizes OCR-extracted product names using AI models
 """
 import json
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -16,46 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 class NormalizationService:
-    """
-    Normalize and categorize product names from OCR results.
+    """Normalize and categorize product names from OCR results.
 
     Uses multiple AI models to correct OCR errors, identify real product names,
     preserve brand names and weights, categorize products, and estimate calories.
-
-    Attributes:
-        MODELS: List of fallback models ordered by quality (best first)
-
-    Example:
-        >>> service = NormalizationService()
-        >>> raw = [{'name': 'СЕЛЬКИ насло', 'price': 100.0, 'quantity': 1.0}]
-        >>> normalized = await service.normalize_products(raw)
-        >>> print(normalized[0]['name'])
-        'Масло подсолнечное'
     """
+
     MODELS: list[str] = [
-        "perplexity/sonar",
-        "mistralai/mistral-small-3.2-24b-instruct:free",
-        "qwen/qwen2.5-vl-32b-instruct:free"
+        "perplexity/sonar",                                    # Free 1: Best quality with web search
+        "mistralai/mistral-small-3.2-24b-instruct:free",      # Free 2: Fast & Smart
+        "qwen/qwen2.5-vl-32b-instruct:free",                 # Free 3: Working Fallback
+        "google/gemini-2.5-flash-lite-preview-09-2025",       # Paid 1: Cheapest ($0.00016)
+        "openai/gpt-4.1-mini",                                 # Paid 2: Fastest (471ms)
     ]
 
     @classmethod
     async def normalize_products(cls, raw_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """
-        Normalize product names and add category/calories information.
-
-        Args:
-            raw_items: List of raw items from OCR with 'name', 'price', 'quantity' keys
-
-        Returns:
-            List of normalized items with 'name', 'price', 'quantity', 'category', 'calories'
-            Falls back to raw items if all models fail
-
-        Note:
-            - Preserves brand names (e.g., 'МИЛКА' -> 'Милка')
-            - Preserves weight/volume (e.g., '450г', '1л')
-            - All names and categories in Russian
-            - Tries models in order: Perplexity → Mistral → Qwen
-        """
+        """Normalize product names and add category/calories/fiber information."""
         if not raw_items:
             return []
 
@@ -77,13 +54,21 @@ class NormalizationService:
             "2. PRESERVE brand names if recognizable (e.g., 'МИЛКА' -> 'Милка', 'Lays' -> 'Lays').\n"
             "3. PRESERVE weight/volume if present (e.g., '450г', '1л', '200мл').\n"
             "4. Categorize it (e.g., Молочные продукты, Мясо, Овощи, Снеки, Бакалея).\n"
-            "5. Estimate calories per 100g.\n"
+            "5. Find nutrition per 100g: Calories, Protein, Fat, Carbs, Fiber (Клетчатка).\n"
             "6. Return a JSON object with a list of normalized items. Keep the original order.\n"
-            "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n\n"
+            "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n"
+            "IMPORTANT: If a product has NO fiber (e.g. water, oil, meat, sugar), set \"fiber\": 0 explicitly!\n\n"
             "Input List:\n"
             f"{items_str}\n\n"
-            "Output Format (JSON ONLY):\n"
-            "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 123}]}"
+            "CRITICAL OUTPUT REQUIREMENTS:\n"
+            "- Return ONLY the JSON object. Nothing before it, nothing after it.\n"
+            "- Do NOT include markdown formatting (no ```json or ```).\n"
+            "- Do NOT add explanations, comments, or any text after the JSON.\n"
+            "- Your response must start with { and end with }.\n"
+            "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 250, \"protein\": 10.5, \"fat\": 5.2, \"carbs\": 30.0, \"fiber\": 1.2}]}\n"
+            "- Example of WRONG response: {\"normalized\": [...]}\n**Пояснения:** ...\n\n"
+            "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
+            "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0, \"fiber\": 0}]}"
         )
 
         import asyncio
@@ -112,32 +97,42 @@ class NormalizationService:
                             if response.status == 200:
                                 result = await response.json()
                                 content = result['choices'][0]['message']['content']
-                                # Clean markdown
-                                content = content.replace("```json", "").replace("```", "").strip()
+                                
+                                # Robust JSON extraction
+                                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                                if json_match:
+                                    content = json_match.group(1)
+                                else:
+                                    content = content.replace("```json", "").replace("```", "").strip()
+                                    first_brace = content.find('{')
+                                    last_brace = content.rfind('}')
+                                    if first_brace >= 0 and last_brace >= 0:
+                                        content = content[first_brace:last_brace+1]
 
                                 try:
                                     parsed = json.loads(content)
                                     normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
 
-                                    # Merge back with original data (price, quantity)
                                     final_items = []
                                     for item in raw_items:
                                         raw_name = item.get('name', 'Unknown')
                                         norm_data = normalized_map.get(raw_name, {})
 
                                         final_items.append({
-                                            "name": norm_data.get('name', raw_name), # Fallback to raw
+                                            "name": norm_data.get('name', raw_name), 
                                             "price": item.get('price', 0.0),
                                             "quantity": item.get('quantity', 1.0),
                                             "category": norm_data.get('category', 'Uncategorized'),
-                                            "calories": norm_data.get('calories', 0)
+                                            "calories": norm_data.get('calories', 0),
+                                            "protein": norm_data.get('protein', 0),
+                                            "fat": norm_data.get('fat', 0),
+                                            "carbs": norm_data.get('carbs', 0),
+                                            "fiber": norm_data.get('fiber', 0) # NEW: Fiber
                                         })
                                     return final_items
 
                                 except json.JSONDecodeError:
                                     logger.error(f"Failed to parse Normalization JSON ({model}): {content}")
-                                    # Don't return here, try next model if parsing fails?
-                                    # Actually if parsing fails, it might be model specific. Let's continue to next model.
                                     break
                             else:
                                 logger.warning(f"Normalization API ({model}) attempt {attempt+1}/3 failed: {response.status}")
@@ -150,7 +145,283 @@ class NormalizationService:
                             await asyncio.sleep(0.5)
                             continue
 
-            # If we get here, this model failed (network or parsing), try next
             logger.warning(f"Model {model} failed, switching to next...")
 
         return raw_items
+
+    @classmethod
+    async def analyze_food_intake(cls, description: str) -> dict:
+        """Analyze food intake with weight detection.
+        
+        Returns dict with:
+        - name: food name
+        - calories, protein, fat, carbs, fiber: KBJU values
+        - weight_grams: detected weight or None
+        - weight_missing: True if no weight specified
+        """
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+
+        prompt = f'''Analyze this food intake description: "{description}"
+
+TASK:
+1. Extract the food name (in Russian)
+2. Extract the "base_name" (Essence) - the generic name of the product without weight, brand, or adjectives if possible (e.g. "Яблоко 150г" -> "Яблоко", "Творог 5% Простоквашино" -> "Творог 5%").
+3. Detect if weight/portion is specified.
+4. Calculate KBJU based on the specified weight.
+
+WEIGHT DETECTION RULES:
+- "банан 150" -> 150 grams
+- "банан 150г" -> 150 grams
+- "хлеб 40" -> 40 grams
+- "2 яйца" -> ~120g (calculate based on count)
+- "тарелка борща" -> ~300g (estimate standard portion)
+- "банан" (no number) -> weight_missing: true (return per 100g)
+- ALWAYS extract the number if it appears after the name.
+- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'гречка', 'рис', 'овсянка', 'пшено' etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if the user explicitly specifies 'сухая' or 'сырая'.
+
+RETURN JSON ONLY:
+{{
+  "name": "Название продукта (RU)",
+  "base_name": "Суть продукта (RU)",
+  "weight_grams": 150,
+  "weight_missing": false,
+  "calories": 134,
+  "protein": 1.7,
+  "fat": 0.5,
+  "carbs": 34.2,
+  "fiber": 3.9
+}}
+
+If weight is NOT specified:
+{{
+  "name": "Банан",
+  "base_name": "Банан",
+  "weight_grams": null,
+  "weight_missing": true,
+  "calories": 89,
+  "protein": 1.1,
+  "fat": 0.3,
+  "carbs": 22.8,
+  "fiber": 2.6
+}}
+
+CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
+
+        import asyncio
+        import aiohttp
+
+        for model in cls.MODELS[:3]:  # Use first 3 models only
+            for attempt in range(2):
+                try:
+                    payload = {
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1
+                    }
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                content = data["choices"][0]["message"]["content"].strip()
+                                
+                                # Clean JSON
+                                if content.startswith("```"):
+                                    content = content.split("```")[1]
+                                    if content.startswith("json"):
+                                        content = content[4:]
+                                content = content.strip()
+                                
+                                result = json.loads(content)
+                                logger.info(f"Food intake analyzed: {result}")
+                                return result
+                except Exception as e:
+                    logger.error(f"analyze_food_intake error ({model}): {e}")
+                    if attempt < 1:
+                        await asyncio.sleep(0.3)
+                        continue
+        
+        # Fallback
+        return {
+            "name": description,
+            "weight_grams": None,
+            "weight_missing": True,
+            "calories": 100,
+            "protein": 5,
+            "fat": 3,
+            "carbs": 15,
+            "fiber": 1
+        }
+
+    @classmethod
+    async def analyze_food_intake_batch(cls, items: list[dict]) -> list[dict]:
+        """Analyze multiple food items in one AI call.
+        
+        Args:
+            items: list of {"product": str, "weight": int|None}
+            
+        Returns:
+            list of dicts with name, base_name, calories, protein, fat, carbs, fiber, weight_grams
+        """
+        if not items:
+            return []
+            
+        # Build items description
+        lines = []
+        for i, item in enumerate(items, 1):
+            w = f" {item['weight']}г" if item.get('weight') else ""
+            lines.append(f"{i}. {item['product']}{w}")
+        items_text = "\n".join(lines)
+        
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+
+        prompt = f'''Analyze these food items and return KBJU for EACH:
+
+{items_text}
+
+RULES:
+- If weight is specified, calculate KBJU for that weight.
+- If weight is NOT specified, calculate for a standard portion and set weight_missing: true.
+- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'гречка', 'рис', 'овсянка', 'пшено' etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if explicitly specified as 'dry/raw'.
+- Return a JSON array (NOT object) with one entry per item.
+
+RETURN JSON ARRAY ONLY:
+[
+  {{
+    "name": "Помело 230г",
+    "base_name": "Помело",
+    "weight_grams": 230,
+    "weight_missing": false,
+    "calories": 68,
+    "protein": 0.6,
+    "fat": 0.04,
+    "carbs": 17.7,
+    "fiber": 1.8
+  }},
+  ...
+]
+
+CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
+
+        import asyncio
+        import aiohttp
+
+        for model in cls.MODELS[:3]:
+            for attempt in range(2):
+                try:
+                    payload = {
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1
+                    }
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                content = data["choices"][0]["message"]["content"].strip()
+                                
+                                # Clean JSON
+                                if content.startswith("```"):
+                                    content = content.split("```")[1]
+                                    if content.startswith("json"):
+                                        content = content[4:]
+                                content = content.strip()
+                                
+                                result = json.loads(content)
+                                
+                                # Ensure it's a list
+                                if isinstance(result, dict):
+                                    result = [result]
+                                    
+                                logger.info(f"Batch food analyzed: {len(result)} items")
+                                return result
+                except Exception as e:
+                    logger.error(f"analyze_food_intake_batch error ({model}): {e}")
+                    if attempt < 1:
+                        await asyncio.sleep(0.3)
+                        continue
+        
+        # Fallback: return basic data per item
+        fallback = []
+        for item in items:
+            fallback.append({
+                "name": f"{item['product']} {item.get('weight', '')}г".strip(),
+                "base_name": item['product'],
+                "weight_grams": item.get('weight'),
+                "weight_missing": item.get('weight') is None,
+                "calories": 100,
+                "protein": 5,
+                "fat": 3,
+                "carbs": 15,
+                "fiber": 1
+            })
+        return fallback
+
+    @classmethod
+    async def suggest_dish_name(cls, ingredients: list[str]) -> str:
+        """Suggest a culinary name for a list of ingredients."""
+        if not ingredients:
+            return "Мое блюдо"
+            
+        ing_str = ", ".join(ingredients)
+        
+        prompt = (
+            f"Ingredients: {ing_str}\n"
+            "Task: Name this dish in Russian (max 3-4 words). "
+            "Examples: 'Oats, Milk, Berries' -> 'Овсяная каша с ягодами'. "
+            "'Eggs, Tomato' -> 'Яичница с помидорами'. "
+            "'Bread, Cheese' -> 'Бутерброд с сыром'. "
+            "Return ONLY the name, nothing else."
+        )
+
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://foodflow.app",
+            "X-Title": "FoodFlow Bot"
+        }
+        
+        import aiohttp
+        for model in cls.MODELS:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": model, 
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.3
+                        },
+                        timeout=10
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            result = data["choices"][0]["message"]["content"].strip()
+                            return result.strip('"').strip("'")
+            except Exception as e:
+                logger.error(f"Dish Naming Failed ({model}): {e}")
+                continue # Try next model
+            
+        return "Мое блюдо"

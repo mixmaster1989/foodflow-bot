@@ -1,5 +1,11 @@
+"""Module for real-time price search using Perplexity Sonar API.
+
+Contains:
+- PriceSearchService: Search for current prices in Russian stores
+"""
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
@@ -9,14 +15,44 @@ logger = logging.getLogger(__name__)
 
 
 class PriceSearchService:
-    """Service to search for real-time prices using Perplexity Sonar"""
-    MODEL = "perplexity/sonar"
+    """Service to search for real-time prices using Perplexity Sonar.
+
+    Searches for current prices of products in Russian grocery stores
+    (Пятёрочка, Магнит, Лента, Перекрёсток) and returns price statistics.
+
+    Attributes:
+        MODEL: Perplexity Sonar model identifier
+
+    Example:
+        >>> service = PriceSearchService()
+        >>> prices = await service.search_prices("Молоко 3.2%")
+        >>> print(prices['min_price'])
+        89.99
+
+    """
+
+    MODEL: str = "perplexity/sonar"
 
     @staticmethod
-    async def search_prices(product_name: str) -> dict | None:
-        """
-        Search for current prices of a product in Russian stores.
-        Returns dict with prices from different stores or None if failed.
+    async def search_prices(product_name: str) -> dict[str, Any] | None:
+        """Search for current prices of a product in Russian stores.
+
+        Args:
+            product_name: Product name to search for
+
+        Returns:
+            Dictionary with keys:
+            - 'product': Product name
+            - 'prices': List of dicts with 'store' and 'price' keys
+            - 'min_price': Minimum price found
+            - 'max_price': Maximum price found
+            - 'avg_price': Average price
+            Or None if search failed
+            Or dict with 'raw_response' key if JSON parsing failed but text response available
+
+        Note:
+            Uses Perplexity Sonar for web search. Retries 3 times with 0.5s delay.
+
         """
         import re
         from datetime import datetime

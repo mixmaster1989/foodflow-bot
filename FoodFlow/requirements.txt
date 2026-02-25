@@ -1,8 +1,0 @@
-aiogram>=3.0.0
-sqlalchemy>=2.0.0
-asyncpg
-python-dotenv
-requests
-aiohttp
-pydantic-settings
-rapidfuzz

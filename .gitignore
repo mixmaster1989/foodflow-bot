@@ -64,10 +64,12 @@ foodflow-bg.log
 foodflow.log
 
 # Database
-*.db
-*.sqlite
-*.sqlite3
-foodflow.db
+*.db*
+*.sqlite*
+foodflow.db*
+*.db-shm
+*.db-wal
+*.bak*
 
 # Testing
 .pytest_cache/
@@ -90,10 +92,14 @@ coverage.xml
 *.temp
 temp/
 tmp/
+stdout.txt
+stderr.txt
+last_entry.txt
+temp_*
 
 # OCR Results (temporary test files)
-ocr_results.json
-gpt4o_mini_ocr_results.json
+ocr_results*.json
+gpt4o_mini_ocr_results*.json
 test_web_search.py
 ocr_championship.py
 
@@ -106,6 +112,9 @@ read_pdfs.py
 receipt.jpeg
 photo_*.jpg
 photo_*.jpeg
+test_*.png
+test_*.jpg
+test_*.jpeg
 
 # Test scripts and results (but NOT tests/ directory)
 # Ignore test scripts in root, but allow tests/ directory

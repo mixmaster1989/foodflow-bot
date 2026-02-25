@@ -19,8 +19,7 @@ dependencies = [
     "aiohttp>=3.9.0,<4.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
     "rapidfuzz>=3.0.0,<4.0.0",
-    # Type stubs for type checking
-    "types-aiohttp>=0.1.0",
+    # Note: aiohttp>=3.8 includes built-in type stubs, no types-aiohttp needed
 ]
 
 [project.optional-dependencies]

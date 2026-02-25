@@ -3,8 +3,8 @@ module.exports = {
         {
             name: 'foodflow-bot',
             script: 'main.py',
-            interpreter: '/home/user1/foodflow-bot/venv/bin/python',
-            cwd: '/home/user1/foodflow-bot',
+            interpreter: '/home/user1/foodflow-bot_new/venv/bin/python',
+            cwd: '/home/user1/foodflow-bot_new',
             instances: 1,
             autorestart: true,
             watch: false,
