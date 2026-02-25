@@ -1,5 +1,5 @@
 """Tests for onboarding handlers."""
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -53,6 +53,23 @@ async def test_handle_gender_selection(db_session, mock_callback_query, mock_fsm
 
     # Check that gender was saved
     mock_fsm_context.update_data.assert_called_once_with(gender="male")
+    # Check that state was changed to age (NEW since mass linting/update)
+    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_age)
+
+
+@pytest.mark.asyncio
+async def test_handle_age_input_valid(db_session, mock_telegram_message, mock_fsm_context):
+    """Test age input with valid value."""
+    from handlers.onboarding import handle_age_input
+
+    mock_telegram_message.text = "25"
+    mock_fsm_context.update_data = AsyncMock()
+    mock_fsm_context.set_state = AsyncMock()
+
+    await handle_age_input(mock_telegram_message, mock_fsm_context)
+
+    # Check that age was saved
+    mock_fsm_context.update_data.assert_called_once_with(age=25)
     # Check that state was changed to height
     mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_height)
 
@@ -123,21 +140,51 @@ async def test_handle_goal_selection_and_finish(
 
     await handle_goal_selection(mock_callback_query, mock_fsm_context)
 
+    # Check that state was changed to calorie confirmation (NEW step)
+    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_calorie_confirmation)
+    # state should NOT be cleared yet
+    assert not mock_fsm_context.clear.called
+
+@pytest.mark.asyncio
+async def test_handle_goal_accept(
+    db_session, mock_callback_query, mock_fsm_context, sample_user
+):
+    """Test accepting calculated goals during onboarding."""
+    from handlers.onboarding import handle_goal_accept
+
+    mock_callback_query.message.chat.id = sample_user.id
+    mock_fsm_context.get_data = AsyncMock(
+        return_value={
+            "gender": "male", "age": 30, "height": 180, "weight": 80.0, "goal": "lose_weight",
+            "pending_targets": {"calories": 2000, "protein": 150, "fat": 60, "carbs": 200}
+        }
+    )
+    mock_fsm_context.clear = AsyncMock()
+    mock_callback_query.message.delete = AsyncMock()
+    mock_callback_query.message.answer = AsyncMock()
+
+    with patch('handlers.onboarding.get_db') as mock_get_db:
+        async def db_generator():
+            yield db_session
+        mock_get_db.return_value = db_generator()
+
+        await handle_goal_accept(mock_callback_query, mock_fsm_context)
+
     # Check that state was cleared
     mock_fsm_context.clear.assert_called_once()
+    mock_callback_query.answer.assert_called_once()
+    mock_callback_query.message.answer.assert_called_once()
 
     # Check that settings were saved
-    async for session in db_session:
-        stmt = select(UserSettings).where(UserSettings.user_id == sample_user.id)
-        result = await session.execute(stmt)
-        settings = result.scalar_one_or_none()
-        assert settings is not None
-        assert settings.gender == "male"
-        assert settings.height == 180
-        assert settings.weight == 80.0
-        assert settings.goal == "lose_weight"
-        assert settings.is_initialized is True
-        break
+    stmt = select(UserSettings).where(UserSettings.user_id == sample_user.id)
+    result = await db_session.execute(stmt)
+    settings = result.scalar_one_or_none()
+    assert settings is not None
+    assert settings.gender == "male"
+    assert settings.height == 180
+    assert settings.weight == 80.0
+    assert settings.goal == "lose_weight"
+    assert settings.is_initialized is True
 
 
 

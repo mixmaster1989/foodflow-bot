@@ -133,23 +133,7 @@ async def process_ingredient_input(message: types.Message, state: FSMContext):
 
         await state.update_data(dish_components=components, total_stats=stats)
 
-        # Render list
-        comp_list = "\n".join([f"• {c['name']} ({c['weight']}г) - {int(c['calories'])} ккал" for c in components])
-
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Закончить и назвать", callback_data="dish_finish_building")
-        builder.button(text="❌ Отмена", callback_data="main_menu")
-        builder.adjust(1)
-
-        await msg.edit_text(
-            f"🏗️ <b>Блюдо собирается...</b>\n\n"
-            f"{comp_list}\n\n"
-            f"<b>Итого:</b> {int(stats['cal'])} ккал\n"
-            f"🥩 {stats['prot']:.1f} | 🥑 {stats['fat']:.1f} | 🍞 {stats['carb']:.1f} | 🥬 {stats['fib']:.1f}\n\n"
-            f"👇 <b>Что дальше?</b> (Напишите следующий ингредиент или нажмите 'Закончить')",
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML"
-        )
+        await render_builder_ui(msg, state)
 
     except Exception as e:
         logger.error(f"Ingredient Add Error: {e}", exc_info=True)
@@ -312,6 +296,33 @@ async def save_dish_final(message: types.Message, state: FSMContext):
     name = message.text.strip()
     await save_dish_internal(message, state, name)
 
+async def render_builder_ui(message: types.Message, state: FSMContext):
+    """Render the interactive dish builder UI."""
+    data = await state.get_data()
+    components = data.get("dish_components", [])
+    stats = data.get("total_stats", {"cal": 0, "prot": 0, "fat": 0, "carb": 0, "fib": 0})
+
+    comp_list = "\n".join([f"• {c['name']} ({c['weight']}г) - {int(c['calories'])} ккал" for c in components])
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Закончить и назвать", callback_data="dish_finish_building")
+    builder.button(text="❌ Отмена", callback_data="main_menu")
+    builder.adjust(1)
+
+    text = (
+        f"🏗️ <b>Блюдо собирается...</b>\n\n"
+        f"{comp_list if comp_list else '<i>Ингреденты пока не добавлены</i>'}\n\n"
+        f"<b>Итого:</b> {int(stats['cal'])} ккал\n"
+        f"🥩 {stats['prot']:.1f} | 🥑 {stats['fat']:.1f} | 🍞 {stats['carb']:.1f} | 🥬 {stats['fib']:.1f}\n\n"
+        f"👇 <b>Что дальше?</b> (Напишите следующий ингредиент или нажмите 'Закончить')"
+    )
+
+    try:
+        await message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+
 # =====================================================
 # "Мои блюда" - List View
 # =====================================================
@@ -368,11 +379,11 @@ async def show_saved_dishes_list(callback: types.CallbackQuery, state: FSMContex
 
 async def render_dishes_list(message: types.Message, dishes: list, page: int):
     """Render paginated list of saved dishes with details in text."""
-    ITEMS_PER_PAGE = 5
-    total_pages = max(1, (len(dishes) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    items_per_page = 5
+    total_pages = max(1, (len(dishes) + items_per_page - 1) // items_per_page)
 
-    start_idx = page * ITEMS_PER_PAGE
-    end_idx = min(start_idx + ITEMS_PER_PAGE, len(dishes))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, len(dishes))
     current_dishes = dishes[start_idx:end_idx]
 
     # Build text with numbered items and details
@@ -658,11 +669,11 @@ async def show_saved_meals_list(callback: types.CallbackQuery, state: FSMContext
 
 async def render_meals_list(message: types.Message, meals: list, page: int):
     """Render paginated list of saved meals."""
-    ITEMS_PER_PAGE = 6
-    total_pages = max(1, (len(meals) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    items_per_page = 6
+    total_pages = max(1, (len(meals) + items_per_page - 1) // items_per_page)
 
-    start_idx = page * ITEMS_PER_PAGE
-    end_idx = min(start_idx + ITEMS_PER_PAGE, len(meals))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, len(meals))
     current_meals = meals[start_idx:end_idx]
 
     # Build text with numbered items and details
@@ -949,16 +960,15 @@ async def start_build_meal(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
 async def render_meal_builder_ui(message: types.Message, state: FSMContext):
+    """Render the interactive meal builder (dishes + individual logs)."""
     data = await state.get_data()
+    items_per_page = 8
     items = data.get("meal_items", [])
     selected_indices = set(data.get("selected_indices", []))
     page = data.get("current_page", 0)
 
-    ITEMS_PER_PAGE = 8
-    total_pages = max(1, (len(items) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
-
-    start_idx = page * ITEMS_PER_PAGE
-    end_idx = min(start_idx + ITEMS_PER_PAGE, len(items))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, len(items))
     current_batch = items[start_idx:end_idx]
 
     builder = InlineKeyboardBuilder()
@@ -984,6 +994,7 @@ async def render_meal_builder_ui(message: types.Message, state: FSMContext):
     callback_action = "meal_ask_name" if count > 0 else "meal_noop"
     nav_buttons.append(types.InlineKeyboardButton(text=action_text, callback_data=callback_action))
 
+    total_pages = max(1, (len(items) + items_per_page - 1) // items_per_page)
     if page < total_pages - 1:
         nav_buttons.append(types.InlineKeyboardButton(text="➡️", callback_data="meal_next"))
 

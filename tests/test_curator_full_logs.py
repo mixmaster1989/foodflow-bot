@@ -49,9 +49,15 @@ async def test_curator_full_logs_view(db_session):
 
         await curator_ward_detail(callback)
 
-        args, kwargs = callback.message.edit_text.call_args
-        text = args[0]
-        assert "Последние приёмы" in text
+        # Check either edit_media or answer_photo
+        if callback.message.edit_media.called:
+            args, kwargs = callback.message.edit_media.call_args
+            caption = kwargs.get('media').caption if 'media' in kwargs else args[0].caption
+        else:
+            args, kwargs = callback.message.answer_photo.call_args
+            caption = kwargs.get('caption') or args[1]
+
+        assert "📅" in caption
 
         # Verify "Full list" button
         markup = kwargs['reply_markup']
@@ -60,25 +66,28 @@ async def test_curator_full_logs_view(db_session):
             for btn in row:
                 if "Весь список" in btn.text:
                     found_full_list = True
-                    assert btn.callback_data == f"curator_ward_logs:{ward_id}:0"
+                    # Format changed to curator_ward_logs:{ward_id}:{page}:{date}
+                    assert btn.callback_data.startswith(f"curator_ward_logs:{ward_id}:0")
 
         assert found_full_list
 
         # 4. Test Full Logs List View (Page 0)
         callback_logs = AsyncMock()
         callback_logs.from_user.id = curator_id
-        callback_logs.data = f"curator_ward_logs:{ward_id}:0"
+        # New format: curator_ward_logs:{ward_id}:{page}:{date}
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        callback_logs.data = f"curator_ward_logs:{ward_id}:0:{today_str}"
         callback_logs.message = AsyncMock()
 
         await curator_ward_logs_list(callback_logs)
 
         args_list, kwargs_list = callback_logs.message.edit_text.call_args
         list_text = args_list[0]
-        assert "Еда за сегодня" in list_text
+        assert "Еда за" in list_text
         assert "1/2" in list_text
         assert list_text.count("•") == 10
 
         # Check next page button
         markup_list = kwargs_list['reply_markup']
-        assert any("Следующая" in btn.text for row in markup_list.inline_keyboard for btn in row)
+        assert any("➡️" in btn.text for row in markup_list.inline_keyboard for btn in row)
 

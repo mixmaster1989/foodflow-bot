@@ -92,7 +92,7 @@ async def start_correction(callback: types.CallbackQuery, bot: Bot, state: FSMCo
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
-        schedule_message_deletion(correction_msg, bot, user_name)
+        await schedule_message_deletion(correction_msg, bot, user_name)
         await callback.answer()
 
 
@@ -174,7 +174,7 @@ async def apply_name_correction(message: types.Message, bot: Bot, state: FSMCont
                 reply_markup=builder.as_markup(),
                 parse_mode="HTML"
             )
-            schedule_message_deletion(result_msg, bot, user_name)
+            await schedule_message_deletion(result_msg, bot, user_name)
         else:
             await message.answer("❌ Продукт не найден")
 
@@ -263,7 +263,7 @@ async def apply_price_correction(message: types.Message, bot: Bot, state: FSMCon
                 reply_markup=builder.as_markup(),
                 parse_mode="HTML"
             )
-            schedule_message_deletion(result_msg, bot, user_name)
+            await schedule_message_deletion(result_msg, bot, user_name)
         else:
             await message.answer("❌ Продукт не найден")
 
@@ -352,7 +352,7 @@ async def apply_quantity_correction(message: types.Message, bot: Bot, state: FSM
                 reply_markup=builder.as_markup(),
                 parse_mode="HTML"
             )
-            schedule_message_deletion(result_msg, bot, user_name)
+            await schedule_message_deletion(result_msg, bot, user_name)
         else:
             await message.answer("❌ Продукт не найден")
 
@@ -396,7 +396,7 @@ async def start_edit_category(callback: types.CallbackQuery, bot: Bot, state: FS
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
-        schedule_message_deletion(category_msg, bot, user_name)
+        await schedule_message_deletion(category_msg, bot, user_name)
         await callback.answer()
 
 
@@ -445,7 +445,7 @@ async def apply_category_correction(callback: types.CallbackQuery, bot: Bot, sta
                 reply_markup=builder.as_markup(),
                 parse_mode="HTML"
             )
-            schedule_message_deletion(result_msg, bot, user_name)
+            await schedule_message_deletion(result_msg, bot, user_name)
         else:
             await callback.answer("❌ Продукт не найден", show_alert=True)
             return

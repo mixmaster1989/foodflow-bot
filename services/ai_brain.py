@@ -232,13 +232,14 @@ class AIBrainService:
                 "X-Title": "FoodFlow Bot",
             }
 
-            VISION_MODELS = [
-                "google/gemini-2.5-flash-lite-preview-09-2025", # Main
-                "qwen/qwen2.5-vl-72b-instruct:free"               # Fallback
+            vision_models = [
+                "google/gemini-2.0-flash-exp:free",
+                "google/gemini-pro-vision",
+                "qwen/qwen2.5-vl-72b-instruct:free" # Fallback
             ]
 
             async with aiohttp.ClientSession() as session:
-                for model in VISION_MODELS:
+                for model in vision_models:
                     try:
                         payload = {
                             "model": model,

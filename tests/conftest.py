@@ -14,22 +14,27 @@ os.environ['BOT_TOKEN'] = "test-token"
 os.environ['OPENROUTER_API_KEY'] = "test-key"
 
 # Import all models to ensure they are registered with Base.metadata
-from database.base import Base
+# Import engine from database.base once it's configured
+from database.base import Base, engine
 from database.models import (
+    ConsumptionLog,
+    Marathon,
+    MarathonParticipant,
     Product,
     Receipt,
+    SavedDish,
+    ShoppingSession,
     User,
     UserSettings,
+    WaterLog,
+    WeightLog,
 )
-
-# In-memory SQLite database for tests
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture(scope="function")
 async def db_session():
-    """Create an in-memory SQLite database session for testing."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    """Create a database session using the shared test engine."""
+    from database.base import async_session
     async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
     # Create all tables - ensure all models are imported first

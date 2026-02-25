@@ -243,8 +243,10 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
     # 3. Build List
     total_pages = math.ceil(total_items / PAGE_SIZE)
     # Ensure page is valid
-    if page >= total_pages: page = total_pages - 1
-    if page < 0: page = 0
+    if page >= total_pages:
+        page = total_pages - 1
+    if page < 0:
+        page = 0
 
     text = f"🔍 <b>Результаты поиска: «{query}»</b>\n"
     text += f"Найдено: {total_items} (Стр. {page+1}/{total_pages})\n\n"

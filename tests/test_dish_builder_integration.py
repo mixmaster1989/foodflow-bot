@@ -154,6 +154,8 @@ async def test_dish_builder_integration(db_session):
     # Step 5: Name and Save
     # ---------------------------------------------------------
     msg_name = AsyncMock(spec=Message)
+    msg_name.chat = MagicMock()
+    msg_name.chat.id = user_id
     msg_name.from_user = MagicMock()
     msg_name.from_user.id = user_id
     msg_name.text = "Banana Milkshake"

@@ -41,8 +41,8 @@ async def check_user_data():
         c_stmt = select(ConsumptionLog).where(ConsumptionLog.user_id == TARGET_USER_ID)
         logs = (await session.execute(c_stmt)).scalars().all()
         print(f"Consumption Logs: {len(logs)}")
-        for l in logs[:5]:
-             print(f" - {l.product_name} ({l.date})")
+        for log in logs[:5]:
+             print(f" - {log.product_name} ({log.date})")
 
         # Check Receipts
         r_stmt = select(Receipt).where(Receipt.user_id == TARGET_USER_ID)

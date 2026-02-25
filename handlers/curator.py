@@ -196,11 +196,11 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
         water_total = (await session.execute(water_stmt)).scalar() or 0
 
     # Calculate totals
-    total_cal = sum(l.calories for l in logs)
-    total_prot = sum(l.protein for l in logs)
-    total_fat = sum(l.fat for l in logs)
-    total_carbs = sum(l.carbs for l in logs)
-    total_fiber = sum(l.fiber for l in logs) # NEW: Fiber
+    total_cal = sum(log.calories for log in logs)
+    total_prot = sum(log.protein for log in logs)
+    total_fat = sum(log.fat for log in logs)
+    total_carbs = sum(log.carbs for log in logs)
+    total_fiber = sum(log.fiber for log in logs) # NEW: Fiber
 
     goal_cal = ward_settings.calorie_goal if ward_settings else 2000
 

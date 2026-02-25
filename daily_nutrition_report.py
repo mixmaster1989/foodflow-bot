@@ -114,8 +114,10 @@ def sanitize_telegram_html(text: str) -> str:
     def replace_tag(match):
         full_tag = match.group(0)
         tag_name = match.group(1).lower().split()[0]
-        if tag_name.startswith('/'): tag_name = tag_name[1:]
-        if tag_name in ALLOWED_TAGS: return full_tag
+        if tag_name.startswith('/'):
+            tag_name = tag_name[1:]
+        if tag_name in ALLOWED_TAGS:
+            return full_tag
         return ''
 
     text = re.sub(r'<(/?\w+)[^>]*>', replace_tag, text)
@@ -130,9 +132,11 @@ def validate_html_tags(text: str) -> bool:
     for match in tag_pattern.finditer(text):
         is_closing = match.group(1) == '/'
         tag_name = match.group(2).lower()
-        if tag_name not in ALLOWED_TAGS: continue
+        if tag_name not in ALLOWED_TAGS:
+            continue
         if is_closing:
-            if not stack or stack[-1] != tag_name: return False
+            if not stack or stack[-1] != tag_name:
+                return False
             stack.pop()
         else:
             stack.append(tag_name)
@@ -172,7 +176,8 @@ async def get_nutrition_report(food_data: dict, retries: int = 2) -> str:
     for attempt in range(retries):
         for model in MODELS:
             response = await call_openrouter(model, prompt)
-            if not response: continue
+            if not response:
+                continue
             sanitized = sanitize_telegram_html(response)
             if validate_html_tags(sanitized):
                 return sanitized
@@ -225,7 +230,7 @@ async def get_yesterday_data(user_id: int):
     total_fiber = sum(log.fiber or 0 for log in logs)
 
     # Format for AI Prompt
-    food_list_text = "\n".join([f"• {l.product_name}: {int(l.calories or 0)} ккал" for l in logs])
+    food_list_text = "\n".join([f"• {log.product_name}: {int(log.calories or 0)} ккал" for log in logs])
 
     return {
         "user_name": user_name,
@@ -328,8 +333,9 @@ async def run_daily_report():
             logger.info(f"TEST MODE: Targeting ONLY {TARGET_TEST_ID}")
         else:
             # Fallback to Admin if self-test
-            all_users = await get_users_with_yesterday_data()
-            if ADMIN_ID in all_users: user_ids = [ADMIN_ID]
+            all_users = await get_users_with_daily_report_access()
+            if ADMIN_ID in all_users:
+                user_ids = [ADMIN_ID]
             logger.info(f"TEST MODE: Targeting Admin {ADMIN_ID}")
     else:
         user_ids = await get_users_with_daily_report_access()
@@ -345,7 +351,8 @@ async def run_daily_report():
         try:
             # A. Get Data
             data = await get_yesterday_data(user_id)
-            if not data: continue
+            if not data:
+                continue
 
             # B. Generate AI Text Report
             report_text = await get_nutrition_report(data['prompt_data'])

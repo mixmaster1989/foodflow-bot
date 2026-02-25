@@ -3,6 +3,8 @@
 Contains:
 - cmd_start: Initial bot start handler that creates user if not exists
 """
+from datetime import datetime
+
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext

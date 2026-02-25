@@ -304,8 +304,10 @@ async def handle_action_pending_voice(message: types.Message, bot: Bot, state: F
         await bot.download_file(file_info.file_path, ogg_path)
 
         text = await stt_engine.process_voice_message(ogg_path)
-        try: os.remove(ogg_path)
-        except Exception: pass
+        try:
+            os.remove(ogg_path)
+        except Exception:
+            pass
 
         if not text:
             await status_msg.edit_text("❌ Не удалось распознать. Выберите кнопку.")
@@ -1368,8 +1370,10 @@ async def handle_weight_voice(message: types.Message, bot: Bot, state: FSMContex
         await bot.download_file(file_info.file_path, ogg_path)
 
         text = await stt_engine.process_voice_message(ogg_path)
-        try: os.remove(ogg_path)
-        except Exception: pass
+        try:
+            os.remove(ogg_path)
+        except Exception:
+            pass
 
         if not text:
             await status_msg.edit_text("❌ Не удалось распознать. Напишите числом.")
@@ -1423,8 +1427,10 @@ async def handle_clarification_voice(message: types.Message, bot: Bot, state: FS
         await bot.download_file(file_info.file_path, ogg_path)
 
         text = await stt_engine.process_voice_message(ogg_path)
-        try: os.remove(ogg_path)
-        except Exception: pass
+        try:
+            os.remove(ogg_path)
+        except Exception:
+            pass
 
         if not text:
             await status_msg.edit_text("❌ Не удалось распознать. Напишите текстом.")

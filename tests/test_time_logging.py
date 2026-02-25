@@ -2,6 +2,9 @@ import asyncio
 import os
 import sys
 from datetime import datetime, timedelta
+from unittest.mock import patch
+
+import pytest
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -12,12 +15,17 @@ from database.base import get_db
 from database.models import ConsumptionLog
 
 
-async def test_single_save_with_time():
+@pytest.mark.asyncio
+async def test_single_save_with_time(db_session):
     print("🧪 Testing single log save with custom time...")
     test_user_id = 999999
     custom_time = datetime.now() - timedelta(hours=2)
 
-    async for session in get_db():
+    with patch('database.base.get_db') as mock_get_db:
+        async def db_generator():
+            yield db_session
+        mock_get_db.return_value = db_generator()
+
         log = ConsumptionLog(
             user_id=test_user_id,
             product_name="Test Product",
@@ -28,12 +36,12 @@ async def test_single_save_with_time():
             fiber=2,
             date=custom_time
         )
-        session.add(log)
-        await session.commit()
+        db_session.add(log)
+        await db_session.commit()
 
         # Verify
         stmt = select(ConsumptionLog).where(ConsumptionLog.user_id == test_user_id).order_by(ConsumptionLog.id.desc()).limit(1)
-        result = await session.execute(stmt)
+        result = await db_session.execute(stmt)
         saved_log = result.scalar_one_or_none()
 
         assert saved_log is not None
@@ -42,7 +50,8 @@ async def test_single_save_with_time():
         assert abs((saved_log.date - custom_time).total_seconds()) < 1.0
         print(f"✅ Single log saved correctly with time: {saved_log.date}")
 
-async def test_batch_save_with_time():
+@pytest.mark.asyncio
+async def test_batch_save_with_time(db_session):
     print("🧪 Testing batch log save with custom time...")
     test_user_id = 999999
     custom_time = datetime.now().replace(hour=13, minute=0, second=0, microsecond=0)
@@ -52,7 +61,11 @@ async def test_batch_save_with_time():
         {"name": "Batch Item 2", "calories": 150, "protein": 15, "fat": 7, "carbs": 30, "fiber": 3}
     ]
 
-    async for session in get_db():
+    with patch('database.base.get_db') as mock_get_db:
+        async def db_generator():
+            yield db_session
+        mock_get_db.return_value = db_generator()
+
         for item in items:
             log = ConsumptionLog(
                 user_id=test_user_id,
@@ -64,29 +77,15 @@ async def test_batch_save_with_time():
                 fiber=item["fiber"],
                 date=custom_time
             )
-            session.add(log)
-        await session.commit()
+            db_session.add(log)
+        await db_session.commit()
 
         # Verify
         stmt = select(ConsumptionLog).where(ConsumptionLog.user_id == test_user_id, ConsumptionLog.product_name.like("Batch Item%"))
-        result = await session.execute(stmt)
+        result = await db_session.execute(stmt)
         saved_logs = result.scalars().all()
 
         assert len(saved_logs) == 2
         for log in saved_logs:
              assert abs((log.date - custom_time).total_seconds()) < 1.0
         print(f"✅ Batch logs saved correctly with time: {custom_time}")
-
-async def run_tests():
-    try:
-        await test_single_save_with_time()
-        await test_batch_save_with_time()
-        print("\n✨ ALL TESTS PASSED! ✨")
-    except Exception as e:
-        print(f"\n❌ TEST FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
-if __name__ == "__main__":
-    asyncio.run(run_tests())

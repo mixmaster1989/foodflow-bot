@@ -333,18 +333,28 @@ class TestShoppingHandler:
         with patch('handlers.shopping.LabelOCRService.parse_label', new_callable=AsyncMock) as mock_ocr:
             mock_ocr.return_value = mock_ocr_result
 
-            # Call handler
-            await shopping.scan_label(mock_telegram_message, mock_bot, mock_fsm_context)
+            with patch('services.photo_queue.PhotoQueueManager.add_item', new_callable=AsyncMock) as mock_add:
+                # Call handler
+                await shopping.scan_label(mock_telegram_message, mock_bot, mock_fsm_context)
 
-            # Verify OCR was called
-            mock_ocr.assert_called_once()
+                # Verify added to queue
+                mock_add.assert_called_once()
 
-            # Verify bot methods were called
-            mock_bot.get_file.assert_called_once()
-            mock_bot.download_file.assert_called_once()
+                # Now test the worker directly
+                from handlers.shopping import process_single_label_shopping
+                await process_single_label_shopping(
+                    mock_telegram_message, mock_bot, mock_fsm_context, "test_file_id"
+                )
 
-            # Verify message was sent (status message)
-            assert mock_telegram_message.answer.called
+                # Verify OCR was called
+                mock_ocr.assert_called_once()
+
+                # Verify bot methods were called
+                mock_bot.get_file.assert_called_once()
+                mock_bot.download_file.assert_called_once()
+
+                # Verify message was sent (status message)
+                assert mock_telegram_message.answer.called
 
     @pytest.mark.asyncio
     async def test_scan_label_no_session(self, mock_telegram_message, mock_bot, mock_fsm_context):

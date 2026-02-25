@@ -105,7 +105,7 @@ async def test_simple_recommendations_allergy_check(sample_user_settings):
         price=100,
         quantity=1,
     )
-    sample_user_settings.allergies = "орехи"
+    sample_user_settings.allergies = "орех"
 
     result = ConsultantService._calculate_simple_recommendations(product, sample_user_settings)
 

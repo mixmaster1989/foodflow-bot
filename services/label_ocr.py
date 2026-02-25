@@ -63,8 +63,8 @@ class LabelOCRService:
         )
 
         import asyncio
-        RETRY_ATTEMPTS = 3
-        RETRY_DELAY = 1.0  # seconds
+        retry_attempts = 3
+        retry_delay = 2  # seconds
 
         for model in cls.MODELS:
             payload = {
@@ -86,7 +86,7 @@ class LabelOCRService:
             }
 
             # Retry logic: 3 attempts with 1s delay
-            for attempt in range(RETRY_ATTEMPTS):
+            for attempt in range(retry_attempts):
                 async with aiohttp.ClientSession() as session:
                     try:
                         async with session.post(
@@ -104,13 +104,13 @@ class LabelOCRService:
                                 return parsed_data
 
                             logger.warning(f"Label OCR ({model}) attempt {attempt+1}/3 failed: {response.status}")
-                            if attempt < RETRY_ATTEMPTS - 1:
-                                await asyncio.sleep(RETRY_DELAY)
+                            if attempt < retry_attempts - 1:
+                                await asyncio.sleep(retry_delay)
                                 continue
                     except Exception as exc:
                         logger.error(f"Label OCR exception ({model}) attempt {attempt+1}/3: {exc}")
-                        if attempt < RETRY_ATTEMPTS - 1:
-                            await asyncio.sleep(RETRY_DELAY)
+                        if attempt < retry_attempts - 1:
+                            await asyncio.sleep(retry_delay)
                             continue
 
             # If we get here, this model failed 3 times, try next model

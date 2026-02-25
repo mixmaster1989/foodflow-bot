@@ -16,37 +16,54 @@ class TestCommonHandler:
     """Tests for common handler."""
 
     @pytest.mark.asyncio
-    async def test_cmd_start_new_user(self, db_session, mock_telegram_message, mock_telegram_user):
-        """Test /start command with new user."""
-        with patch('handlers.common.get_db') as mock_get_db:
+    async def test_cmd_start_new_user(
+        self, db_session, mock_telegram_message, mock_telegram_user
+    ):
+        """Test /start command with new user starts onboarding."""
+        mock_telegram_message.text = "/start"
+        with patch("handlers.common.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            with patch('handlers.common.show_main_menu') as mock_show_menu:
-                await common.cmd_start(mock_telegram_message)
+            with patch("handlers.common.start_onboarding") as mock_onboarding:
+                await common.cmd_start(mock_telegram_message, AsyncMock())
 
                 # Verify user was created
                 from sqlalchemy import select
+
                 stmt = select(User).where(User.id == mock_telegram_user.id)
                 result = await db_session.execute(stmt)
                 user = result.scalar_one_or_none()
                 assert user is not None
                 assert user.id == mock_telegram_user.id
 
-                # Verify main menu was shown
-                mock_show_menu.assert_called_once()
+                # Verify onboarding was started
+                mock_onboarding.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_cmd_start_existing_user(self, db_session, mock_telegram_message, sample_user):
-        """Test /start command with existing user."""
-        with patch('handlers.common.get_db') as mock_get_db:
+    async def test_cmd_start_existing_user(
+        self, db_session, mock_telegram_message, sample_user
+    ):
+        """Test /start command with existing user shows main menu."""
+        mock_telegram_message.text = "/start"
+        
+        # Setup initialized settings
+        settings = UserSettings(user_id=sample_user.id, is_initialized=True)
+        db_session.add(settings)
+        await db_session.commit()
+
+        with patch("handlers.common.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            with patch('handlers.common.show_main_menu') as mock_show_menu:
-                await common.cmd_start(mock_telegram_message)
+            with patch("handlers.common.show_main_menu") as mock_show_menu:
+                await common.cmd_start(mock_telegram_message, AsyncMock())
 
                 # Verify main menu was shown
                 mock_show_menu.assert_called_once()
@@ -62,12 +79,16 @@ class TestCorrectionHandler:
         """Test starting correction for existing product."""
         mock_callback_query.data = f"correct_{sample_product.id}"
 
-        with patch('handlers.correction.get_db') as mock_get_db:
+        with patch("handlers.correction.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            await correction.start_correction(mock_callback_query, AsyncMock())
+            await correction.start_correction(
+                mock_callback_query, AsyncMock(), AsyncMock()
+            )
 
             # Verify callback was answered
             mock_callback_query.answer.assert_called_once()
@@ -75,16 +96,22 @@ class TestCorrectionHandler:
             mock_callback_query.message.answer.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_correction_product_not_found(self, db_session, mock_callback_query):
+    async def test_start_correction_product_not_found(
+        self, db_session, mock_callback_query
+    ):
         """Test starting correction for non-existent product."""
         mock_callback_query.data = "correct_99999"
 
-        with patch('handlers.correction.get_db') as mock_get_db:
+        with patch("handlers.correction.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            await correction.start_correction(mock_callback_query, AsyncMock())
+            await correction.start_correction(
+                mock_callback_query, AsyncMock(), AsyncMock()
+            )
 
             # Verify error answer
             mock_callback_query.answer.assert_called_once_with(
@@ -102,12 +129,16 @@ class TestCorrectionHandler:
         mock_state.get_data = AsyncMock(return_value={"product_id": sample_product.id})
         mock_state.clear = AsyncMock()
 
-        with patch('handlers.correction.get_db') as mock_get_db:
+        with patch("handlers.correction.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            await correction.apply_correction(mock_telegram_message, mock_state)
+            await correction.apply_name_correction(
+                mock_telegram_message, AsyncMock(), mock_state
+            )
 
             # Verify product was updated
             await db_session.refresh(sample_product)
@@ -126,12 +157,16 @@ class TestCorrectionHandler:
         mock_state = AsyncMock()
         mock_state.get_data = AsyncMock(return_value={"product_id": sample_product.id})
 
-        with patch('handlers.correction.get_db') as mock_get_db:
+        with patch("handlers.correction.get_db") as mock_get_db:
+
             async def db_generator():
                 yield db_session
+
             mock_get_db.return_value = db_generator()
 
-            await correction.apply_correction(mock_telegram_message, mock_state)
+            await correction.apply_name_correction(
+                mock_telegram_message, AsyncMock(), mock_state
+            )
 
             # Verify error message was sent
             mock_telegram_message.answer.assert_called_once_with(
@@ -245,7 +280,7 @@ class TestShoppingListHandler:
             mock_callback_query.answer.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_add_item(self, mock_callback_query, mock_fsm_context):
+    async def test_start_add_item(self, db_session, mock_callback_query, mock_fsm_context):
         """Test starting add item flow."""
         await shopping_list.start_add_item(mock_callback_query, mock_fsm_context)
 
@@ -417,12 +452,22 @@ class TestUserSettingsHandler:
             mock_callback_query.answer.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_edit_goals(self, mock_callback_query, mock_fsm_context):
+    async def test_start_edit_goals(self, db_session, mock_callback_query, mock_fsm_context):
         """Test starting edit goals flow."""
-        await user_settings.start_edit_goals(mock_callback_query, mock_fsm_context)
+        # Ensure settings exist
+        settings = UserSettings(user_id=mock_callback_query.from_user.id)
+        db_session.add(settings)
+        await db_session.commit()
 
-        # Verify state was set
-        mock_fsm_context.set_state.assert_called()
+        with patch('handlers.user_settings.get_db') as mock_get_db:
+            async def db_generator():
+                yield db_session
+            mock_get_db.return_value = db_generator()
+
+            await user_settings.start_edit_goals(mock_callback_query, mock_fsm_context)
+
+        # Verify state data was updated with pending targets
+        mock_fsm_context.update_data.assert_called()
         # Verify callback was answered
         mock_callback_query.answer.assert_called_once()
 
@@ -440,6 +485,13 @@ class TestUserSettingsHandler:
             async def db_generator():
                 yield db_session
             mock_get_db.return_value = db_generator()
+
+            mock_telegram_message.from_user.id = sample_user.id
+            
+            # Ensure settings exist
+            settings = UserSettings(user_id=sample_user.id)
+            db_session.add(settings)
+            await db_session.commit()
 
             await user_settings.set_calories(mock_telegram_message, mock_state)
 

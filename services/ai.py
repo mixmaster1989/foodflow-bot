@@ -163,8 +163,8 @@ class AIService:
             "X-Title": "FoodFlow Bot",
         }
 
-        RETRY_ATTEMPTS = 3
-        RETRY_DELAY = 1.0
+        retry_attempts = 3
+        retry_delay = 1.0
 
         for model in models:
             payload = {
@@ -179,7 +179,7 @@ class AIService:
                     }
                 ],
             }
-            for attempt in range(RETRY_ATTEMPTS):
+            for attempt in range(retry_attempts):
                 async with aiohttp.ClientSession() as session:
                     try:
                         async with session.post(
@@ -211,23 +211,23 @@ class AIService:
                                     else:
                                         logger.warning(f"AI ({model}) returned unknown/null result on attempt {attempt+1}: {content}")
                                         # Force retry since it failed to identify properly
-                                        if attempt < RETRY_ATTEMPTS - 1:
-                                            await asyncio.sleep(RETRY_DELAY)
+                                        if attempt < retry_attempts - 1:
+                                            await asyncio.sleep(retry_delay)
                                             continue
                                 except json.JSONDecodeError as je:
                                     logger.warning(f"JSON Parse Error ({model}) attempt {attempt+1}: {je}")
-                                    if attempt < RETRY_ATTEMPTS - 1:
-                                        await asyncio.sleep(RETRY_DELAY)
+                                    if attempt < retry_attempts - 1:
+                                        await asyncio.sleep(retry_delay)
                                         continue
                             else:
                                 error_text = await response.text()
                                 logger.warning(f"AI Error {response.status} ({model}) attempt {attempt+1}: {error_text}")
-                                if attempt < RETRY_ATTEMPTS - 1:
-                                    await asyncio.sleep(RETRY_DELAY)
+                                if attempt < retry_attempts - 1:
+                                    await asyncio.sleep(retry_delay)
                                     continue
                     except Exception as e:
                         logger.error(f"Exc in AI Vision ({model}) attempt {attempt+1}: {e}")
-                        if attempt < RETRY_ATTEMPTS - 1:
-                            await asyncio.sleep(RETRY_DELAY)
+                        if attempt < retry_attempts - 1:
+                            await asyncio.sleep(retry_delay)
                         continue
         return None

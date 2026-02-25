@@ -417,7 +417,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
     }.get(goal, "здоровое питание")
 
     try:
-        await callback.message.delete()
+        await message.delete()
     except Exception:
         pass
 

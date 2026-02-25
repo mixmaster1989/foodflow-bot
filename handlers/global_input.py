@@ -192,7 +192,7 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         product = data.get("pending_product")
 
         if not product:
-            await message.reply("⚠️ Ошибка контекста. Попробуйте ввести продукт заново.")
+            await message.answer("Я не понимаю это сообщение. Попробуйте отправить фото еды или текст.")
             await state.clear()
             return
 
@@ -242,10 +242,6 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         await message.reply(f"❌ Ошибка при сохранении: {e}")
         await state.clear()
 
-    except Exception as e:
-        logger.error(f"Global I Ate Error: {e}", exc_info=True)
-        await msg.edit_text(f"❌ Ошибка: {e}")
-        await state.clear()
 
 @router.callback_query(GlobalInputStates.action_pending, F.data == "global_action_fridge")
 async def global_fridge(callback: types.CallbackQuery, state: FSMContext) -> None:

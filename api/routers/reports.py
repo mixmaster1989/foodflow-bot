@@ -29,11 +29,11 @@ async def get_daily_report(
     logs = (await session.execute(stmt)).scalars().all()
 
     # Calculate totals
-    total_calories = sum(l.calories for l in logs) if logs else 0
-    total_protein = sum(l.protein for l in logs) if logs else 0
-    total_fat = sum(l.fat for l in logs) if logs else 0
-    total_carbs = sum(l.carbs for l in logs) if logs else 0
-    total_fiber = sum(l.fiber for l in logs if l.fiber) if logs else 0
+    total_calories = sum(log.calories for log in logs) if logs else 0
+    total_protein = sum(log.protein for log in logs) if logs else 0
+    total_fat = sum(log.fat for log in logs) if logs else 0
+    total_carbs = sum(log.carbs for log in logs) if logs else 0
+    total_fiber = sum(log.fiber for log in logs if log.fiber) if logs else 0
 
     # Get goals
     settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)

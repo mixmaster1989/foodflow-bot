@@ -13,34 +13,34 @@ async def test_scenarios():
     print("🚀 Начинаю хардкорные тесты системы кураторов и ссылок...\n")
 
     # Данные из базы
-    CURATOR_ID = 295543071  # Ольга (@zumbaola)
-    WARD_ID = 5422141137    # Подопечный Ольги
-    MARATHON_ID = 2         # Активный марафон Ольги
+    curator_id = 295543071  # Ольга (@zumbaola)
+    ward_id = 5422141137    # Подопечный Ольги
+    marathon_id = 2         # Активный марафон Ольги
 
     async for session in get_db():
         # --- ТЕСТ 1: Удаление подопечного ---
         print("🛠 Тест 1: Удаление подопечного (Ward Removal)")
-        ward_before = await session.get(User, WARD_ID)
-        print(f"До удаления: User {WARD_ID}, Curator: {ward_before.curator_id}")
+        ward_before = await session.get(User, ward_id)
+        print(f"До удаления: User {ward_id}, Curator: {ward_before.curator_id}")
 
         # Симулируем удаление (как в handlers/curator.py)
         ward_before.curator_id = None
         await session.commit()
 
-        ward_after = await session.get(User, WARD_ID)
-        print(f"После удаления: User {WARD_ID}, Curator: {ward_after.curator_id}")
+        ward_after = await session.get(User, ward_id)
+        print(f"После удаления: User {ward_id}, Curator: {ward_after.curator_id}")
         if ward_after.curator_id is None:
             print("✅ ТЕСТ 1 ПРОЙДЕН: Пользователь отвязан, но остался в базе.\n")
         else:
             print("❌ ТЕСТ 1 ПРОВАЛЕН.\n")
 
         # Возвращаем как было для следующих тестов
-        ward_after.curator_id = CURATOR_ID
+        ward_after.curator_id = curator_id
         await session.commit()
 
         # --- ТЕСТ 2: Истекающая реферальная ссылка (ref_) ---
         print("🛠 Тест 2: Истекающая реферальная ссылка (Referral Expiration)")
-        curator = await session.get(User, CURATOR_ID)
+        curator = await session.get(User, curator_id)
         new_token = f"test_ref_{uuid.uuid4().hex[:6]}"
         curator.referral_token = new_token
         # Устанавливаем срок -1 минута (уже истекла)
@@ -64,15 +64,16 @@ async def test_scenarios():
         # Старая ссылка m_2 (Марафон Ольги)
         user_info = {"username": "test_legacy", "first_name": "Legacy", "last_name": "Test"}
         # Мы используем временного ID для теста, чтобы не плодить мусор
-        TEST_USER_ID = 999999999
+        test_user_id = 999999999
 
         # Удалим если остался от прошлых запусков
-        stmt_del = select(MarathonParticipant).where(MarathonParticipant.user_id == TEST_USER_ID)
+        stmt_del = select(MarathonParticipant).where(MarathonParticipant.user_id == test_user_id)
         old_p = (await session.execute(stmt_del)).scalars().all()
-        for p in old_p: await session.delete(p)
+        for p in old_p:
+            await session.delete(p)
         await session.commit()
 
-        result = await MarathonService.process_invite(session, MARATHON_ID, TEST_USER_ID, user_info)
+        result = await MarathonService.process_invite(session, marathon_id, test_user_id, user_info)
         print(f"Результат входа по ID (m_2): {result['success']} - {result['message']}")
         if result['success'] and "Весна близко" in result['marathon_name']:
             print("✅ ТЕСТ 3 ПРОЙДЕН: Старая ссылка m_ID сработала.")
@@ -82,7 +83,7 @@ async def test_scenarios():
 
         # --- ТЕСТ 4: Марафон - Истекающая ссылка (m_{token}) ---
         print("🛠 Тест 4: Марафон - Истекающая ссылка (Expiring m_{token})")
-        marathon = await session.get(Marathon, MARATHON_ID)
+        marathon = await session.get(Marathon, marathon_id)
         new_m_token = f"m_test_{uuid.uuid4().hex[:6]}"
         marathon.invite_token = new_m_token
         marathon.invite_token_expires_at = datetime.now() - timedelta(minutes=1)

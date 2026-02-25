@@ -52,7 +52,7 @@ async def test_i_ate_flow_integration(db_session):
         yield db_session
 
     with patch('handlers.i_ate.get_db', side_effect=mock_get_db):
-        await i_ate.process_confirm(callback, state)
+        await i_ate.process_confirm_now(callback, state)
 
     # 4. Verify DB persistence
     # Perform a real SELECT query
@@ -71,5 +71,5 @@ async def test_i_ate_flow_integration(db_session):
     state.clear.assert_called_once()
 
     # Verify UI feedback
-    assert "✅ <b>Сохранено:</b>" in callback.message.edit_text.call_args[0][0]
+    assert "✅ <b>Записано!</b>" in callback.message.edit_text.call_args[0][0]
 

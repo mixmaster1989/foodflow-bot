@@ -83,9 +83,12 @@ class HerbalifeExpertService:
 
         # Fallbacks for specific known types if DB is missing data
         if not unit_weight:
-             if "ложка" in std_serving.get("unit", ""): unit_weight = 13.0 # F1 approx
-             elif product["id"] == "h24_rebuild": unit_weight = 25.0
-             else: unit_weight = 1.0 # Safe default
+             if "ложка" in std_serving.get("unit", ""):
+                 unit_weight = 13.0 # F1 approx
+             elif product["id"] == "h24_rebuild":
+                 unit_weight = 25.0
+             else:
+                 unit_weight = 1.0 # Safe default
 
         if "ложк" in unit or "черпак" in unit:
             # Scoops/spoons
