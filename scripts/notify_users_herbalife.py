@@ -1,14 +1,14 @@
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aiogram import Bot
 from sqlalchemy import select
-from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+
 from config import settings
 from database.base import get_db
 from database.models import User
@@ -34,28 +34,28 @@ HERBALIFE_MESSAGE = """
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     logger.info("Starting User notification (Herbalife)...")
-    
+
     success_count = 0
     fail_count = 0
-    
+
     async for session in get_db():
         result = await session.execute(select(User.id))
         user_ids = result.scalars().all()
-        
+
         logger.info(f"Found {len(user_ids)} total users.")
-        
+
         for user_id in user_ids:
             try:
                 await bot.send_message(user_id, HERBALIFE_MESSAGE, parse_mode="HTML")
                 success_count += 1
                 logger.info(f"Sent to user {user_id}")
                 await asyncio.sleep(0.05)
-            except Exception as e:
+            except Exception:
                 # logger.error(f"Failed to send to {user_id}: {e}") # Silent fails for normal users to avoid cluttering logs
                 fail_count += 1
-        
+
     logger.info(f"User Notification finished. Success: {success_count}, Failed: {fail_count}")
     await bot.session.close()
 

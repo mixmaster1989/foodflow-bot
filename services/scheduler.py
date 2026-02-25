@@ -9,16 +9,16 @@ import logging
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.base import StorageKey
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 
+from daily_nutrition_report import run_daily_report
 from database.base import get_db
 from database.models import UserSettings
-from aiogram.fsm.storage.base import StorageKey
-from aiogram.fsm.context import FSMContext
 from handlers.weight import WeightStates
-from daily_nutrition_report import run_daily_report
 from services.reports import generate_daily_report
 
 logger = logging.getLogger(__name__)
@@ -31,16 +31,16 @@ async def send_weight_reminders(bot: Bot, dp: Dispatcher) -> None:
     current_hour = datetime.now().strftime("%H")
     current_minute = datetime.now().strftime("%M")
     current_time = f"{current_hour}:{current_minute}"
-    
+
     logger.info(f"Running weight reminder job at {current_time}")
-    
+
     async for session in get_db():
         # Get ALL users with reminders enabled (removed is_initialized filter)
         stmt = select(UserSettings).where(
-            UserSettings.reminders_enabled == True,
+            UserSettings.reminders_enabled,
         )
         settings_list = (await session.execute(stmt)).scalars().all()
-        
+
         for settings in settings_list:
             # Check if reminder_time hour matches current hour
             reminder_hour = settings.reminder_time.split(":")[0] if settings.reminder_time else "09"
@@ -56,7 +56,7 @@ async def send_weight_reminders(bot: Bot, dp: Dispatcher) -> None:
                         )
                     )
                     await state.set_state(WeightStates.waiting_for_morning_weight)
-                    
+
                     prompt_suffix = "(например: 72.5)"
                     if settings.weight:
                         prompt_suffix = f"(прошлый: {settings.weight})"
@@ -85,16 +85,16 @@ async def send_daily_summaries(bot: Bot) -> None:
     from datetime import datetime
     current_hour = datetime.now().strftime("%H:00")
     logger.info(f"Running daily summary check for hour {current_hour}")
-    
+
     async for session in get_db():
         # Get ALL users whose summary_time matches current hour (removed is_initialized filter)
         stmt = select(UserSettings).where(
             UserSettings.summary_time == current_hour
         )
         settings_list = (await session.execute(stmt)).scalars().all()
-        
+
         logger.info(f"Found {len(settings_list)} users for summary at {current_hour}")
-        
+
         for settings in settings_list:
             try:
                 report_text = await generate_daily_report(settings.user_id)
@@ -112,9 +112,9 @@ async def send_daily_summaries(bot: Bot) -> None:
 def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
     """Initialize and start the APScheduler."""
     global scheduler
-    
+
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    
+
     # 1. Weight Reminders (Hourly check)
     scheduler.add_job(
         send_weight_reminders,
@@ -132,7 +132,7 @@ def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
         id="daily_summaries",
         replace_existing=True
     )
-    
+
     # TODO [CURATOR-3.1]: Add curator morning summary job
     # scheduler.add_job(
     #     send_curator_summaries,  # from services.curator_analytics
@@ -141,7 +141,7 @@ def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
     #     id="curator_summaries",
     #     replace_existing=True
     # )
-    
+
     # 3. Visual Nutrition Report (12:00 MSK)
     scheduler.add_job(
         run_daily_report,
@@ -149,8 +149,8 @@ def start_scheduler(bot: Bot, dp: Dispatcher) -> AsyncIOScheduler:
         id="visual_daily_report",
         replace_existing=True
     )
-    
+
     scheduler.start()
     logger.info("📅 Reminder scheduler started")
-    
+
     return scheduler

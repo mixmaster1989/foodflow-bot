@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from api.auth import DBSession, CurrentUser
+from api.auth import CurrentUser, DBSession
 from api.schemas import ShoppingListItemCreate, ShoppingListItemRead
 from database.models import ShoppingListItem
 
@@ -40,7 +40,7 @@ async def mark_bought(item_id: int, user: CurrentUser, session: DBSession):
     item = await session.get(ShoppingListItem, item_id)
     if not item or item.user_id != user.id:
         raise HTTPException(status_code=404, detail="Item not found")
-    
+
     item.is_bought = True
     await session.commit()
     return {"message": "Marked as bought"}
@@ -52,7 +52,7 @@ async def mark_unbought(item_id: int, user: CurrentUser, session: DBSession):
     item = await session.get(ShoppingListItem, item_id)
     if not item or item.user_id != user.id:
         raise HTTPException(status_code=404, detail="Item not found")
-    
+
     item.is_bought = False
     await session.commit()
     return {"message": "Marked as not bought"}
@@ -64,6 +64,6 @@ async def delete_shopping_item(item_id: int, user: CurrentUser, session: DBSessi
     item = await session.get(ShoppingListItem, item_id)
     if not item or item.user_id != user.id:
         raise HTTPException(status_code=404, detail="Item not found")
-    
+
     await session.delete(item)
     await session.commit()

@@ -235,7 +235,7 @@ class TestShoppingHandler:
         # Verify session was created
         stmt = select(ShoppingSession).where(
             ShoppingSession.user_id == sample_user.id,
-            ShoppingSession.is_active == True  # noqa: E712
+            ShoppingSession.is_active  # noqa: E712
         )
         result = await db_session.execute(stmt)
         session = result.scalar_one_or_none()
@@ -277,7 +277,7 @@ class TestShoppingHandler:
         # Verify existing session is reused (not new one created)
         stmt = select(ShoppingSession).where(
             ShoppingSession.user_id == sample_user.id,
-            ShoppingSession.is_active == True  # noqa: E712
+            ShoppingSession.is_active  # noqa: E712
         )
         result = await db_session.execute(stmt)
         sessions = result.scalars().all()

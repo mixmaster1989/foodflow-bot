@@ -5,23 +5,22 @@ Contains handlers for:
 - Product detail view with pagination
 - Consuming and deleting products
 """
+import io
 import logging
 import math
-import io
 from datetime import datetime
 
+from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram import Bot, Router, F, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from database.base import get_db
-from database.models import ConsumptionLog, Product, Receipt, UserSettings
-from services.consultant import ConsultantService
-from services.photo_queue import PhotoQueueManager
+from database.models import ConsumptionLog, Product, Receipt
 from services.ai import AIService
+from services.photo_queue import PhotoQueueManager
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext =
     """Show fridge summary with total items and recently added products."""
     if state:
         await state.clear()
-        
+
     user_id = callback.from_user.id
 
     async for session in get_db():
@@ -190,7 +189,7 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
 
     async for session in get_db():
         product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
-        
+
         owner_id = product.user_id
         if product.receipt:
              owner_id = product.receipt.user_id
@@ -256,15 +255,15 @@ async def handle_consume_choice(callback: types.CallbackQuery, state: FSMContext
     mode = parts[1]
     product_id = int(parts[2])
     page = int(parts[3]) if len(parts) > 3 else 0
-    
+
     if mode == "whole":
         await consume_product(callback, product_id, page, amount=1, unit="qty")
-        
+
     elif mode == "grams_input":
         await state.set_state(FridgeStates.waiting_for_consume_grams)
         await state.update_data(product_id=product_id, page=page)
         await callback.message.edit_text("⚖️ <b>Введите вес (в граммах):</b>\n\nНапример: 50, 100", parse_mode="HTML")
-        
+
     elif mode == "pieces_input":
         await state.set_state(FridgeStates.waiting_for_consume_pieces)
         await state.update_data(product_id=product_id, page=page)
@@ -275,16 +274,16 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
     """Core consumption logic."""
     async for session in get_db():
         product = await session.get(Product, product_id)
-        
+
         if not product:
             await callback.answer("Товар не найден", show_alert=True)
             return
 
         calculated_calories = 0
-        
+
         if unit == "grams":
             calculated_calories = (amount / 100) * product.calories if product.calories else 0
-            
+
             if product.weight_g is not None:
                 if product.weight_g > amount:
                     product.weight_g -= amount
@@ -310,7 +309,7 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
                 estimated_weight = 100.0 * amount
                 calculated_calories = (estimated_weight / 100) * product.calories if product.calories else 0
                 # We can't reduce weight_g since it's None.
-            
+
             if product.quantity > amount:
                 product.quantity -= amount
                 msg = f"✅ Съедено {amount} шт. Осталось: {product.quantity}"
@@ -319,7 +318,7 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
                 await session.delete(product)
                 msg = "✅ Продукт закончился."
                 remaining = False
-                
+
         # Log to DB
         log = ConsumptionLog(
             user_id=callback.from_user.id,
@@ -333,12 +332,12 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
         )
         session.add(log)
         await session.commit()
-        
+
         if not product.weight_g and unit == "qty":
              msg += " (Вес неизвестен, считаем 100г/шт)"
 
         await callback.answer(msg, show_alert=True)
-        
+
         if remaining:
              from types import SimpleNamespace
              new_callback = SimpleNamespace(data=f"fridge_item:{product_id}:{page}", from_user=callback.from_user, message=callback.message, answer=callback.answer)
@@ -361,7 +360,7 @@ async def delete_product(callback: types.CallbackQuery) -> None:
 
     async for session in get_db():
         product = await session.get(Product, product_id, options=[selectinload(Product.receipt)])
-        
+
         owner_id = product.user_id
         if product and product.receipt:
              owner_id = product.receipt.user_id
@@ -403,12 +402,12 @@ async def fridge_add_choice(callback: types.CallbackQuery, state: FSMContext) ->
     builder.button(text="🥘 Готовое блюдо", callback_data="fridge_add:dish")
     builder.button(text="🔙 Назад", callback_data="menu_fridge")
     builder.adjust(1)
-    
+
     text = (
         "➕ <b>Добавить еду в холодильник</b>\n\n"
         "Выбери способ добавления:"
     )
-    
+
     try:
         await callback.message.edit_caption(
             caption=text,
@@ -433,7 +432,7 @@ async def fridge_add_choice(callback: types.CallbackQuery, state: FSMContext) ->
 @router.callback_query(F.data.startswith("fridge_add:"))
 async def fridge_add_mode_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
     mode = callback.data.split(":")[1]
-    
+
     if mode == "receipt":
         await state.set_state(FridgeStates.waiting_for_receipt_scan)
         text = "📄 <b>Сканирование чека</b>\n\nПришли фото чека, и я добавлю все продукты."
@@ -443,10 +442,10 @@ async def fridge_add_mode_handler(callback: types.CallbackQuery, state: FSMConte
     elif mode == "dish":
         await state.set_state(FridgeStates.waiting_for_dish_photo)
         text = "🥘 <b>Готовое блюдо</b>\n\nСфотографируй блюдо, которое хочешь сохранить."
-        
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="fridge_add_choice")
-    
+
     try:
         await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup(), parse_mode="HTML")
     except Exception:
@@ -467,7 +466,6 @@ async def process_fridge_receipt(message: types.Message, bot: Bot, state: FSMCon
 
 @router.message(FridgeStates.waiting_for_label_photo, F.photo)
 async def process_fridge_label(message: types.Message, bot: Bot, state: FSMContext) -> None:
-    from services.photo_queue import PhotoQueueManager
     await PhotoQueueManager.add_item(
         user_id=message.from_user.id,
         message=message,
@@ -485,7 +483,7 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
         await bot.download_file(file_info.file_path, photo_bytes)
 
         product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
-        
+
         if not product_data or not product_data.get("name"):
             raise ValueError("Не удалось распознать. Попробуй еще раз.")
 
@@ -507,7 +505,7 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
             )
             session.add(product)
             await session.commit()
-            
+
         builder = InlineKeyboardBuilder()
         builder.button(text="➕ Добавить еще", callback_data="fridge_add:label")
         builder.button(text="🔙 В холодильник", callback_data="menu_fridge")
@@ -526,7 +524,6 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
 
 @router.message(FridgeStates.waiting_for_dish_photo, F.photo)
 async def process_fridge_dish(message: types.Message, bot: Bot, state: FSMContext) -> None:
-    from services.photo_queue import PhotoQueueManager
     await PhotoQueueManager.add_item(
         user_id=message.from_user.id,
         message=message,
@@ -544,7 +541,7 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
         await bot.download_file(file_info.file_path, photo_bytes)
 
         product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
-        
+
         if not product_data or not product_data.get("name"):
             raise ValueError("Не удалось распознать блюдо.")
 
@@ -561,7 +558,7 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
                 carbs=float(product_data.get("carbs", 0)),
                 fiber=float(product_data.get("fiber", 0)), # SAVE FIBER
                 price=0.0,
-                quantity=1.0, 
+                quantity=1.0,
                 weight_g=float(product_data.get("weight_g", 0)) if product_data.get("weight_g") else None
             )
             session.add(product)
@@ -571,7 +568,7 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
         builder.button(text="➕ Добавить еще", callback_data="fridge_add:dish")
         builder.button(text="🔙 В холодильник", callback_data="menu_fridge")
         builder.adjust(1)
-        
+
         await status_msg.edit_text(
             f"✅ <b>Готовое блюдо добавлено:</b>\n<b>{product_data['name']}</b>\n"
             f"🔥 <code>{product_data.get('calories')} ккал</code>\n"
@@ -588,7 +585,7 @@ async def process_consume_grams(message: types.Message, state: FSMContext) -> No
     data = await state.get_data()
     product_id = data.get("product_id")
     page = data.get("page", 0)
-    
+
     try:
         amount = float(message.text.replace(",", "."))
         if amount <= 0:
@@ -596,16 +593,16 @@ async def process_consume_grams(message: types.Message, state: FSMContext) -> No
     except ValueError:
         await message.answer("❌ Введите положительное число (например: 50 или 100.5)")
         return
-    
+
     await state.clear()
-    
+
     from types import SimpleNamespace
     mock_callback = SimpleNamespace(
         from_user=message.from_user,
         message=message,
         answer=lambda text, show_alert=False: message.answer(text)
     )
-    
+
     await consume_product(mock_callback, product_id, page, amount=amount, unit="grams")
 
 @router.message(FridgeStates.waiting_for_consume_pieces)
@@ -613,7 +610,7 @@ async def process_consume_pieces(message: types.Message, state: FSMContext) -> N
     data = await state.get_data()
     product_id = data.get("product_id")
     page = data.get("page", 0)
-    
+
     try:
         amount = float(message.text.replace(",", "."))
         if amount <= 0:
@@ -621,16 +618,16 @@ async def process_consume_pieces(message: types.Message, state: FSMContext) -> N
     except ValueError:
         await message.answer("❌ Введите положительное число (например: 1 или 0.5)")
         return
-    
+
     await state.clear()
-    
+
     from types import SimpleNamespace
     mock_callback = SimpleNamespace(
         from_user=message.from_user,
         message=message,
         answer=lambda text, show_alert=False: message.answer(text)
     )
-    
+
     await consume_product(mock_callback, product_id, page, amount=amount, unit="qty")
 
 

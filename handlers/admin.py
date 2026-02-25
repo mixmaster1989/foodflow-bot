@@ -1,6 +1,7 @@
 import logging
 import subprocess
-from aiogram import Router, F, types, Bot
+
+from aiogram import Bot, F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -66,7 +67,7 @@ async def restart_bot_handler(callback: types.CallbackQuery):
     await callback.answer()
 
     logger.warning(f"Admin {user_id} initiated bot restart.")
-    
+
     try:
         subprocess.Popen(["pm2", "restart", "foodflow-bot"])
     except Exception as e:
@@ -79,17 +80,17 @@ async def admin_send_message_start(callback: types.CallbackQuery, state: FSMCont
     if not is_admin(callback.from_user.id):
         await callback.answer("⛔ Нет доступа", show_alert=True)
         return
-    
+
     async for session in get_db():
         users = (await session.execute(select(User))).scalars().all()
-        
+
         builder = InlineKeyboardBuilder()
         for user in users:
             name = user.username or f"ID:{user.id}"
             builder.button(text=f"👤 {name}", callback_data=f"admin_select_user:{user.id}")
         builder.button(text="❌ Отмена", callback_data="main_menu")
         builder.adjust(1)
-        
+
         try:
             await callback.message.edit_text(
                 "📨 <b>Выберите получателя:</b>",
@@ -112,19 +113,19 @@ async def admin_select_user(callback: types.CallbackQuery, state: FSMContext) ->
     """Handle user selection, ask for message."""
     if not is_admin(callback.from_user.id):
         return
-    
+
     user_id = int(callback.data.split(":")[1])
-    
+
     async for session in get_db():
         user = await session.get(User, user_id)
         user_name = user.username if user else f"ID:{user_id}"
-    
+
     await state.update_data(target_user_id=user_id, target_user_name=user_name)
     await state.set_state(AdminStates.typing_message)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ Отмена", callback_data="admin_cancel")
-    
+
     await callback.message.edit_text(
         f"📝 Напишите сообщение для <b>{user_name}</b>:\n\n"
         "<i>Просто отправьте текст в чат</i>",
@@ -139,16 +140,16 @@ async def admin_send_message(message: types.Message, state: FSMContext, bot: Bot
     """Send the typed message to selected user."""
     if not is_admin(message.from_user.id):
         return
-    
+
     data = await state.get_data()
     target_user_id = data.get("target_user_id")
     target_user_name = data.get("target_user_name")
-    
+
     if not target_user_id:
         await message.answer("⚠️ Получатель не выбран")
         await state.clear()
         return
-    
+
     try:
         await bot.send_message(
             chat_id=target_user_id,
@@ -161,7 +162,7 @@ async def admin_send_message(message: types.Message, state: FSMContext, bot: Bot
         )
     except Exception as e:
         await message.answer(f"❌ Ошибка отправки: {e}")
-    
+
     await state.clear()
 
 

@@ -7,34 +7,31 @@ from config import settings
 from database import migrations
 from database.base import init_db
 from handlers import (
-    common,
-    auth,
-    onboarding,
-    menu,
-    water,
-    i_ate,
-    receipt,
-    shopping,
-    stats,
-    fridge,
-    recipes,
-    user_settings,
-    subscription,
-    curator,
-    saved_dishes,
-    weight,
-    weight,
-    base,
-    universal_input,
-    fridge_search,
-    errors, 
-    shopping_list,
     admin,
-    support,
+    common,
     correction,
+    curator,
+    errors,
+    fridge,
+    fridge_search,
     herbalife,
+    i_ate,
+    menu,
+    onboarding,
+    receipt,
+    recipes,
+    saved_dishes,
+    shopping,
+    shopping_list,
+    stats,
+    subscription,
+    support,
+    universal_input,
+    user_settings,
     ward_interactions,
     # global_input,
+    water,
+    weight,
 )
 from handlers.marathon import curator_menu
 
@@ -59,13 +56,13 @@ async def main():
     # Register Middleware
     from handlers.auth import AuthMiddleware
     from middleware.admin_logger import AdminLoggerMiddleware
-    from middleware.user_enrichment import UserEnrichmentMiddleware
     from middleware.paywall import PaywallMiddleware
-    
+    from middleware.user_enrichment import UserEnrichmentMiddleware
+
     dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
     dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
     dp.update.middleware(AuthMiddleware())
-    
+
     # Paywall should intercept messages and callbacks
     dp.message.middleware(PaywallMiddleware())
     dp.callback_query.middleware(PaywallMiddleware())

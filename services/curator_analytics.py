@@ -9,14 +9,6 @@ This module provides:
 TODO [CURATOR-3]: Implement this module
 """
 import logging
-from datetime import datetime, timedelta
-from typing import Any
-
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from database.base import get_db
-from database.models import User, ConsumptionLog, UserSettings
 
 logger = logging.getLogger(__name__)
 

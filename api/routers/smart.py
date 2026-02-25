@@ -1,7 +1,8 @@
 """Smart Analysis Router."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from api.auth import CurrentUser, DBSession
+
+from api.auth import CurrentUser
 from services.normalization import NormalizationService
 
 router = APIRouter()
@@ -23,7 +24,7 @@ async def analyze_text(request: AnalyzeRequest, user: CurrentUser):
     """Analyze text description of food."""
     try:
         result = await NormalizationService.analyze_food_intake(request.text)
-        
+
         # Safe extraction
         return AnalyzedProduct(
             name=result.get("name", request.text),

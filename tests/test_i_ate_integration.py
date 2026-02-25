@@ -1,11 +1,12 @@
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from sqlalchemy import select
-from datetime import datetime
 
+import pytest
+from sqlalchemy import select
+
+from database.models import ConsumptionLog, User
 from handlers import i_ate
-from database.models import User, ConsumptionLog
+
 
 @pytest.mark.asyncio
 async def test_i_ate_flow_integration(db_session):
@@ -28,9 +29,9 @@ async def test_i_ate_flow_integration(db_session):
     callback = AsyncMock()
     callback.from_user.id = user_id
     callback.message = message
-    
+
     state = AsyncMock()
-    
+
     # Mock data that would be in FSM after user says "Apple 100g"
     pending_data = {
         "pending_product": {
@@ -44,7 +45,7 @@ async def test_i_ate_flow_integration(db_session):
         }
     }
     state.get_data.return_value = pending_data
-    
+
     # 3. Simulate Clicking "Confirm" (process_confirm)
     # We need to patch get_db to return our test db_session
     async def mock_get_db():
@@ -52,23 +53,23 @@ async def test_i_ate_flow_integration(db_session):
 
     with patch('handlers.i_ate.get_db', side_effect=mock_get_db):
         await i_ate.process_confirm(callback, state)
-    
+
     # 4. Verify DB persistence
     # Perform a real SELECT query
     result = await db_session.execute(
         select(ConsumptionLog).where(ConsumptionLog.user_id == user_id)
     )
     logs = result.scalars().all()
-    
+
     assert len(logs) == 1
     log = logs[0]
     assert log.product_name == "Apple (100г)"
     assert log.calories == 52.0
     assert log.carbs == 13.8  # Verify it saved the correct data
-    
+
     # Verify State was cleared
     state.clear.assert_called_once()
-    
+
     # Verify UI feedback
     assert "✅ <b>Сохранено:</b>" in callback.message.edit_text.call_args[0][0]
 

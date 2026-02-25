@@ -8,10 +8,10 @@ Contains:
 - menu_settings_handler: Show settings menu
 """
 from aiogram import F, Router, types
-from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
 
@@ -61,22 +61,24 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Check user role and gender from DB
     is_curator = False
     is_female = False
+    from datetime import date
+
+    from sqlalchemy import and_, func, select
+
     from database.base import get_db
-    from database.models import User, UserSettings, ConsumptionLog, WaterLog
-    from sqlalchemy import select, and_, func
-    from datetime import datetime, date
+    from database.models import ConsumptionLog, User, UserSettings, WaterLog
     async for session in get_db():
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
         if user and user.role == "curator":
             is_curator = True
-        
+
         # Check gender from settings
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(settings_stmt)).scalar_one_or_none()
         if settings and settings.gender == "female":
             is_female = True
-    
+
         # Get daily metrics (calories, macros) for display
         today = date.today()
         metrics_stmt = select(
@@ -92,7 +94,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
             )
         )
         row = (await session.execute(metrics_stmt)).fetchone()
-        
+
         total_metrics = {
             "calories": row[0] or 0,
             "protein": row[1] or 0,
@@ -100,7 +102,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
             "carbs": row[3] or 0,
             "fiber": row[4] or 0
         }
-        
+
         # Get daily water
         water_stmt = select(func.sum(WaterLog.amount_ml)).where(
             and_(
@@ -109,21 +111,21 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
             )
         )
         water_total = (await session.execute(water_stmt)).scalar() or 0
-        
+
         goals = {
             "calories": settings.calorie_goal if settings else 2000,
             "water": settings.water_goal if settings else 2000
         }
-        
+
     # Row 0: BIG "I ATE" button - gender aware
     ate_text = "🍽️ Я СЪЕЛА!" if is_female else "🍽️ Я СЪЕЛ!"
     builder.button(text=ate_text, callback_data="menu_i_ate")
     builder.button(text="💧 Вода", callback_data="menu_water")
-    
+
     # Curator dashboard button (visible only for curators)
     if is_curator:
         builder.button(text="👨‍🏫 Кабинет Куратора", callback_data="curator_dashboard")
-    
+
     # Row 1: Fridge
     builder.button(text="🧊 Холодильник", callback_data="menu_fridge")
 
@@ -137,7 +139,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Row 4: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
-    
+
     # Row 5: Web App
     if user_tier != "free":
         from aiogram.types import WebAppInfo
@@ -159,7 +161,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
         rows = [2, 1, 1, 2, 2, 1, 1]  # I ATE/Water, Fridge, Recipes(1), Stats(2), System(2), WebApp(1), Contact(1)
     if message.from_user.id in settings.ADMIN_IDS:
         rows.append(2)
-        
+
     builder.adjust(*rows)
 
     # Get recent logs for the card
@@ -172,11 +174,11 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
             )
         ).order_by(ConsumptionLog.date.desc()).limit(10)
         logs = (await session.execute(stmt)).scalars().all()
-        
+
     # Generate the dynamic dashboard card
     from services.image_renderer import draw_daily_card
     photo_bytes = draw_daily_card(user_name, today, logs, total_metrics, goals, water_total)
-    
+
     # Use InputMediaPhoto instead of Animation
     media_file = types.BufferedInputFile(photo_bytes.getvalue(), filename="dashboard.png")
 
@@ -225,9 +227,9 @@ async def menu_check_handler(callback: types.CallbackQuery, state: FSMContext) -
 
     """
     from handlers.shopping import ShoppingMode
-    
+
     await state.set_state(ShoppingMode.waiting_for_receipt)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="main_menu")
 

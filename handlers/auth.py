@@ -1,7 +1,8 @@
-from typing import Any, Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, Update
 from sqlalchemy.future import select
 
 from config import settings
@@ -13,11 +14,11 @@ from handlers.menu import show_main_menu
 class AuthMiddleware(BaseMiddleware):
     async def __call__(
         self,
-        handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[Update, dict[str, Any]], Awaitable[Any]],
         event: Update,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> Any:
-        
+
         # Determine user_id and message object for reply
         user_id = None
         message_obj = None
@@ -28,7 +29,7 @@ class AuthMiddleware(BaseMiddleware):
         elif event.callback_query:
             user_id = event.callback_query.from_user.id
             message_obj = event.callback_query.message
-        
+
         if not user_id:
             return await handler(event, data)
 
@@ -38,19 +39,19 @@ class AuthMiddleware(BaseMiddleware):
             user = (await session.execute(stmt)).scalar_one_or_none()
 
             # If user not found (first start), let them pass to cmd_start (which checks logic)
-            # BUT cmd_start creates user. 
+            # BUT cmd_start creates user.
             # We want to BLOCK everything until password.
             # If user usually gets created in cmd_start, we might face issue if we block start.
-            
-            # Allow /start if user doesn't exist? 
+
+            # Allow /start if user doesn't exist?
             # If user sends /start, we want to ask for password.
-            
+
             if not user:
                 # If user doesn't exist, we probably shouldn't block yet, OR we treat them as unverified.
                 # Let's say we enforce password for EVERYONE.
                 # If they send 'Welcome2026', we create them/verify them.
                 pass
-            
+
             # Check verification
             is_verified = user.is_verified if user else False
 
@@ -67,17 +68,17 @@ class AuthMiddleware(BaseMiddleware):
                 resize_keyboard=True,
                 persistent=True
             )
-            
+
             # Only handle handle text messages for password input
             if event.message and event.message.text:
                 text = event.message.text.strip()
-                
+
                 # Check Global Password (New Users)
                 if text == settings.GLOBAL_PASSWORD:
                     if not user:
                         # Create user if not exists
                         user = User(
-                            id=user_id, 
+                            id=user_id,
                             username=event.message.from_user.username,
                             first_name=event.message.from_user.first_name,
                             last_name=event.message.from_user.last_name,
@@ -86,23 +87,23 @@ class AuthMiddleware(BaseMiddleware):
                         session.add(user)
                     else:
                         user.is_verified = True
-                    
+
                     await session.commit()
                     await message_obj.answer("✅ Пароль принят! Добро пожаловать.", reply_markup=kb)
-                    
+
                     # Check if onboarding is needed (CRITICAL FIX)
                     from database.models import UserSettings
                     from handlers.onboarding import start_onboarding
                     settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
                     user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-                    
+
                     if not user_settings or not user_settings.is_initialized:
                         # Start onboarding for new users
                         state = data.get("state")
                         if state:
                             await start_onboarding(message_obj, state)
                         return
-                    
+
                     # Show main menu only if already initialized
                     await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation (we handled it)
@@ -113,7 +114,7 @@ class AuthMiddleware(BaseMiddleware):
                     if not user:
                          # Should not happen for old users, but if so...
                         user = User(
-                            id=user_id, 
+                            id=user_id,
                             username=event.message.from_user.username,
                             first_name=event.message.from_user.first_name,
                             last_name=event.message.from_user.last_name,
@@ -122,20 +123,20 @@ class AuthMiddleware(BaseMiddleware):
                         session.add(user)
                     else:
                         user.is_verified = True
-                    
+
                     await session.commit()
                     await message_obj.answer("✅ Личный пароль принят!", reply_markup=kb)
-                    
+
                     # Check if onboarding is needed (same fix as global password)
                     settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
                     user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-                    
+
                     if not user_settings or not user_settings.is_initialized:
                         state = data.get("state")
                         if state:
                             await start_onboarding(message_obj, state)
                         return
-                    
+
                     # Show main menu only if already initialized
                     await show_main_menu(message_obj, message_obj.from_user.first_name, message_obj.from_user.id)
                     return # Stop propagation
@@ -143,7 +144,7 @@ class AuthMiddleware(BaseMiddleware):
             # If we are here, user is not verified and didn't guess password.
             # Block access.
             if message_obj:
-                # Avoid spamming on every update? 
+                # Avoid spamming on every update?
                 # Only answer if it's a message.
                 if event.message:
                     await message_obj.answer(
@@ -152,6 +153,6 @@ class AuthMiddleware(BaseMiddleware):
                         "Введите пароль для продолжения.",
                         parse_mode="HTML"
                     )
-            
+
             # Stop propagation
             return

@@ -7,7 +7,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy.future import select
-from database.base import init_db, get_db
+
+from database.base import get_db, init_db
 from database.models import User
 
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,7 @@ async def check_status():
     async for session in get_db():
         stmt = select(User).where(User.id == 7846721167)
         user = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if user:
             print(f"User Found: {user.username}")
             print(f"Verified: {user.is_verified}")

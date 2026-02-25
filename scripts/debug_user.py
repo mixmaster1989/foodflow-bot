@@ -5,9 +5,11 @@ from pathlib import Path
 # Add root directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from database.base import init_db, get_db
-from database.models import User, UserSettings
 from sqlalchemy.future import select
+
+from database.base import get_db, init_db
+from database.models import User, UserSettings
+
 
 async def check_user(user_id):
     await init_db()
@@ -19,7 +21,7 @@ async def check_user(user_id):
         if user:
             print(f"  is_verified: {user.is_verified}")
             print(f"  created_at: {user.created_at}")
-        
+
         # Check UserSettings
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()

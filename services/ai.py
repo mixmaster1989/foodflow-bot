@@ -3,12 +3,12 @@
 Contains:
 - AIService: Generates recipes based on available ingredients and category
 """
+import asyncio
 import json
 import logging
 from typing import Any
 
 import aiohttp
-import asyncio
 
 from config import settings
 
@@ -46,7 +46,7 @@ class AIService:
             }
             goal_text = goal_map.get(user_settings.goal, "здоровое питание")
             allergies = user_settings.allergies if user_settings.allergies else "нет"
-            
+
             context_str = (
                 f"USER PROFILE:\n"
                 f"- Goal: {goal_text}\n"
@@ -125,6 +125,7 @@ class AIService:
         """Recognize product from photo and get average KBZHU + Fiber."""
         import base64
         import re
+
         from services.label_ocr import LabelOCRService
 
         # First try: parse as label (has KBZHU on it)
@@ -195,12 +196,12 @@ class AIService:
 
                                 content = result["choices"][0]["message"]["content"]
                                 content = content.replace("```json", "").replace("```", "").strip()
-                                
+
                                 # Robust JSON extraction
                                 json_match = re.search(r"\{.*\}", content, re.DOTALL)
                                 if json_match:
                                     content = json_match.group(0)
-                                
+
                                 try:
                                     data = json.loads(content)
                                     # SUCCESS CRITERIA: Must have a name and it shouldn't be null/empty

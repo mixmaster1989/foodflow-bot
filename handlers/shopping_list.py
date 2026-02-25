@@ -18,7 +18,6 @@ from sqlalchemy import select
 from database.base import get_db
 from database.models import Product, ShoppingListItem, UserSettings
 from services.consultant import ConsultantService
-from sqlalchemy import select
 
 router = Router()
 

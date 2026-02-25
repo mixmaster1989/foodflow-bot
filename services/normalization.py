@@ -97,7 +97,7 @@ class NormalizationService:
                             if response.status == 200:
                                 result = await response.json()
                                 content = result['choices'][0]['message']['content']
-                                
+
                                 # Robust JSON extraction
                                 json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
                                 if json_match:
@@ -119,7 +119,7 @@ class NormalizationService:
                                         norm_data = normalized_map.get(raw_name, {})
 
                                         final_items.append({
-                                            "name": norm_data.get('name', raw_name), 
+                                            "name": norm_data.get('name', raw_name),
                                             "price": item.get('price', 0.0),
                                             "quantity": item.get('quantity', 1.0),
                                             "category": norm_data.get('category', 'Uncategorized'),
@@ -152,7 +152,7 @@ class NormalizationService:
     @classmethod
     async def analyze_food_intake(cls, description: str) -> dict:
         """Analyze food intake with weight detection.
-        
+
         Returns dict with:
         - name: food name
         - calories, protein, fat, carbs, fiber: KBJU values
@@ -213,6 +213,7 @@ If weight is NOT specified:
 CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
 
         import asyncio
+
         import aiohttp
 
         for model in cls.MODELS[:3]:  # Use first 3 models only
@@ -223,7 +224,7 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1
                     }
-                    
+
                     async with aiohttp.ClientSession() as session:
                         async with session.post(
                             "https://openrouter.ai/api/v1/chat/completions",
@@ -234,14 +235,14 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
                             if resp.status == 200:
                                 data = await resp.json()
                                 content = data["choices"][0]["message"]["content"].strip()
-                                
+
                                 # Clean JSON
                                 if content.startswith("```"):
                                     content = content.split("```")[1]
                                     if content.startswith("json"):
                                         content = content[4:]
                                 content = content.strip()
-                                
+
                                 result = json.loads(content)
                                 logger.info(f"Food intake analyzed: {result}")
                                 return result
@@ -250,7 +251,7 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
                     if attempt < 1:
                         await asyncio.sleep(0.3)
                         continue
-        
+
         # Fallback
         return {
             "name": description,
@@ -266,23 +267,23 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
     @classmethod
     async def analyze_food_intake_batch(cls, items: list[dict]) -> list[dict]:
         """Analyze multiple food items in one AI call.
-        
+
         Args:
             items: list of {"product": str, "weight": int|None}
-            
+
         Returns:
             list of dicts with name, base_name, calories, protein, fat, carbs, fiber, weight_grams
         """
         if not items:
             return []
-            
+
         # Build items description
         lines = []
         for i, item in enumerate(items, 1):
             w = f" {item['weight']}г" if item.get('weight') else ""
             lines.append(f"{i}. {item['product']}{w}")
         items_text = "\n".join(lines)
-        
+
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -319,6 +320,7 @@ RETURN JSON ARRAY ONLY:
 CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
 
         import asyncio
+
         import aiohttp
 
         for model in cls.MODELS[:3]:
@@ -329,7 +331,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1
                     }
-                    
+
                     async with aiohttp.ClientSession() as session:
                         async with session.post(
                             "https://openrouter.ai/api/v1/chat/completions",
@@ -340,20 +342,20 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                             if resp.status == 200:
                                 data = await resp.json()
                                 content = data["choices"][0]["message"]["content"].strip()
-                                
+
                                 # Clean JSON
                                 if content.startswith("```"):
                                     content = content.split("```")[1]
                                     if content.startswith("json"):
                                         content = content[4:]
                                 content = content.strip()
-                                
+
                                 result = json.loads(content)
-                                
+
                                 # Ensure it's a list
                                 if isinstance(result, dict):
                                     result = [result]
-                                    
+
                                 logger.info(f"Batch food analyzed: {len(result)} items")
                                 return result
                 except Exception as e:
@@ -361,7 +363,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                     if attempt < 1:
                         await asyncio.sleep(0.3)
                         continue
-        
+
         # Fallback: return basic data per item
         fallback = []
         for item in items:
@@ -383,9 +385,9 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
         """Suggest a culinary name for a list of ingredients."""
         if not ingredients:
             return "Мое блюдо"
-            
+
         ing_str = ", ".join(ingredients)
-        
+
         prompt = (
             f"Ingredients: {ing_str}\n"
             "Task: Name this dish in Russian (max 3-4 words). "
@@ -401,7 +403,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
             "HTTP-Referer": "https://foodflow.app",
             "X-Title": "FoodFlow Bot"
         }
-        
+
         import aiohttp
         for model in cls.MODELS:
             try:
@@ -410,7 +412,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json={
-                            "model": model, 
+                            "model": model,
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.3
                         },
@@ -423,5 +425,5 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
             except Exception as e:
                 logger.error(f"Dish Naming Failed ({model}): {e}")
                 continue # Try next model
-            
+
         return "Мое блюдо"

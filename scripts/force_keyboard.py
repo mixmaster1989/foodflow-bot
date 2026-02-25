@@ -6,12 +6,14 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from aiogram import Bot
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
 from config import settings
+
 
 async def send_keyboard(user_id):
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🏠 Главное меню")]
@@ -19,7 +21,7 @@ async def send_keyboard(user_id):
         resize_keyboard=True,
         persistent=True
     )
-    
+
     try:
         await bot.send_message(
             chat_id=user_id,

@@ -10,7 +10,7 @@ from aiogram import Bot
 from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def notify_summary():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     msg_text = (
         "🌙 <b>Итоги дня: FoodFlow Bot v1.2</b>\n\n"
         "Мы завершили серию крупных обновлений. Спасибо за ваше активное тестирование!\n\n"
@@ -40,13 +40,13 @@ async def notify_summary():
         "- ✅ Подтверждение перед сохранением в холодильник (чтобы не добавлялось «молча»).\n\n"
         "<i>Спокойной ночи и приятного аппетита!</i> 🍏"
     )
-    
+
     count = 0
     async for session in get_db():
-        stmt = select(User).where(User.is_verified == True)
+        stmt = select(User).where(User.is_verified)
         result = await session.execute(stmt)
         users = result.scalars().all()
-        
+
         for user in users:
             try:
                 await bot.send_message(chat_id=user.id, text=msg_text, parse_mode="HTML")

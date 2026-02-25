@@ -1,11 +1,11 @@
 """Dependency injection for FoodFlow API."""
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.base import async_session
-from database.models import User
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:

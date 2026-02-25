@@ -129,11 +129,11 @@ async def show_settings(callback: types.CallbackQuery) -> None:
 async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Initiate editing nutrition goals with recommendations."""
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if not settings:
             await callback.answer("Профиль не найден", show_alert=True)
             return
@@ -146,12 +146,12 @@ async def start_edit_goals(callback: types.CallbackQuery, state: FSMContext) -> 
             age=settings.age or 30,
             goal=settings.goal or "healthy"
         )
-        
+
         # Save pending targets
         await state.update_data(pending_targets=targets)
         await state.update_data(current_settings_weight=settings.weight) # helpful for macros
         await state.update_data(current_settings_goal=settings.goal)
-        
+
         # Build UI
         builder = InlineKeyboardBuilder()
         builder.button(text="✅ Принять рекомендованные", callback_data="settings_goals:accept")
@@ -180,15 +180,15 @@ async def accept_recommended_goals(callback: types.CallbackQuery, state: FSMCont
     """Save recommended goals."""
     data = await state.get_data()
     targets = data.get("pending_targets")
-    
+
     if not targets:
         await callback.answer("Ошибка данных", show_alert=True)
         return
-        
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if settings:
             settings.calorie_goal = targets["calories"]
             settings.protein_goal = targets["protein"]
@@ -196,7 +196,7 @@ async def accept_recommended_goals(callback: types.CallbackQuery, state: FSMCont
             settings.carb_goal = targets["carbs"]
             settings.fiber_goal = targets.get("fiber", 30)
             await session.commit()
-            
+
     await state.clear()
     await show_settings(callback) # Return to settings menu
 
@@ -233,11 +233,11 @@ async def set_calories(message: types.Message, state: FSMContext) -> None:
 
         # Retrieve context for macro calc
         data = await state.get_data()
-        
+
         # If we came from settings menu directly without cache (unlikely but possible), fetch defaults
         weight = data.get("current_settings_weight", 70)
         goal = data.get("current_settings_goal", "healthy")
-        
+
         # If not in state, try DB fallback
         if not weight or not goal:
              async for session in get_db():
@@ -246,10 +246,10 @@ async def set_calories(message: types.Message, state: FSMContext) -> None:
                 if settings:
                     weight = settings.weight or 70
                     goal = settings.goal or "healthy"
-        
+
         # Calculate macros
         targets = NutritionCalculator.calculate_macros(calories, weight, goal)
-        
+
         # Save to DB immediately (simplification for UX)
         async for session in get_db():
             stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
@@ -386,19 +386,19 @@ async def edit_profile(callback: types.CallbackQuery, state: FSMContext) -> None
 async def edit_summary_time(callback: types.CallbackQuery) -> None:
     """Show time selection for daily summary."""
     builder = InlineKeyboardBuilder()
-    
+
     # Popular times as buttons
     times = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"]
     for t in times:
         builder.button(text=f"🕐 {t}", callback_data=f"set_summary_time:{t}")
     builder.button(text="🔙 Назад", callback_data="menu_settings")
     builder.adjust(3, 3, 1)
-    
+
     text = (
         "🕐 <b>Выберите время дневной сводки:</b>\n\n"
         "В это время вам придёт отчёт о питании за день."
     )
-    
+
     # Handle both photo and text messages
     try:
         # Try to edit caption (for photo messages)
@@ -431,23 +431,23 @@ async def save_summary_time(callback: types.CallbackQuery) -> None:
     """Save selected summary time."""
     new_time = callback.data.split(":")[1] + ":" + callback.data.split(":")[2]
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if settings:
             settings.summary_time = new_time
             await session.commit()
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
-    
+
     text = (
         f"✅ Время дневной сводки установлено: <b>{new_time}</b>\n\n"
         "Теперь отчёт будет приходить в это время каждый день."
     )
-    
+
     try:
         await callback.message.edit_caption(
             caption=text,
@@ -480,13 +480,13 @@ async def edit_reminder_time(callback: types.CallbackQuery) -> None:
         builder.button(text=f"⏰ {time}", callback_data=f"set_reminder_time:{time}")
     builder.button(text="🔙 Назад", callback_data="menu_settings")
     builder.adjust(3, 3, 1)
-    
+
     text = (
         "⏰ <b>Время напоминания о весе</b>\n\n"
         "В это время бот будет напоминать записать вес.\n\n"
         "Выберите удобное время:"
     )
-    
+
     try:
         await callback.message.edit_caption(
             caption=text,
@@ -515,23 +515,23 @@ async def save_reminder_time(callback: types.CallbackQuery) -> None:
     """Save the selected reminder time."""
     new_time = callback.data.split(":")[1] + ":00"
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if settings:
             settings.reminder_time = new_time
             await session.commit()
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Вернуться в настройки", callback_data="menu_settings")
-    
+
     text = (
         f"✅ Время напоминания о весе установлено: <b>{new_time}</b>\n\n"
         "Теперь бот будет напоминать записать вес в это время."
     )
-    
+
     try:
         await callback.message.edit_caption(
             caption=text,

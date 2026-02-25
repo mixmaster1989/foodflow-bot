@@ -1,10 +1,11 @@
 """Tests for onboarding handlers."""
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from sqlalchemy import select
 
 from database.models import UserSettings
 from handlers.onboarding import OnboardingStates, start_onboarding
-from sqlalchemy import select
 
 
 @pytest.mark.asyncio

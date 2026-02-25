@@ -8,10 +8,9 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from aiogram import Bot
 from sqlalchemy import update
-from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
 
 logging.basicConfig(level=logging.INFO)
@@ -23,20 +22,20 @@ WRONG_USER_ID = 911990304 # ElenaOdr
 async def fix_verification():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     async for session in get_db():
         # 1. Verify Wife
         logger.info(f"Verifying user {CORRECT_USER_ID}...")
         stmt_verify = update(User).where(User.id == CORRECT_USER_ID).values(is_verified=True)
         await session.execute(stmt_verify)
-        
+
         # 2. Unverify Wrong User
         logger.info(f"Unverifying user {WRONG_USER_ID}...")
         stmt_unverify = update(User).where(User.id == WRONG_USER_ID).values(is_verified=False)
         await session.execute(stmt_unverify)
-        
+
         await session.commit()
-        
+
         # 3. Send Message to Wife
         try:
             await bot.send_message(

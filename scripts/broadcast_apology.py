@@ -1,17 +1,18 @@
 
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Ensure project root is in path
 sys.path.append(os.getcwd())
 
 from aiogram import Bot
 from sqlalchemy import select
+
+from config import settings
 from database.base import async_session
 from database.models import User
-from config import settings
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -34,17 +35,17 @@ async def broadcast():
     print("Initializing bot...")
     # Safe init for aiogram 2.x and simple usage in 3.x for send_message
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     print("Fetching users...")
     async with async_session() as session:
         result = await session.execute(select(User.id))
         user_ids = result.scalars().all()
-    
+
     print(f"Target audience: {len(user_ids)} users.")
-    
+
     sent_count = 0
     err_count = 0
-    
+
     for user_id in user_ids:
         try:
             await bot.send_message(user_id, MESSAGE, parse_mode="HTML")
@@ -54,11 +55,11 @@ async def broadcast():
         except Exception as e:
             logger.error(f"Failed to send to {user_id}: {e}")
             err_count += 1
-            
-    print(f"✅ Broadcast complete.")
+
+    print("✅ Broadcast complete.")
     print(f"Sent: {sent_count}")
     print(f"Errors: {err_count}")
-    
+
     await bot.session.close()
 
 if __name__ == "__main__":

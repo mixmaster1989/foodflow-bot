@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
-from database.models import User, Marathon, MarathonParticipant
-from datetime import datetime
+
+from database.models import Marathon, MarathonParticipant, User
+
 
 class MarathonService:
     @staticmethod
@@ -14,8 +17,8 @@ class MarathonService:
         """Check if user is in ANY active marathon."""
         stmt = select(MarathonParticipant).join(Marathon).where(
             MarathonParticipant.user_id == user_id,
-            MarathonParticipant.is_active == True,
-            Marathon.is_active == True,
+            MarathonParticipant.is_active,
+            Marathon.is_active,
             Marathon.end_date > datetime.now()
         )
         participant = (await session.execute(stmt)).first()
@@ -25,11 +28,11 @@ class MarathonService:
     async def process_invite(session: Session, marathon_invite: str | int, user_id: int, user_info: dict) -> dict:
         """
         Process invite link m_{id} or m_{token}.
-        
+
         Returns:
             dict: {
-                "success": bool, 
-                "message": str, 
+                "success": bool,
+                "message": str,
                 "is_new_user": bool,
                 "marathon_name": str
             }
@@ -43,14 +46,14 @@ class MarathonService:
             # It's a string token
             stmt = select(Marathon).where(Marathon.invite_token == str(marathon_invite))
             marathon = (await session.execute(stmt)).scalar_one_or_none()
-            
+
             if marathon and marathon.invite_token_expires_at:
                 if marathon.invite_token_expires_at < datetime.now():
                     return {"success": False, "message": "Эта ссылка-приглашение истекла."}
 
         if not marathon:
             return {"success": False, "message": "Марафон не найден."}
-            
+
         if not marathon.is_active:
              return {"success": False, "message": "Этот марафон завершен."}
 
@@ -64,7 +67,7 @@ class MarathonService:
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
         is_new_user = False
-        
+
         if not user:
             # Create new user logic
             is_new_user = True
@@ -78,7 +81,7 @@ class MarathonService:
             )
             session.add(user)
             await session.flush() # Get ID if needed, though we set it manually
-        
+
         # 3. Check Conflicts
         # Check if already in THIS marathon
         stmt_part = select(MarathonParticipant).where(
@@ -86,7 +89,7 @@ class MarathonService:
             MarathonParticipant.marathon_id == marathon_id
         )
         existing_part = (await session.execute(stmt_part)).scalar_one_or_none()
-        
+
         if existing_part:
             if existing_part.is_active:
                 return {"success": False, "message": "Вы уже участник этого марафона!"}
@@ -99,7 +102,7 @@ class MarathonService:
         # Check if in OTHER active marathon
         if await MarathonService.is_user_participating(session, user_id):
              return {"success": False, "message": "Вы уже участвуете в другом активном марафоне. Нельзя быть в двух сразу."}
-             
+
         # 4. Add to Marathon
         new_part = MarathonParticipant(
             marathon_id=marathon_id,
@@ -109,9 +112,9 @@ class MarathonService:
         )
         session.add(new_part)
         await session.commit() # SAVE IT!
-        
+
         return {
-            "success": True, 
+            "success": True,
             "message": f"Вы успешно присоединились к марафону '{marathon.name}'!",
             "is_new_user": is_new_user,
             "marathon_name": marathon.name,

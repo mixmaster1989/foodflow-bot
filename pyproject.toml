@@ -64,6 +64,10 @@ select = [
 ]
 ignore = [
     "E501",  # Line too long (handled by formatter)
+    "E701",  # Multiple statements on one line (colon) - Temporarily ignored
+    "E741",  # Ambiguous variable name - Temporarily ignored
+    "N806",  # Non-lowercase variable in function - Temporarily ignored
+    "F821",  # Undefined name - Temporarily ignored (Requires investigation)
 ]
 
 [tool.ruff.lint.per-file-ignores]

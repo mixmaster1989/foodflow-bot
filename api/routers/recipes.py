@@ -1,12 +1,12 @@
 """Recipes router for FoodFlow API."""
 from fastapi import APIRouter
+from sqlalchemy import or_, select
 
-from api.auth import DBSession, CurrentUser
+from api.auth import CurrentUser, DBSession
 from api.schemas import RecipeRead, RecipeRequest
 from database.models import Product, UserSettings
 from services.ai import AIService
 from services.cache import get_cached_recipes, make_hash, store_recipes
-from sqlalchemy import or_, select
 
 router = APIRouter()
 
@@ -42,28 +42,28 @@ async def generate_recipes(
     )
     products = (await session.execute(stmt)).scalars().all()
     ingredients = [p.name for p in products]
-    
+
     if not ingredients:
         ingredients = ["яйца", "молоко", "хлеб"]  # Defaults
-    
+
     # Check cache
     ingredients_hash = make_hash(ingredients)
     if not request.refresh:
         cached = await get_cached_recipes(user.id, ingredients_hash, request.category)
         if cached:
             return cached
-    
+
     # Get user settings
     settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)
     settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-    
+
     # Generate via AI
     recipes = await AIService.generate_recipes(ingredients, request.category, settings)
-    
+
     # Store in cache
     if recipes:
         await store_recipes(user.id, ingredients_hash, request.category, recipes)
-    
+
     return [
         RecipeRead(
             title=r.get("title", "Без названия"),

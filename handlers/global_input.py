@@ -2,17 +2,16 @@
 import logging
 from datetime import datetime
 
-from aiogram import Router, F, types
+from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
-from config import settings
+
 from database.base import get_db
-from database.models import Product, Receipt, ConsumptionLog, SavedDish
+from database.models import ConsumptionLog, Product, SavedDish
 from services.normalization import NormalizationService
-from services.ai import AIService # If needed, but NormalizationService covers most
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -60,7 +59,7 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
     """Handle 'I ate' action for global text."""
     data = await state.get_data()
     text = data.get("global_text")
-    
+
     if not text:
         await callback.answer("⚠️ Ошибка: текст потерян.", show_alert=True)
         await state.clear()
@@ -68,9 +67,9 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
 
     user_id = callback.from_user.id
     msg = callback.message
-    
+
     await msg.edit_text(f"🔄 Анализирую: <i>{text}</i>...", parse_mode="HTML")
-    
+
     try:
         # 1. Check Saved Dishes (Exact match first)
         dish_match = None
@@ -80,7 +79,7 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
             dish_match = res.scalars().first()
             if dish_match:
                 break
-        
+
         if dish_match:
             # Use saved dish data
             name = dish_match.name
@@ -92,12 +91,12 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
             weight_grams = None # It's a combo
             weight_missing = False
             base_name = name # Use dish name as base_name
-            
+
             result = {} # Dummy
         else:
             # 2. AI Analysis
             result = await NormalizationService.analyze_food_intake(text)
-            
+
             name = result.get("name", text)
             calories = float(result.get("calories") or 0)
             protein = float(result.get("protein") or 0)
@@ -123,7 +122,7 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
                     }
                 )
                 await state.set_state(GlobalInputStates.waiting_for_weight)
-                
+
                 # Show AI guess but ask for weight
                 await msg.edit_text(
                     f"🧐 Вы сказали: <i>{text}</i>\n"
@@ -134,9 +133,9 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
                 return
 
         # Variables are now set from either SavedDish or AI Analysis (with weight)
-        
+
         final_name = f"{name} ({weight_grams}г)" if weight_grams else name
-        
+
         async for session in get_db():
             log = ConsumptionLog(
                 user_id=user_id,
@@ -151,12 +150,12 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
             )
             session.add(log)
             await session.commit()
-            
+
         await state.clear()
-        
+
         # Success Message
         weight_note = "" if weight_grams else "\n⚠️ <i>Вес не указан, посчитано на 100г.</i>"
-        
+
         await msg.edit_text(
             f"✅ <b>Записано!</b>\n\n"
             f"🍽️ {final_name}\n\n"
@@ -167,7 +166,7 @@ async def global_i_ate(callback: types.CallbackQuery, state: FSMContext) -> None
             f"🥬 Клетчатка: <b>{fiber:.1f}</b>г{weight_note}",
             parse_mode="HTML"
         )
-        
+
     except Exception as e:
         logger.error(f"Global I Ate Error: {e}", exc_info=True)
         await msg.edit_text(f"❌ Ошибка: {e}")
@@ -182,24 +181,24 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         # Extract number if mixed text (e.g. "55g")
         import re
         match = re.search(r'(\d+(?:\.\d+)?)', weight_text)
-        
+
         if not match:
             await message.reply("⚠️ Пожалуйста, введите только число (вес в граммах).")
             return
 
         weight = float(match.group(1))
-        
+
         data = await state.get_data()
         product = data.get("pending_product")
-        
+
         if not product:
             await message.reply("⚠️ Ошибка контекста. Попробуйте ввести продукт заново.")
             await state.clear()
             return
-            
+
         # Recalculate based on weight
         factor = weight / 100.0
-        
+
         name = product['name']
         base_name = product['base_name']
         calories = product['calories100'] * factor
@@ -207,9 +206,9 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         fat = product['fat100'] * factor
         carbs = product['carbs100'] * factor
         fiber = product['fiber100'] * factor
-        
+
         final_name = f"{name} ({int(weight)}г)"
-        
+
         async for session in get_db():
             log = ConsumptionLog(
                 user_id=message.from_user.id,
@@ -224,9 +223,9 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
             )
             session.add(log)
             await session.commit()
-            
+
         await state.clear()
-        
+
         await message.answer(
             f"✅ <b>Записано!</b>\n\n"
             f"🍽️ {final_name}\n\n"
@@ -237,12 +236,12 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
             f"🥬 Клетчатка: <b>{fiber:.1f}</b>г",
             parse_mode="HTML"
         )
-        
+
     except Exception as e:
         logger.error(f"Weight Input Error: {e}", exc_info=True)
         await message.reply(f"❌ Ошибка при сохранении: {e}")
         await state.clear()
-        
+
     except Exception as e:
         logger.error(f"Global I Ate Error: {e}", exc_info=True)
         await msg.edit_text(f"❌ Ошибка: {e}")
@@ -253,7 +252,7 @@ async def global_fridge(callback: types.CallbackQuery, state: FSMContext) -> Non
     """Handle 'To Fridge' action for global text."""
     data = await state.get_data()
     text = data.get("global_text")
-    
+
     if not text:
         await callback.answer("⚠️ Ошибка: текст потерян.", show_alert=True)
         await state.clear()
@@ -261,13 +260,13 @@ async def global_fridge(callback: types.CallbackQuery, state: FSMContext) -> Non
 
     user_id = callback.from_user.id
     msg = callback.message
-    
+
     await msg.edit_text(f"🔄 Добавляю в холодильник: <i>{text}</i>...", parse_mode="HTML")
-    
+
     try:
         # AI Analysis (Same service, but we use it for Product fields)
         result = await NormalizationService.analyze_food_intake(text)
-        
+
         name = result.get("name", text)
         calories = float(result.get("calories") or 0)
         protein = float(result.get("protein") or 0)
@@ -275,8 +274,8 @@ async def global_fridge(callback: types.CallbackQuery, state: FSMContext) -> Non
         carbs = float(result.get("carbs") or 0)
         fiber = float(result.get("fiber") or 0)
         weight_grams = result.get("weight_grams")
-        
-        
+
+
         async for session in get_db():
             product = Product(
                 user_id=user_id,
@@ -288,22 +287,22 @@ async def global_fridge(callback: types.CallbackQuery, state: FSMContext) -> Non
                 carbs=carbs,
                 fiber=fiber,
                 price=0.0,
-                quantity=1.0, 
+                quantity=1.0,
                 weight_g=float(weight_grams) if weight_grams else 100.0, # Default to 100g if weight missing? Or None?
                 source="global_text"
             )
             session.add(product)
             await session.commit()
-            
+
         await state.clear()
-        
+
         await msg.edit_text(
             f"✅ <b>Добавлено в холодильник!</b>\n\n"
             f"📦 {name}\n"
             f"⚖️ {weight_grams if weight_grams else '100'}г",
             parse_mode="HTML"
         )
-        
+
     except Exception as e:
         logger.error(f"Global Fridge Error: {e}", exc_info=True)
         await msg.edit_text(f"❌ Ошибка: {e}")

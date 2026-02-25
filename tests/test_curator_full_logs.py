@@ -1,23 +1,26 @@
-import pytest
 from datetime import datetime
 from unittest.mock import patch
-from database.models import User, ConsumptionLog
+
+import pytest
+
+from database.models import ConsumptionLog, User
 from handlers.curator import curator_ward_detail, curator_ward_logs_list
-from tests.conftest import AsyncMock, MagicMock
+from tests.conftest import AsyncMock
+
 
 @pytest.mark.asyncio
 async def test_curator_full_logs_view(db_session):
     # 1. Setup Curator and Ward in test DB
     curator_id = 12345
     ward_id = 67890
-    
+
     curator = User(id=curator_id, username="curator_boss")
     ward = User(id=ward_id, username="ward_student", curator_id=curator_id)
-    
+
     db_session.add(curator)
     db_session.add(ward)
     await db_session.commit()
-    
+
     # 2. Add 15 logs for Ward today
     for i in range(15):
         log = ConsumptionLog(
@@ -32,7 +35,7 @@ async def test_curator_full_logs_view(db_session):
         )
         db_session.add(log)
     await db_session.commit()
-    
+
     # 3. Patch get_db to return our test session
     async def mock_get_db():
         yield db_session
@@ -43,13 +46,13 @@ async def test_curator_full_logs_view(db_session):
         callback.from_user.id = curator_id
         callback.data = f"curator_ward:{ward_id}"
         callback.message = AsyncMock()
-        
+
         await curator_ward_detail(callback)
-        
+
         args, kwargs = callback.message.edit_text.call_args
         text = args[0]
         assert "Последние приёмы" in text
-        
+
         # Verify "Full list" button
         markup = kwargs['reply_markup']
         found_full_list = False
@@ -58,7 +61,7 @@ async def test_curator_full_logs_view(db_session):
                 if "Весь список" in btn.text:
                     found_full_list = True
                     assert btn.callback_data == f"curator_ward_logs:{ward_id}:0"
-        
+
         assert found_full_list
 
         # 4. Test Full Logs List View (Page 0)
@@ -66,15 +69,15 @@ async def test_curator_full_logs_view(db_session):
         callback_logs.from_user.id = curator_id
         callback_logs.data = f"curator_ward_logs:{ward_id}:0"
         callback_logs.message = AsyncMock()
-        
+
         await curator_ward_logs_list(callback_logs)
-        
+
         args_list, kwargs_list = callback_logs.message.edit_text.call_args
         list_text = args_list[0]
         assert "Еда за сегодня" in list_text
         assert "1/2" in list_text
         assert list_text.count("•") == 10
-        
+
         # Check next page button
         markup_list = kwargs_list['reply_markup']
         assert any("Следующая" in btn.text for row in markup_list.inline_keyboard for btn in row)

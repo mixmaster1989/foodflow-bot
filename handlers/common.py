@@ -3,14 +3,14 @@
 Contains:
 - cmd_start: Initial bot start handler that creates user if not exists
 """
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-    InlineKeyboardMarkup,
     InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
 )
 from sqlalchemy.future import select
 
@@ -71,14 +71,14 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     referral_token = None
     marathon_invite_id = None
     curator = None
-    
+
     if len(message.text.split()) > 1:
         args = message.text.split()[1]
         if args.startswith("ref_"):
             referral_token = args[4:]
         elif args.startswith("m_"):
             marathon_invite_id = args[2:]
-    
+
     async for session in get_db():
         # Handle Marathon Invite
         if marathon_invite_id:
@@ -91,12 +91,13 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             result = await MarathonService.process_invite(
                 session, marathon_invite_id, message.from_user.id, user_info
             )
-            
+
             if result["success"]:
                 await message.answer(f"🎉 {result['message']}")
                 # Notify curator about new participant
                 if result.get("curator_id"):
                     from aiogram import Bot
+
                     from config import settings
                     bot = Bot(token=settings.BOT_TOKEN)
                     try:
@@ -113,7 +114,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                     await bot.session.close()
             else:
                 await message.answer(f"⚠️ {result['message']}")
-        
+
         # If referral token provided, find the curator (only if not marathon invite? or both?)
         # Let's allow both independently, but usually mutually exclusive.
         if referral_token:
@@ -123,7 +124,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 if curator.referral_token_expires_at < datetime.now():
                     await message.answer("⚠️ <b>Ошибка:</b> Данная ссылка-приглашение истекла.", parse_mode="HTML")
                     curator = None
-        
+
         stmt = select(User).where(User.id == message.from_user.id)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
@@ -133,17 +134,18 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             # If coming via referral link, auto-verify (no password needed)
             # If came via Marathon Link, user ALREADY created by Service above!
             user = User(
-                id=message.from_user.id, 
+                id=message.from_user.id,
                 username=message.from_user.username,
                 curator_id=curator.id if curator else None,
                 is_verified=True if curator else False
             )
             session.add(user)
             await session.commit()
-            
+
             # Notify curator about new ward
             if curator:
                 from aiogram import Bot
+
                 from config import settings
                 bot = Bot(token=settings.BOT_TOKEN)
                 try:
@@ -163,9 +165,10 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 user.curator_id = curator.id
                 user.is_verified = True  # Referral = auto-verified!
                 await session.commit()
-                
+
                 # Notify curator about new ward
                 from aiogram import Bot
+
                 from config import settings
                 bot = Bot(token=settings.BOT_TOKEN)
                 try:
@@ -191,7 +194,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
     # Send a separate message to force the ReplyKeyboard to appear
     await message.answer(
-        "Загружаю меню...", 
+        "Загружаю меню...",
         reply_markup=get_main_keyboard()
     )
     # Then show the visual menu (which will edit/send the photo)

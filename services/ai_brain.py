@@ -1,12 +1,13 @@
 
+import asyncio
 import json
 import logging
-import aiohttp
-import asyncio
 import time
-from typing import List, Dict
+
+import aiohttp
+
 from config import settings
-from monitoring import stats, get_ai_semaphore
+from monitoring import get_ai_semaphore, stats
 
 logger = logging.getLogger("ai.brain")
 
@@ -60,7 +61,7 @@ class AIBrainService:
     @classmethod
     async def analyze_text(cls, text: str) -> dict | None:
         """Call LLM to analyze text and return structured data."""
-        
+
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -80,7 +81,7 @@ class AIBrainService:
 
         # Use semaphore to limit concurrent AI calls (Phase 1 optimization)
         semaphore = get_ai_semaphore(max_concurrent=5)
-        
+
         async with semaphore:
             start_time = time.time()
             for attempt in range(2):
@@ -97,11 +98,11 @@ class AIBrainService:
                                 content = data['choices'][0]['message']['content']
                                 # Clean output just in case
                                 content = content.replace("```json", "").replace("```", "").strip()
-                                
+
                                 # Track stats
                                 duration_ms = (time.time() - start_time) * 1000
                                 stats.record_ai_call(duration_ms)
-                                
+
                                 return json.loads(content)
                             else:
                                 logger.warning(f"AI Brain error {response.status}: {await response.text()}")
@@ -109,15 +110,15 @@ class AIBrainService:
                 except Exception as e:
                     logger.error(f"AI Brain exception: {e}")
                     stats.record_error()
-                    
+
                 await asyncio.sleep(0.5)
-            
+
         return None
 
     @classmethod
-    async def resolve_herbalife_product(cls, text: str, products_context: List[Dict]) -> str | None:
+    async def resolve_herbalife_product(cls, text: str, products_context: list[dict]) -> str | None:
         """Use AI to match user input to a specific Herbalife Product ID."""
-        
+
         # Prepare a compact list of products for the prompt
         compact_list = [
             {"id": p["id"], "name": p["name"], "aliases": p.get("aliases", [])}
@@ -159,7 +160,7 @@ class AIBrainService:
 
         # Use semaphore to limit concurrent AI calls
         semaphore = get_ai_semaphore(max_concurrent=5)
-        
+
         async with semaphore:
             start_time = time.time()
             try:
@@ -177,11 +178,11 @@ class AIBrainService:
                             result = json.loads(content)
                             matched_id = result.get("matched_product_id")
                             logger.info(f"Herbalife AI Matched ID: {matched_id}, Reason: {result.get('reason', 'N/A')}")
-                            
+
                             # Track stats
                             duration_ms = (time.time() - start_time) * 1000
                             stats.record_ai_call(duration_ms)
-                            
+
                             return matched_id
                         else:
                             logger.warning(f"Herbalife AI HTTP Error: {response.status}")
@@ -189,17 +190,16 @@ class AIBrainService:
             except Exception as e:
                 logger.error(f"Herbalife Resolution AI Error: {e}")
                 stats.record_error()
-            
+
 
     @classmethod
     async def analyze_image(cls, message_or_path: any, prompt: str = "Describe this image.") -> str | None:
         """Analyze image using Vision model. Accepts aiogram Message or file path."""
         import base64
-        import os
-        
+
         # Determine image source
         b64_image = None
-        
+
         try:
             if isinstance(message_or_path, str):
                 # It's a file path
@@ -216,7 +216,7 @@ class AIBrainService:
                     file_id = message_or_path.photo[-1].file_id
                     file = await bot.get_file(file_id)
                     file_path = file.file_path
-                    
+
                     # Download to memory
                     io_obj = await bot.download_file(file_path)
                     b64_image = base64.b64encode(io_obj.read()).decode('utf-8')
@@ -259,7 +259,7 @@ class AIBrainService:
                         }
 
                         logger.info(f"Vision Analysis: Trying model {model}...")
-                        
+
                         async with session.post(
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
@@ -278,7 +278,7 @@ class AIBrainService:
                     except Exception as e:
                         logger.error(f"Vision Analysis Exception ({model}): {e}")
                         # Continue to next model
-            
+
             logger.error("All Vision models failed.")
             return None
 
@@ -288,11 +288,11 @@ class AIBrainService:
 
 
     @classmethod
-    async def summarize_fridge(cls, product_list: List[str]) -> Dict | None:
+    async def summarize_fridge(cls, product_list: list[str]) -> dict | None:
         """Generate a structured summary (text + tags) of fridge contents."""
-        
+
         products_str = ", ".join(product_list[:40]) # Limit context window
-        
+
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -301,7 +301,7 @@ class AIBrainService:
         }
 
         prompt = f"""
-Ты — дружелюбный и вежливый ассистент FoodFlow. 
+Ты — дружелюбный и вежливый ассистент FoodFlow.
 Твоя задача — проанализировать список продуктов в холодильнике и вернуть JSON.
 
 Список продуктов: {products_str}
@@ -310,16 +310,16 @@ class AIBrainService:
 {{
   "summary": "Текст саммари (макс 3 предложения). Тон: дружелюбный, профессиональный, легкая ирония. НИКАКОГО сленга.",
   "tags": [
-    {{"tag": "Молоко", "emoji": "🥛"}}, 
+    {{"tag": "Молоко", "emoji": "🥛"}},
     {{"tag": "Курица", "emoji": "🍗"}}
-  ] 
+  ]
 }}
 
 Правила для tags:
 - Выбери 3-4 ключевых слова для поиска.
 - КРИТИЧНО: Теги ("tag") должны быть СЛОВАМИ, которые ФИЗИЧЕСКИ присутствуют в названиях продуктов.
 - "emoji": Подбери ОДИН стандартный эмодзи, подходящий по смыслу. Не используй редкие символы.
-- Пример: если есть "Молоко Простоквашино", tag="Молоко", emoji="🥛". 
+- Пример: если есть "Молоко Простоквашино", tag="Молоко", emoji="🥛".
 - ЗАПРЕЩЕНО: Придумывать категории, которых нет в тексте.
 - Если список странный, верни пустой список тегов.
 
@@ -338,7 +338,7 @@ class AIBrainService:
 
         # Use semaphore to limit concurrent AI calls
         semaphore = get_ai_semaphore(max_concurrent=5)
-        
+
         async with semaphore:
             start_time = time.time()
             for attempt in range(2):
@@ -370,7 +370,7 @@ class AIBrainService:
                 except Exception as e:
                     logger.error(f"AI Summary exception: {e}")
                     stats.record_error()
-                    
+
                 await asyncio.sleep(0.5)
-            
+
         return None

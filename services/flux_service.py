@@ -1,12 +1,12 @@
 import asyncio
-import aiohttp
+import io
+import logging
 import os
 import time
-import logging
-from typing import Optional, List
 import urllib.parse
+
+import aiohttp
 from PIL import Image
-import io
 
 logger = logging.getLogger("flux_service")
 
@@ -26,7 +26,7 @@ class FluxService:
         os.makedirs(f"{ASSETS_DIR}/daily", exist_ok=True)
         self.cooldown_until = 0
 
-    async def generate_product_icon(self, product_name: str) -> Optional[str]:
+    async def generate_product_icon(self, product_name: str) -> str | None:
         """Generates a professional 512x512 icon for a product."""
         # Sanitize name for filename and prompt
         clean_name = "".join(x for x in product_name if x.isalnum() or x == " ").strip()
@@ -41,7 +41,7 @@ class FluxService:
         prompt = f"Professional high-quality studio photo of {clean_name}, isolated on neutral dark background, 8k resolution, food photography"
         return await self._generate(prompt, filepath, width=512, height=512)
 
-    async def generate_daily_collage(self, products: List[str]) -> Optional[str]:
+    async def generate_daily_collage(self, products: list[str]) -> str | None:
         """Generates a daily collage of the current fridge content."""
         date_str = time.strftime("%Y-%m-%d")
         filepath = f"{ASSETS_DIR}/daily/fridge_{date_str}.png"
@@ -51,10 +51,10 @@ class FluxService:
 
         products_str = ", ".join(products[:8])
         prompt = f"Abstract artistic composition of healthy food ingredients: {products_str}. Dynamic lighting, dark cinematic background, vibrant colors, wide angel photography, top down view"
-        
+
         return await self._generate(prompt, filepath, width=1280, height=720)
 
-    async def _generate(self, prompt: str, filepath: str, width: int, height: int) -> Optional[str]:
+    async def _generate(self, prompt: str, filepath: str, width: int, height: int) -> str | None:
         if time.time() < self.cooldown_until:
             wait_left = int(self.cooldown_until - time.time())
             logger.warning(f"🕒 Flux service is on cooldown for {wait_left}s...")
@@ -63,7 +63,7 @@ class FluxService:
         async with generation_semaphore:
             encoded_prompt = urllib.parse.quote(prompt)
             url = f"{POLLINATIONS_BASE_URL}/{encoded_prompt}"
-            
+
             params = {
                 "width": width,
                 "height": height,
@@ -76,13 +76,13 @@ class FluxService:
             max_retries = 3
             for attempt in range(max_retries):
                 logger.info(f"Generating Flux image (Attempt {attempt+1}): {prompt[:50]}...")
-                
+
                 async with aiohttp.ClientSession() as session:
                     try:
                         async with session.get(url, params=params, timeout=60) as response:
                             if response.status == 200:
                                 data = await response.read()
-                                
+
                                 # CHECK FINGERPRINT (Detect "Limit Reached" placeholder)
                                 if len(data) == POLLINATIONS_LIMIT_FINGERPRINT:
                                     wait_time = (attempt + 1) * 60 # wait 1 min, then 2, then 3
@@ -96,18 +96,18 @@ class FluxService:
                                 img.save(filepath, "PNG", optimize=True)
                                 logger.info(f"✅ Generated and saved: {filepath}")
                                 return filepath
-                            
+
                             elif response.status == 429:
                                 wait_time = (attempt + 1) * 30
                                 logger.warning(f"⚠️ API 429. Waiting {wait_time}s...")
                                 await asyncio.sleep(wait_time)
                             else:
                                 logger.error(f"❌ Flux API Error {response.status}")
-                                break 
+                                break
                     except Exception as e:
                         logger.error(f"❌ Flux Generation Exception: {e}")
                         await asyncio.sleep(5)
-            
+
             return None
 
 flux_service = FluxService()

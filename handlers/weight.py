@@ -30,16 +30,16 @@ class WeightStates(StatesGroup):
 async def show_weight_menu(callback: types.CallbackQuery) -> None:
     """Show weight tracking menu with current weight and history."""
     user_id = callback.from_user.id
-    
+
     # Clear state if entering from menu, to reset any stale states
     # But wait, checking logic above: usually menus don't clear unless explicit.
     # Actually, standard behavior: just show menu.
-    
+
     async for session in get_db():
         # Get current weight from settings
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-        
+
         # Get last 5 weight entries
         logs_stmt = (
             select(WeightLog)
@@ -50,10 +50,10 @@ async def show_weight_menu(callback: types.CallbackQuery) -> None:
         logs = (await session.execute(logs_stmt)).scalars().all()
 
         current_weight = settings.weight if settings else "?"
-        
-        text = f"⚖️ <b>Отслеживание веса</b>\n\n"
+
+        text = "⚖️ <b>Отслеживание веса</b>\n\n"
         text += f"📊 Текущий вес: <b>{current_weight} кг</b>\n\n"
-        
+
         if logs:
             text += "📈 <b>История:</b>\n"
             for log in logs:
@@ -79,7 +79,7 @@ async def show_weight_menu(callback: types.CallbackQuery) -> None:
 async def start_weight_input(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start weight input flow."""
     await state.set_state(WeightStates.waiting_for_weight)
-    
+
     user_id = callback.from_user.id
     current_weight = None
 
@@ -127,13 +127,13 @@ async def save_weight(message: types.Message, state: FSMContext) -> None:
                 recorded_at=datetime.now()
             )
             session.add(log)
-            
+
             # Update current weight in settings
             settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
             settings = (await session.execute(settings_stmt)).scalar_one_or_none()
             if settings:
                 settings.weight = weight
-            
+
             await session.commit()
 
         await state.clear()
@@ -155,8 +155,8 @@ async def save_weight(message: types.Message, state: FSMContext) -> None:
         # Actually standard practice is usually 'cancel' -> clears state.
         # But 'menu_weight' button above (line 93) was 'Back'.
         # Let's use a clear 'cancel' that clears state and goes to main menu or just clears.
-        builder.button(text="🔙 Отмена", callback_data="main_menu") 
-        
+        builder.button(text="🔙 Отмена", callback_data="main_menu")
+
         await message.answer(
             "⚠️ <b>Ожидается вес тела (кг)</b>\n\n"
             "Вы ввели текст, но я жду число (например: 75.5).\n"

@@ -1,11 +1,12 @@
 """Products router for FoodFlow API."""
-from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from datetime import datetime
 
-from api.auth import DBSession, CurrentUser
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import func, select
+
+from api.auth import CurrentUser, DBSession
 from api.schemas import ConsumeRequest, ProductCreate, ProductList, ProductRead
 from database.models import ConsumptionLog, Product, Receipt
-from datetime import datetime
 
 router = APIRouter()
 
@@ -24,7 +25,7 @@ async def list_products(
         .where(Product.user_id == user.id)
     )
     total = await session.scalar(count_stmt) or 0
-    
+
     # Fetch page
     stmt = (
         select(Product)
@@ -34,7 +35,7 @@ async def list_products(
         .limit(page_size)
     )
     products = (await session.execute(stmt)).scalars().all()
-    
+
     return ProductList(
         items=[ProductRead.model_validate(p) for p in products],
         total=total,
@@ -47,20 +48,20 @@ async def list_products(
 async def get_product(product_id: int, user: CurrentUser, session: DBSession):
     """Get product details by ID."""
     product = await session.get(Product, product_id)
-    
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     # Check ownership
     owner_id = product.user_id
     if product.receipt_id:
         receipt = await session.get(Receipt, product.receipt_id)
         if receipt:
             owner_id = receipt.user_id
-    
+
     if owner_id != user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     return ProductRead.model_validate(product)
 
 
@@ -91,20 +92,20 @@ async def create_product(product_data: ProductCreate, user: CurrentUser, session
 async def delete_product(product_id: int, user: CurrentUser, session: DBSession):
     """Delete a product from fridge."""
     product = await session.get(Product, product_id)
-    
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     # Check ownership
     owner_id = product.user_id
     if product.receipt_id:
         receipt = await session.get(Receipt, product.receipt_id)
         if receipt:
             owner_id = receipt.user_id
-    
+
     if owner_id != user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     await session.delete(product)
     await session.commit()
 
@@ -118,10 +119,10 @@ async def consume_product(
 ):
     """Consume a product (log to consumption and optionally reduce quantity)."""
     product = await session.get(Product, product_id)
-    
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     # Calculate consumed values
     if consume_data.unit == "grams":
         factor = consume_data.amount / 100
@@ -132,13 +133,13 @@ async def consume_product(
         else:
             weight_per_unit = 100.0
         factor = (weight_per_unit * consume_data.amount) / 100
-    
+
     calories = product.calories * factor if product.calories else 0
     protein = product.protein * factor if product.protein else 0
     fat = product.fat * factor if product.fat else 0
     carbs = product.carbs * factor if product.carbs else 0
     fiber = product.fiber * factor if product.fiber else 0
-    
+
     # Create consumption log
     log = ConsumptionLog(
         user_id=user.id,
@@ -151,7 +152,7 @@ async def consume_product(
         date=datetime.now(),
     )
     session.add(log)
-    
+
     # Update product quantity
     if consume_data.unit == "qty":
         if product.quantity <= consume_data.amount:
@@ -170,9 +171,9 @@ async def consume_product(
                 message = f"Consumed {consume_data.amount}g"
         else:
             message = f"Logged {consume_data.amount}g (weight not tracked)"
-    
+
     await session.commit()
-    
+
     return {
         "message": message,
         "logged": {

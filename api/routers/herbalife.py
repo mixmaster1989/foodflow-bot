@@ -1,7 +1,8 @@
 """Herbalife Expert Router."""
-from fastapi import APIRouter, HTTPException, Query
-from services.herbalife_expert import herbalife_expert
+from fastapi import APIRouter, HTTPException
+
 from api.auth import CurrentUser
+from services.herbalife_expert import herbalife_expert
 
 router = APIRouter()
 
@@ -12,7 +13,7 @@ async def search_herbalife(q: str, user: CurrentUser):
         product = await herbalife_expert.find_product_by_alias(q)
         if not product:
             return {"found": False, "message": "Продукт не найден в базе Herbalife"}
-        
+
         return {
             "found": True,
             "product": product
@@ -31,6 +32,6 @@ async def calculate_herbalife_nutrition(product_id: str, amount: float, unit: st
     product = herbalife_expert.get_product_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     result = herbalife_expert.calculate_nutrition(product, amount, unit)
     return result

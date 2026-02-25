@@ -1,11 +1,14 @@
 import asyncio
+
 from sqlalchemy import text
+
 from database.base import async_session
+
 
 async def migrate():
     async with async_session() as session:
         print("Starting Fiber Migration...")
-        
+
         # 1. Products
         try:
             await session.execute(text("ALTER TABLE products ADD COLUMN fiber FLOAT DEFAULT 0.0"))

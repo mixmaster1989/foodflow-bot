@@ -415,11 +415,11 @@ async def apply_category_correction(callback: types.CallbackQuery, bot: Bot, sta
     parts = callback.data.split("_")
     product_id = int(parts[2])
     category_idx = int(parts[3])
-    
+
     if category_idx < 0 or category_idx >= len(CATEGORIES):
         await callback.answer("❌ Неверная категория", show_alert=True)
         return
-    
+
     category = CATEGORIES[category_idx]
 
     async for session in get_db():

@@ -27,13 +27,13 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.now)
     last_activity = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     is_verified = Column(Boolean, default=False)  # User auth status
-    
+
     # Curator system fields
     role = Column(String, default="user")  # "user" | "curator" | "admin"
     curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # who curates this user
     referral_token = Column(String, unique=True, nullable=True)  # for invite links (curators only)
     referral_token_expires_at = Column(DateTime, nullable=True)
-    
+
     # Relationships
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
@@ -46,7 +46,7 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, unique=True) # 1 to 1 
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, unique=True) # 1 to 1
     tier = Column(String, default="free") # "free", "basic", "pro"
     starts_at = Column(DateTime, default=datetime.now)
     expires_at = Column(DateTime, nullable=True) # Если None - бесконечно
@@ -105,14 +105,14 @@ class SavedDish(Base):
     name = Column(String, nullable=False)
     dish_type = Column(String, default="dish")  # "dish" or "meal"
     components = Column(JSON, nullable=False) # List of dicts: [{name, weight, calories...}]
-    
+
     # Pre-calculated totals for quick logging
     total_calories = Column(Float, default=0.0)
     total_protein = Column(Float, default=0.0)
     total_fat = Column(Float, default=0.0)
     total_carbs = Column(Float, default=0.0)
     total_fiber = Column(Float, default=0.0)
-    
+
     created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", backref="saved_dishes")
 
@@ -176,7 +176,7 @@ class UserSettings(Base):
     reminder_time = Column(String, default="09:00")  # HH:MM for weight reminders
     summary_time = Column(String, default="21:00")
     reminders_enabled = Column(Boolean, default=True)
-    
+
     # Fridge Summary Cache (24h)
     fridge_summary_cache = Column(String, nullable=True) # Text
     fridge_summary_date = Column(DateTime, nullable=True) # Timestamp of last generation
@@ -248,14 +248,14 @@ class Marathon(Base):
     is_registration_open = Column(Boolean, default=True) # Can users join via link?
     invite_token = Column(String, unique=True, nullable=True)
     invite_token_expires_at = Column(DateTime, nullable=True)
-    
+
     # Store wave configuration [start, end, label]
-    waves_config = Column(JSON, nullable=True) 
-    
+    waves_config = Column(JSON, nullable=True)
+
     # Points Customization
     points_name = Column(String, default="Снежинки")
     points_emoji = Column(String, default="❄️")
-    
+
     created_at = Column(DateTime, default=datetime.now)
     curator = relationship("User", backref="marathons", foreign_keys=[curator_id])
     participants = relationship("MarathonParticipant", back_populates="marathon")
@@ -267,16 +267,16 @@ class MarathonParticipant(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     marathon_id = Column(Integer, ForeignKey("marathons.id"), nullable=False)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    
+
     start_weight = Column(Float, nullable=True) # Weight at entry
     final_weight = Column(Float, nullable=True) # Weight at exit/finish
-    
+
     # Cached totals for quick leadership board
     total_snowflakes = Column(Integer, default=0)
-    
+
     is_active = Column(Boolean, default=True) # If kicked -> False
     joined_at = Column(DateTime, default=datetime.now)
-    
+
     marathon = relationship("Marathon", back_populates="participants")
     user = relationship("User", backref="marathon_participations")
     snowflake_logs = relationship("SnowflakeLog", back_populates="participant")
@@ -291,5 +291,5 @@ class SnowflakeLog(Base):
     amount = Column(Integer, nullable=False) # Can be negative
     reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
-    
+
     participant = relationship("MarathonParticipant", back_populates="snowflake_logs")

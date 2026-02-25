@@ -41,20 +41,19 @@ async def schedule_message_deletion(
         """Delete message and show main menu after timeout."""
         try:
             await asyncio.sleep(MESSAGE_TIMEOUT)
-            
+
             # Try to delete the message
             try:
                 await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             except Exception as e:
                 logger.warning(f"Failed to delete message {message.message_id}: {e}")
-            
+
             # Import here to avoid circular imports
-            from handlers.menu import show_main_menu
-            
+
             # Send main menu
             try:
                 from aiogram.utils.keyboard import InlineKeyboardBuilder
-                
+
                 builder = InlineKeyboardBuilder()
                 # Row 1: Shopping Mode (Prominent)
                 builder.button(text="🛒 Иду в магазин (AR)", callback_data="start_shopping_mode")
@@ -69,7 +68,7 @@ async def schedule_message_deletion(
                 builder.button(text="⚙️ Настройки", callback_data="menu_settings")
                 builder.button(text="ℹ️ Справка", callback_data="menu_help")
                 builder.adjust(1, 2, 2, 2)  # Adjust button layout
-                
+
                 await bot.send_message(
                     chat_id=message.chat.id,
                     text=f"👋 Привет, {user_name}!",
@@ -77,12 +76,12 @@ async def schedule_message_deletion(
                 )
             except Exception as e:
                 logger.error(f"Failed to send main menu after message deletion: {e}")
-                
+
         except asyncio.CancelledError:
             logger.debug(f"Message deletion task cancelled for message {message.message_id}")
         except Exception as e:
             logger.error(f"Error in message deletion task: {e}")
-    
+
     # Start background task
     asyncio.create_task(_delete_and_show_menu())
 

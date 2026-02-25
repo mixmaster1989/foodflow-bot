@@ -1,7 +1,9 @@
 
 import asyncio
 import logging
+
 from sqlalchemy import select
+
 from database.base import get_db
 from database.models import User
 
@@ -24,6 +26,6 @@ async def check_user(user_id):
         logger.error(f"EXCEPTION: {e}")
 
 if __name__ == "__main__":
-    # Use the ID from the log grep earlier (Update id=958091369 -> user?) 
+    # Use the ID from the log grep earlier (Update id=958091369 -> user?)
     # Or use the user_id mentioned in the "Sent weight reminder" log: 295543071
     asyncio.run(check_user(295543071))

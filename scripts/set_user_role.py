@@ -1,14 +1,15 @@
 import asyncio
-import sys
 import os
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+import sys
+
+from sqlalchemy import select
 
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.base import async_session
 from database.models import User
+
 
 async def set_user_role(user_id: int, role: str):
     print(f"Attempting to set role '{role}' for user ID: {user_id}")
@@ -46,7 +47,7 @@ if __name__ == "__main__":
     except ValueError:
         print(f"Invalid user_id: {user_id_str}. Must be an integer.")
         sys.exit(1)
-    
+
     # Basic validation for role
     if role_to_set not in ["user", "curator", "admin"]:
         print(f"Invalid role: {role_to_set}. Role must be 'user', 'curator', or 'admin'.")

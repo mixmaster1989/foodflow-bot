@@ -10,7 +10,7 @@ from aiogram import Bot
 from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
 
 logging.basicConfig(level=logging.INFO)
@@ -19,20 +19,20 @@ logger = logging.getLogger(__name__)
 async def notify_fix():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     msg_text = (
         "🔥 <b>Хотфикс: Холодильник</b>\n\n"
         "Исправили ошибку, из-за которой не открывалось меню холодильника.\n"
         "Теперь кнопка работает! 🧊\n\n"
         "Можете продолжать тестирование."
     )
-    
+
     count = 0
     async for session in get_db():
-        stmt = select(User).where(User.is_verified == True)
+        stmt = select(User).where(User.is_verified)
         result = await session.execute(stmt)
         users = result.scalars().all()
-        
+
         for user in users:
             try:
                 await bot.send_message(chat_id=user.id, text=msg_text, parse_mode="HTML")

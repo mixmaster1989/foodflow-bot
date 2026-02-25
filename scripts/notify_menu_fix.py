@@ -8,8 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
 from aiogram import Bot
-from sqlalchemy import select
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+from sqlalchemy import select
 
 from config import settings
 from database.base import get_db
@@ -34,21 +34,21 @@ BROADCAST_MESSAGE = """
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     logger.info("Starting menu fix broadcast...")
-    
+
     success_count = 0
     fail_count = 0
     block_count = 0
-    
+
     async for session in get_db():
         # Get all users
         result = await session.execute(select(User.id))
         user_ids = result.scalars().all()
-        
+
         total_users = len(user_ids)
         logger.info(f"Found {total_users} users to notify.")
-        
+
         for i, user_id in enumerate(user_ids):
             try:
                 await bot.send_message(user_id, BROADCAST_MESSAGE, parse_mode="HTML")
@@ -65,12 +65,12 @@ async def main():
                 try:
                     await bot.send_message(user_id, BROADCAST_MESSAGE, parse_mode="HTML")
                     success_count += 1
-                except:
+                except Exception:
                     fail_count += 1
             except Exception as e:
                 logger.error(f"Failed to send to {user_id}: {e}")
                 fail_count += 1
-        
+
     logger.info(f"Broadcast finished. Success: {success_count}, Blocked: {block_count}, Failed: {fail_count}")
     await bot.session.close()
 

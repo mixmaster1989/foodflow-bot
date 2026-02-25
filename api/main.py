@@ -1,15 +1,30 @@
 """FoodFlow API — FastAPI Application."""
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-import logging
 from fastapi.middleware.cors import CORSMiddleware
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.main")
 
-from api.routers import auth, products, consumption, recipes, weight, shopping_list, reports, receipts, recognize, smart, search, herbalife, universal, assets
+from api.routers import (
+    assets,
+    auth,
+    consumption,
+    herbalife,
+    products,
+    receipts,
+    recipes,
+    recognize,
+    reports,
+    search,
+    shopping_list,
+    smart,
+    universal,
+    weight,
+)
 
 
 @asynccontextmanager

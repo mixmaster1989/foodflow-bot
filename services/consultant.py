@@ -262,15 +262,15 @@ class ConsultantService:
                             import html
                             if json_match:
                                 content = json_match.group(0)
-                            
+
                             parsed_json = json.loads(content)
-                            
+
                             # Sanitize all strings in the JSON to be safe for HTML parse mode
                             if isinstance(parsed_json, dict):
                                 for key in ["warnings", "recommendations", "missing"]:
                                     if key in parsed_json and isinstance(parsed_json[key], list):
                                         parsed_json[key] = [html.escape(str(item)) for item in parsed_json[key]]
-                            
+
                             return parsed_json
                         else:
                             logger.warning(

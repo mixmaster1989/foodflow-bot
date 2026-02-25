@@ -3,11 +3,13 @@ FoodFlow Bot - Health Monitoring Module
 Инструменты для мониторинга нагрузки и здоровья бота
 """
 import asyncio
-import psutil
 import time
-from datetime import datetime
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+import psutil
+
 
 @dataclass
 class RequestStats:
@@ -18,26 +20,26 @@ class RequestStats:
     errors: int = 0
     start_time: float = field(default_factory=time.time)
     ai_avg_response_ms: float = 0.0
-    last_request_time: Optional[float] = None
-    
+    last_request_time: float | None = None
+
     def record_request(self):
         self.total_requests += 1
         self.last_request_time = time.time()
-    
+
     def record_ai_call(self, duration_ms: float):
         self.ai_calls += 1
         # Rolling average
         self.ai_avg_response_ms = (
-            (self.ai_avg_response_ms * (self.ai_calls - 1) + duration_ms) 
+            (self.ai_avg_response_ms * (self.ai_calls - 1) + duration_ms)
             / self.ai_calls
         )
-    
+
     def record_error(self):
         self.errors += 1
-    
+
     def get_uptime_seconds(self) -> float:
         return time.time() - self.start_time
-    
+
     def get_requests_per_minute(self) -> float:
         uptime = self.get_uptime_seconds()
         if uptime < 60:
@@ -49,14 +51,14 @@ class RequestStats:
 stats = RequestStats()
 
 
-async def get_system_health() -> Dict[str, Any]:
+async def get_system_health() -> dict[str, Any]:
     """Получить полную информацию о здоровье системы"""
-    
+
     # Системные метрики
     cpu_percent = psutil.cpu_percent(interval=0.1)
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
-    
+
     # Активные процессы Python
     python_procs = []
     for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'cpu_percent']):
@@ -69,11 +71,11 @@ async def get_system_health() -> Dict[str, Any]:
                 })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
-    
+
     return {
         'timestamp': datetime.now().isoformat(),
         'uptime_seconds': stats.get_uptime_seconds(),
-        
+
         # Системные ресурсы
         'system': {
             'cpu_percent': cpu_percent,
@@ -86,7 +88,7 @@ async def get_system_health() -> Dict[str, Any]:
             'disk_free_gb': disk.free / (1024**3),
             'disk_percent': disk.percent,
         },
-        
+
         # Статистика бота
         'bot': {
             'total_requests': stats.total_requests,
@@ -96,10 +98,10 @@ async def get_system_health() -> Dict[str, Any]:
             'errors': stats.errors,
             'requests_per_minute': round(stats.get_requests_per_minute(), 2),
         },
-        
+
         # Python процессы
         'python_processes': python_procs,
-        
+
         # Статус здоровья
         'health_status': _calculate_health_status(cpu_percent, memory.percent, disk.percent)
     }
@@ -118,7 +120,7 @@ def _calculate_health_status(cpu: float, mem: float, disk: float) -> str:
 async def get_health_summary() -> str:
     """Получить краткую сводку для логов/алертов"""
     health = await get_system_health()
-    
+
     return (
         f"[Health] {health['health_status']} | "
         f"CPU: {health['system']['cpu_percent']:.1f}% | "
@@ -131,21 +133,22 @@ async def get_health_summary() -> str:
 
 
 # Semaphore для ограничения AI вызовов (Phase 1)
-AI_SEMAPHORE: Optional[asyncio.Semaphore] = None
+AI_SEMAPHORE: asyncio.Semaphore | None = None
 AI_SEMAPHORE_WAITING: int = 0  # Counter for waiting requests
 
 import logging
+
 _sem_logger = logging.getLogger("ai.semaphore")
 
 class LoggingSemaphore:
     """Semaphore wrapper with logging for debugging."""
-    
+
     def __init__(self, value: int):
         self._semaphore = asyncio.Semaphore(value)
         self._max = value
         self._active = 0
         self._waiting = 0
-    
+
     async def __aenter__(self):
         self._waiting += 1
         if self._active >= self._max:
@@ -155,7 +158,7 @@ class LoggingSemaphore:
         self._active += 1
         _sem_logger.info(f"[Semaphore] ▶️ ACQUIRED: {self._active}/{self._max} active, {self._waiting} waiting")
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         self._active -= 1
         self._semaphore.release()
@@ -163,7 +166,7 @@ class LoggingSemaphore:
         return False
 
 
-_LOGGING_SEMAPHORE: Optional[LoggingSemaphore] = None
+_LOGGING_SEMAPHORE: LoggingSemaphore | None = None
 
 def get_ai_semaphore(max_concurrent: int = 5) -> LoggingSemaphore:
     """Получить семафор для ограничения параллельных AI вызовов"""

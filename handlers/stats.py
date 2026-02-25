@@ -4,9 +4,8 @@ Contains:
 - show_stats_menu: Display daily nutrition statistics
 - stats_placeholder: Placeholder for future stats features
 """
-from datetime import date, datetime, timedelta
-
 import logging
+from datetime import datetime, timedelta
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -24,7 +23,7 @@ router = Router()
 async def show_stats_menu(callback: types.CallbackQuery) -> None:
     """Display daily nutrition statistics with date navigation."""
     parts = callback.data.split(":")
-    
+
     # Check if date is provided
     target_date = datetime.now().date()
     if len(parts) > 1:
@@ -32,9 +31,9 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
             target_date = datetime.strptime(parts[1], "%Y-%m-%d").date()
         except ValueError:
             pass
-            
+
     user_id: int = callback.from_user.id
-    
+
     async for session in get_db():
         # Get consumption for TARGET date
         stmt = select(ConsumptionLog).where(
@@ -54,7 +53,7 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
         date_label = target_date.strftime('%d.%m.%Y')
         if target_date == datetime.now().date():
             date_label += " (Сегодня)"
-            
+
         if not logs:
             response = (
                 f"📊 <b>Статистика за {date_label}</b>\n\n"
@@ -73,26 +72,26 @@ async def show_stats_menu(callback: types.CallbackQuery) -> None:
             )
 
     builder = InlineKeyboardBuilder()
-    
+
     # Navigation Row
     prev_date = target_date - timedelta(days=1)
     next_date = target_date + timedelta(days=1)
     today = datetime.now().date()
-    
+
     nav_row = []
     nav_row.append(types.InlineKeyboardButton(text="⬅️", callback_data=f"menu_stats:{prev_date}"))
     if target_date != today:
         nav_row.append(types.InlineKeyboardButton(text="Сегодня", callback_data=f"menu_stats:{today}"))
         nav_row.append(types.InlineKeyboardButton(text="➡️", callback_data=f"menu_stats:{next_date}"))
-        
+
     builder.row(*nav_row)
 
     if logs:
         builder.button(text="📝 История", callback_data=f"stats_history:{target_date}")
-    
+
     if target_date == today:
          builder.button(text="🗓️ Неделя", callback_data="stats_week")
-         
+
     builder.button(text="🔙 Назад", callback_data="main_menu")
     builder.adjust(1)
 
@@ -129,7 +128,7 @@ async def stats_placeholder(callback: types.CallbackQuery) -> None:
 async def stats_history_handler(callback: types.CallbackQuery) -> None:
     """Show consumption logs with delete buttons for specific date."""
     parts = callback.data.split(":")
-    
+
     # Check if date is provided
     target_date = datetime.now().date()
     if len(parts) > 1:
@@ -137,13 +136,13 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
             target_date = datetime.strptime(parts[1], "%Y-%m-%d").date()
         except ValueError:
             pass
-            
+
     user_id = callback.from_user.id
     logger.info(f"📝 User {user_id} requested sexy history for {target_date}")
-    
+
     from services.reports import generate_detailed_report
     text = await generate_detailed_report(user_id, target_date)
-    
+
     if not text:
         text = f"📝 <b>История за {target_date.strftime('%d.%m.%Y')}</b>\n\nПока нет записей."
 
@@ -153,20 +152,20 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
             func.date(ConsumptionLog.date) == target_date
         ).order_by(ConsumptionLog.date.desc())
         logs = (await session.execute(stmt)).scalars().all()
-    
+
     builder = InlineKeyboardBuilder()
-    
+
     if logs:
         text += "\n\n<i>Нажми 🗑️ чтобы удалить запись:</i>"
         for log in logs:
             cal = int(log.calories) if log.calories else 0
             # Pass date to delete handler so it returns to correct date
             builder.button(text=f"🗑️ {log.product_name[:20]} ({cal})", callback_data=f"delete_log:{log.id}:{target_date}")
-        
+
         builder.adjust(1)
-    
+
     builder.button(text="🔙 Назад", callback_data=f"menu_stats:{target_date}")
-    
+
     try:
         await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception:
@@ -183,12 +182,12 @@ async def delete_log_handler(callback: types.CallbackQuery) -> None:
     """Delete a consumption log entry."""
     parts = callback.data.split(":")
     log_id = int(parts[1])
-    
+
     # Logic to preserve date
     target_date_str = ""
     if len(parts) > 2:
         target_date_str = parts[2]
-    
+
     async for session in get_db():
         log = await session.get(ConsumptionLog, log_id)
         if log and log.user_id == callback.from_user.id:
@@ -198,7 +197,7 @@ async def delete_log_handler(callback: types.CallbackQuery) -> None:
         else:
             await callback.answer("⚠️ Запись не найдена", show_alert=True)
             return
-    
+
     # Refresh history with correct date
     if target_date_str:
         # Hack: overwrite callback data to trick handlers

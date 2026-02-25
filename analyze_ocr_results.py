@@ -1,6 +1,6 @@
 import json
 
-with open('ocr_test_results_20251126_152827.json', 'r') as f:
+with open('ocr_test_results_20251126_152827.json') as f:
     results = json.load(f)
 
 print('📊 АНАЛИЗ РЕЗУЛЬТАТОВ OCR МОДЕЛЕЙ\n')

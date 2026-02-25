@@ -1,11 +1,13 @@
 import asyncio
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.getcwd())
 
 from database.base import async_session
 from database.models import UserSettings
 from services.nutrition_calculator import NutritionCalculator
+
 
 async def restore_elena():
     user_id = 109153550
@@ -14,16 +16,16 @@ async def restore_elena():
     height = 164
     weight = 59.9
     goal = "lose_weight"
-    
+
     # Calculate targets using the bot's logic
     targets = NutritionCalculator.calculate_targets(
         gender, weight, height, age, goal
     )
-    
+
     print(f"Restoring Elena (ID {user_id})...")
     print(f"Params: {gender}, {age}y, {height}cm, {weight}kg, {goal}")
     print(f"Targets: {targets}")
-    
+
     async with async_session() as session:
         settings = UserSettings(
             user_id=user_id,

@@ -7,8 +7,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy.future import select
-from database.base import init_db, get_db
-from database.models import User, Product, ConsumptionLog, Receipt
+
+from database.base import get_db, init_db
+from database.models import ConsumptionLog, Product, Receipt, User
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,7 +21,7 @@ async def check_user_data():
         # Check User Info
         u_stmt = select(User).where(User.id == TARGET_USER_ID)
         user = (await session.execute(u_stmt)).scalar_one_or_none()
-        
+
         if not user:
             print("User not found.")
             return
@@ -42,7 +43,7 @@ async def check_user_data():
         print(f"Consumption Logs: {len(logs)}")
         for l in logs[:5]:
              print(f" - {l.product_name} ({l.date})")
-             
+
         # Check Receipts
         r_stmt = select(Receipt).where(Receipt.user_id == TARGET_USER_ID)
         receipts = (await session.execute(r_stmt)).scalars().all()

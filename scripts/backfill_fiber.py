@@ -8,14 +8,14 @@ This script:
 Run: PYTHONPATH=. python3 scripts/backfill_fiber.py
 """
 import asyncio
-import json
 import logging
+
 import aiohttp
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 
 from config import settings
 from database.base import async_session
-from database.models import Product, ConsumptionLog
+from database.models import ConsumptionLog, Product
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,17 +27,17 @@ async def estimate_fiber(product_name: str) -> float:
         f"Сколько клетчатки (fiber) в граммах содержится в 100г продукта '{product_name}'?\n"
         "Ответь ТОЛЬКО числом (например: 2.4). Если клетчатки нет (мясо, масло, сахар) — ответь 0."
     )
-    
+
     headers = {
         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
-    
+
     payload = {
         "model": "openai/gpt-4.1-mini",  # Fast and cheap
         "messages": [{"role": "user", "content": prompt}]
     }
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -54,7 +54,7 @@ async def estimate_fiber(product_name: str) -> float:
                     return float(content)
     except Exception as e:
         logger.error(f"Error estimating fiber for '{product_name}': {e}")
-    
+
     return 0.0
 
 
@@ -63,13 +63,13 @@ async def backfill_products():
     async with async_session() as session:
         # Find products with no fiber
         stmt = select(Product).where(
-            or_(Product.fiber == 0, Product.fiber == None)
+            or_(Product.fiber == 0, Product.fiber is None)
         )
         result = await session.execute(stmt)
         products = result.scalars().all()
-        
+
         logger.info(f"Found {len(products)} products with no fiber data.")
-        
+
         updated = 0
         for product in products:
             fiber = await estimate_fiber(product.name)
@@ -79,10 +79,10 @@ async def backfill_products():
                 logger.info(f"✅ {product.name}: {fiber}г клетчатки")
             else:
                 logger.info(f"⏭️ {product.name}: 0г (ожидаемо)")
-            
+
             # Rate limiting: 0.5s between requests
             await asyncio.sleep(0.5)
-        
+
         await session.commit()
         logger.info(f"Updated {updated} products with fiber data.")
 
@@ -91,13 +91,13 @@ async def backfill_consumption_logs():
     """Update consumption logs with missing fiber data."""
     async with async_session() as session:
         stmt = select(ConsumptionLog).where(
-            or_(ConsumptionLog.fiber == 0, ConsumptionLog.fiber == None)
+            or_(ConsumptionLog.fiber == 0, ConsumptionLog.fiber is None)
         )
         result = await session.execute(stmt)
         logs = result.scalars().all()
-        
+
         logger.info(f"Found {len(logs)} consumption logs with no fiber data.")
-        
+
         updated = 0
         for log in logs:
             fiber_per_100g = await estimate_fiber(log.product_name)
@@ -111,9 +111,9 @@ async def backfill_consumption_logs():
                     log.fiber = fiber_per_100g  # Default to 100g portion
                 updated += 1
                 logger.info(f"✅ Log: {log.product_name}: ~{log.fiber:.1f}г клетчатки")
-            
+
             await asyncio.sleep(0.5)
-        
+
         await session.commit()
         logger.info(f"Updated {updated} consumption logs with fiber data.")
 

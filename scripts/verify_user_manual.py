@@ -8,12 +8,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from aiogram import Bot
 from sqlalchemy import update
-from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
-from handlers.menu import show_main_menu
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,13 +21,13 @@ TARGET_USER_ID = 911990304  # ElenaOdr
 async def verify_target_user():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     async for session in get_db():
         # Update user
         stmt = update(User).where(User.id == TARGET_USER_ID).values(is_verified=True)
         await session.execute(stmt)
         await session.commit()
-        
+
         # Notify user
         try:
             # Send welcome message

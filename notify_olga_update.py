@@ -1,12 +1,14 @@
 import asyncio
+
 from aiogram import Bot
+
 from config import settings
 
 OLGA_ID = 295543071
 
 async def send_notification():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     text = (
         "🚀 <b>Обновление FoodFlow!</b>\n\n"
         "Ольга, теперь пользоваться ботом стало ещё проще!\n\n"
@@ -22,7 +24,7 @@ async def send_notification():
         "3. <b>Если вес не указан</b>, бот по умолчанию посчитает порцию как <b>100г</b>.\n\n"
         "Попробуйте отправить что-нибудь прямо сейчас! 😉"
     )
-    
+
     try:
         await bot.send_message(OLGA_ID, text, parse_mode="HTML")
         print(f"✅ Notification sent to Olga ({OLGA_ID})")

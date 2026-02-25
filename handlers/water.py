@@ -1,8 +1,10 @@
 """Module for handling water intake logging."""
 import logging
+
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from database.base import get_db
 from database.models import WaterLog
 
@@ -46,7 +48,7 @@ async def process_add_water(callback: types.CallbackQuery, state: FSMContext, us
         await session.commit()
 
     await callback.answer(f"✅ Добавлено {amount_ml} мл воды!", show_alert=True)
-    
+
     # Return to main menu immediately to show updated dashboard
     from handlers.menu import show_main_menu
     await show_main_menu(callback.message, callback.from_user.first_name, user_id, user_tier)

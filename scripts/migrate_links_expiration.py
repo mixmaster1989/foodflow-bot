@@ -1,11 +1,14 @@
-import asqlite
 import asyncio
+
+import asqlite
+
 from config import settings
+
 
 async def apply_migrations():
     print("Starting links migrations...")
     db_path = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "")
-    
+
     async with asqlite.connect(db_path) as conn:
         # Add referral_token_expires_at to users
         try:

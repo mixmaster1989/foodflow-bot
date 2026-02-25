@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime
 
-from aiogram import Router, F, types
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -28,7 +28,7 @@ class IAteStates(StatesGroup):
 async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start the 'I ate' flow - ask for food description."""
     await state.set_state(IAteStates.waiting_for_description)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
     # builder.button(text="🍽️ Приёмы пищи", callback_data="menu_saved_meals")
@@ -36,7 +36,7 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     # builder.button(text="🍳 Собрать приём", callback_data="menu_build_meal")
     builder.button(text="❌ Отмена", callback_data="main_menu")
     builder.adjust(2, 1)
-    
+
     caption = (
         "🍽️ <b>Что съели?</b>\n\n"
         "Опишите что вы съели <b>с указанием веса</b>.\n\n"
@@ -45,9 +45,9 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
         "• Куриная грудка 200г\n"
         "• 2 яйца</i>"
     )
-    
+
     photo_path = types.FSInputFile("assets/i_ate.png")
-    
+
     try:
         await callback.message.edit_media(
             media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
@@ -71,57 +71,58 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
 async def i_ate_process(message: types.Message, state: FSMContext) -> None:
     """Process food description, get KBJU from AI, save to consumption log."""
     description = message.text or message.caption
-    
+
     # Voice message support: transcribe via STT
     if not description and message.voice:
         status_msg = await message.answer("🎤 <i>Распознаю голос...</i>", parse_mode="HTML")
         try:
-            from services.voice_stt import SpeechToText
-            from aiogram import Bot
             import os
-            
+
+            from aiogram import Bot
+
+            from services.voice_stt import SpeechToText
+
             bot = Bot(token=settings.BOT_TOKEN)
             stt = SpeechToText()
-            
+
             file_info = await bot.get_file(message.voice.file_id)
             temp_dir = "services/temp"
             os.makedirs(temp_dir, exist_ok=True)
             ogg_path = f"{temp_dir}/i_ate_voice_{message.voice.file_id}.ogg"
-            
+
             await bot.download_file(file_info.file_path, ogg_path)
             description = await stt.process_voice_message(ogg_path)
-            
+
             try:
                 os.remove(ogg_path)
-            except:
+            except Exception:
                 pass
             await bot.session.close()
-            
+
             if not description:
                 await status_msg.edit_text("❌ Не удалось распознать голос. Попробуйте ещё раз или напишите текстом.")
                 return
-            
+
             await status_msg.edit_text(f"🎤 <b>Распознано:</b> <blockquote>{description}</blockquote>", parse_mode="HTML")
             logger.info(f"🎤 I_ATE STT: {description}")
         except Exception as e:
             logger.error(f"I_ATE STT Error: {e}")
             await message.answer(f"❌ Ошибка распознавания: {e}")
             return
-    
+
     if not description:
         await message.answer("⚠️ Пожалуйста, напишите название блюда текстом (или отправьте фото/голосовое с описанием).")
         return
-        
+
     description = description.strip()
-    user_id = message.from_user.id
-    
+
     status_msg = await message.answer("🔄 <b>Анализирую информацию...</b>", parse_mode="HTML")
-    
+
     try:
         # Check if multi-item input via AI Brain
         from services.ai_brain import AIBrainService
         brain_result = await AIBrainService.analyze_text(description)
-        
+
         if brain_result and isinstance(brain_result, dict) and brain_result.get("multi") and brain_result.get("items"):
             items = brain_result["items"]
             if len(items) > 1:
@@ -129,7 +130,7 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 from handlers.universal_input import process_batch_food_logging
                 await process_batch_food_logging(message, state, items, status_msg)
                 return
-        
+
         # Also handle raw list from AI
         if brain_result and isinstance(brain_result, list) and len(brain_result) > 1:
             items = [{"product": item.get("product") or item.get("name", ""), "weight": item.get("weight")} for item in brain_result if isinstance(item, dict)]
@@ -137,10 +138,10 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 from handlers.universal_input import process_batch_food_logging
                 await process_batch_food_logging(message, state, items, status_msg)
                 return
-        
+
         # Single item: use NormalizationService as before
         result = await NormalizationService.analyze_food_intake(description)
-        
+
         name = result.get("name", description)
         calories = float(result.get("calories") or 0)
         protein = float(result.get("protein") or 0)
@@ -150,7 +151,7 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         weight_grams = result.get("weight_grams")
         weight_missing = result.get("weight_missing", True)
         base_name = result.get("base_name")
-        
+
         # If weight is missing, ask user to specify
         if weight_missing:
             # Save context and ask for weight
@@ -158,7 +159,7 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 pending_product={
                     "name": name,
                     "base_name": base_name,
-                    "calories100": calories, 
+                    "calories100": calories,
                     "protein100": protein,
                     "fat100": fat,
                     "carbs100": carbs,
@@ -166,10 +167,10 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 }
             )
             await state.set_state(IAteStates.waiting_for_weight)
-            
+
             builder = InlineKeyboardBuilder()
             builder.button(text="❌ Отмена", callback_data="main_menu")
-            
+
             await status_msg.edit_text(
                 f"🧐 Вы сказали: <blockquote>{description}</blockquote>\n"
                 f"Это похоже на: <b>{name}</b>\n\n"
@@ -184,17 +185,17 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
             pending_product={
                 "name": f"{name} ({weight_grams}г)",
                 "base_name": base_name,
-                "calories100": calories, 
+                "calories100": calories,
                 "protein100": protein,
                 "fat100": fat,
                 "carbs100": carbs,
                 "fiber100": fiber
             }
         )
-        
+
         # Instead of saving immediately, show confirmation
         await show_confirmation_interface(message, state, status_msg)
-        
+
     except Exception as e:
         logger.error(f"Error in i_ate_process: {e}", exc_info=True)
         await state.clear()
@@ -209,38 +210,38 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         # Extract number if mixed text (e.g. "55g")
         import re
         match = re.search(r'(\d+(?:\.\d+)?)', weight_text)
-        
+
         if not match:
             await message.reply("⚠️ Пожалуйста, введите только число (вес в граммах).")
             return
 
         weight = float(match.group(1))
-        
+
         data = await state.get_data()
         product = data.get("pending_product")
-        
+
         if not product:
             await message.reply("⚠️ Ошибка контекста. Попробуйте ввести продукт заново.")
             await state.clear()
             return
-            
+
         # Recalculate based on weight
         factor = weight / 100.0
-        
+
         name = product['name']
         base_name = product['base_name']
-        calories = product['calories100'] * factor
-        protein = product['protein100'] * factor
-        fat = product['fat100'] * factor
-        carbs = product['carbs100'] * factor
-        fiber = product['fiber100'] * factor
-        
-        final_name = f"{name} ({int(weight)}г)"
-        
+        product['calories100'] * factor
+        product['protein100'] * factor
+        product['fat100'] * factor
+        product['carbs100'] * factor
+        product['fiber100'] * factor
+
+        f"{name} ({int(weight)}г)"
+
         # Update pending product with new weight
         # IMPORTANT: We DO NOT recalculate macros automatically here, as per user request.
         # User can edit them manually if needed.
-        
+
         # FIX: Prevent double weight ("Apple (100g) (200g)")
         # Use base_name if available, otherwise try to strip existing weight
         if base_name:
@@ -249,13 +250,13 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
              # Fallback: remove existing (...) from name
              clean_name = re.sub(r'\s*\(\d+г\)$', '', name)
              product['name'] = f"{clean_name} ({int(weight)}г)"
-        
+
         # Updating state
         await state.update_data(pending_product=product)
-        
+
         # Show confirmation
         await show_confirmation_interface(message, state)
-        
+
     except Exception as e:
         logger.error(f"Weight Input Error: {e}", exc_info=True)
         await message.reply(f"❌ Ошибка: {e}")
@@ -266,7 +267,7 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     """Show the preview with Confirm/Edit buttons."""
     data = await state.get_data()
     product = data.get("pending_product")
-    
+
     if not product:
         await message.reply("⚠️ Ошибка контекста.")
         return
@@ -277,14 +278,14 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     fat = product.get('fat100', 0)
     carbs = product.get('carbs100', 0)
     fiber = product.get('fiber100', 0)
-    
-    # Check if these are actually totals (from i_ate_process they are just values, mapped to 100 for storage sake? 
+
+    # Check if these are actually totals (from i_ate_process they are just values, mapped to 100 for storage sake?
     # No, in i_ate_process we stored them as calories100 etc in the 'else' block, but as plain vars in the main block.
     # Let's standardize in i_ate_process before calling this function.
     # FIX: i_ate_process needs to save pending_product correctly in the 'happy path' too.
     # Wait, i_ate_process didn't save pending_product in the happy path (lines 122+).
     # I need to fix i_ate_process logic first in the ReplacementChunk above.
-    
+
     # Standardizing display
     fiber_line = f"\n🥬 Клетчатка: <code>{fiber:.1f}</code>" if fiber else ""
     text = (
@@ -295,7 +296,7 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
         f"{fiber_line}\n\n"
         f"<blockquote>Всё верно? Нажми «Записать» или отредактируй значения.</blockquote>"
     )
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Прямо сейчас", callback_data="i_ate_confirm_now")
     builder.button(text="🕓 Другое время", callback_data="i_ate_ask_time")
@@ -303,9 +304,9 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     builder.button(text="✏️ Ред. КБЖУ", callback_data="i_ate_edit_macros")
     builder.button(text="❌ Отмена", callback_data="main_menu")
     builder.adjust(2, 2, 1)
-    
+
     await state.set_state(IAteStates.waiting_for_confirmation)
-    
+
     if editable_message:
         await editable_message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
     else:
@@ -334,7 +335,7 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
     if callback.data == "i_ate_time:back":
         await show_confirmation_interface(callback.message, state)
         return
-        
+
     from utils.time_picker import get_time_from_callback
     selected_time = get_time_from_callback(callback.data)
     await process_save(callback, state, selected_time)
@@ -343,7 +344,7 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
     """Common save logic."""
     data = await state.get_data()
     product = data.get("pending_product")
-    
+
     async for session in get_db():
         log = ConsumptionLog(
             user_id=callback.from_user.id,
@@ -358,16 +359,16 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
         )
         session.add(log)
         await session.commit()
-    
+
     await state.clear()
-    
+
     # Format success message with full details
     calories = product.get('calories100', 0)
     protein = product.get('protein100', 0)
     fat = product.get('fat100', 0)
     carbs = product.get('carbs100', 0)
     fiber = product.get('fiber100', 0)
-    
+
     fiber_line = f"\n🥬 Клетчатка: {fiber:.1f}" if fiber else ""
     time_str = timestamp.strftime("%H:%M")
     success_text = (
@@ -377,13 +378,13 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
         f"🥩 <code>{protein:.1f}</code> | 🥑 <code>{fat:.1f}</code> | 🍞 <code>{carbs:.1f}</code>"
         f"{fiber_line}"
     )
-    
+
     await callback.message.edit_text(success_text, parse_mode="HTML")
-    
+
     # NEW: Send visual progress card
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(callback.from_user.id, callback.bot)
-    
+
     await callback.answer()
 
 @router.callback_query(F.data == "edit_field_weight", IAteStates.waiting_for_confirmation)
@@ -401,7 +402,7 @@ async def start_edit_macros(callback: types.CallbackQuery, state: FSMContext):
     builder.button(text="🥬 Клетчатка", callback_data="edit_macro_fiber100")
     builder.button(text="🔙 Назад", callback_data="back_to_confirm")
     builder.adjust(2, 3, 1)
-    
+
     await callback.message.edit_text("👇 Что меняем?", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("edit_macro_"))
@@ -409,12 +410,12 @@ async def ask_macro_value(callback: types.CallbackQuery, state: FSMContext):
     field = callback.data.split("macro_")[1]
     await state.update_data(current_edit_field=field)
     await state.set_state(IAteStates.waiting_for_edit_value)
-    
+
     labels = {
-        "calories100": "Калории", "protein100": "Белки", 
+        "calories100": "Калории", "protein100": "Белки",
         "fat100": "Жиры", "carbs100": "Углеводы", "fiber100": "Клетчатку"
     }
-    
+
     await callback.message.edit_text(f"✏️ Введите новое значение для <b>{labels.get(field)}</b>:", parse_mode="HTML")
 
 @router.message(IAteStates.waiting_for_edit_value)
@@ -424,12 +425,12 @@ async def save_macro_value(message: types.Message, state: FSMContext):
         data = await state.get_data()
         field = data.get("current_edit_field")
         product = data.get("pending_product")
-        
+
         product[field] = value
         await state.update_data(pending_product=product)
-        
+
         await show_confirmation_interface(message, state)
-        
+
     except ValueError:
         await message.reply("⚠️ Введите число.")
 

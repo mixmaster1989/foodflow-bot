@@ -1,10 +1,12 @@
 """Smart Search Router — Fridge Search and AI Summary."""
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
+
 from api.auth import CurrentUser, DBSession
 from database.models import Product, Receipt
 from services.ai_brain import AIBrainService
-import logging
 
 router = APIRouter()
 logger = logging.getLogger("api.search")
@@ -22,9 +24,9 @@ async def search_fridge(
         stmt = select(Product).outerjoin(Receipt).where(
             or_(Receipt.user_id == user.id, Product.user_id == user.id)
         ).order_by(Product.id.desc())
-        
+
         all_products = (await session.execute(stmt)).scalars().all()
-        
+
         # 2. Fuzzy Python Search
         filtered = []
         if not q:
@@ -35,18 +37,19 @@ async def search_fridge(
                 name_norm = p.name.lower()
                 if all(kw in name_norm for kw in keywords):
                     filtered.append(p)
-        
+
         # 3. Optional AI Summary with Caching
         summary_data = None
         if with_summary and not q: # Only summarize full fridge
-            from database.models import UserSettings
-            from datetime import datetime, timedelta
             import json
-            
+            from datetime import datetime, timedelta
+
+            from database.models import UserSettings
+
             # Fetch User Settings
             settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)
             user_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-            
+
             # Check Cache
             cached_data = None
             if user_settings and user_settings.fridge_summary_cache and user_settings.fridge_summary_date:
@@ -54,9 +57,9 @@ async def search_fridge(
                     try:
                         cached_data = json.loads(user_settings.fridge_summary_cache)
                         logger.info(f"AI Summary cache HIT for user {user.id}")
-                    except: 
+                    except Exception:
                         cached_data = None
-            
+
             if cached_data:
                 summary_data = cached_data
             else:
@@ -70,7 +73,7 @@ async def search_fridge(
                         session.add(user_settings)
                         await session.commit()
                         logger.info(f"AI Summary cache UPDATED for user {user.id}")
-        
+
         return {
             "results": [
                 {

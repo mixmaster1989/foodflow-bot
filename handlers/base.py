@@ -1,5 +1,7 @@
 from aiogram import Bot
+
 from config import settings
+
 
 class BaseCommandHandler:
     """

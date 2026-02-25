@@ -9,7 +9,6 @@ from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import or_
 from sqlalchemy.future import select
 
 from database.base import get_db
@@ -109,7 +108,7 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
     """
     # Answer callback IMMEDIATELY to prevent timeout on long AI operations
     await callback.answer()
-    
+
     # callback data can be 'recipes_cat:Category' or 'recipes_cat:Category:refresh'
     parts = callback.data.split(":")
     category = parts[1]

@@ -1,12 +1,15 @@
 
 import asyncio
-from sqlalchemy import select, update
+
+from sqlalchemy import update
+
 from database.base import get_db, init_db
 from database.models import UserSettings
 
+
 async def reset_all_cache():
     await init_db()
-    
+
     print("🔄 Resetting fridge summary cache for ALL users...")
     async for session in get_db():
         stmt = update(UserSettings).values(

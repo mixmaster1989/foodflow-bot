@@ -1,16 +1,15 @@
 """JWT Authentication for FoodFlow API."""
+import logging
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status, Query
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import TokenData
-import logging
 from config import settings
 from database.base import get_db
 from database.models import User
@@ -32,11 +31,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create JWT access token with stringified sub."""
     to_encode = data.copy()
-    
+
     # CRITICAL: Subject MUST be a string for many JWT libraries
     if "sub" in to_encode:
         to_encode["sub"] = str(to_encode["sub"])
-        
+
     expire = datetime.now() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -64,13 +63,13 @@ async def get_current_user(
     token: Annotated[str | None, Depends(oauth2_scheme)] = None,
     token_query: Annotated[str | None, Query(alias="token")] = None,
     # Need to avoid circular import by using dynamic import or manual session
-    session: Annotated[AsyncSession, Depends(get_db)] = None 
+    session: Annotated[AsyncSession, Depends(get_db)] = None
 ) -> User | None:
     """Get current user from JWT token (header or query param)."""
     final_token = token or token_query
     if not final_token:
         return None
-    
+
     token_data = verify_token(final_token)
     if not token_data or not token_data.user_id:
         raise HTTPException(
@@ -78,7 +77,7 @@ async def get_current_user(
             detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Get user directly from session
     # We use __import__ trick if dependencies are nested, but get_db is usually safe
     user = await session.get(User, token_data.user_id)

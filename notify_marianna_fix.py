@@ -1,12 +1,14 @@
 import asyncio
+
 from aiogram import Bot
+
 from config import settings
 
 USER_ID = 7587440056
 
 async def send_apology():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     text = (
         "🌹 <b>Марианна, здравствуйте!</b>\n\n"
         "Несколько минут назад вы столкнулись с ошибкой в боте, когда нажимали «Я съела». "
@@ -18,7 +20,7 @@ async def send_apology():
         "Благодаря вашей активности мы нашли и исправили эту недоработку. Вы помогаете делать FoodFlow лучше!\n\n"
         "Желаем вам чудесного дня, вкусной (и полезной!) еды и отличного настроения! ☀️🍓"
     )
-    
+
     try:
         await bot.send_message(USER_ID, text, parse_mode="HTML")
         print(f"✅ Apology sent to Marianna ({USER_ID})")

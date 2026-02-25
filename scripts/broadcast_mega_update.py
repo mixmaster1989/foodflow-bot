@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import sys
-import os
 from pathlib import Path
 
 # Add root directory to sys.path
@@ -13,7 +12,7 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from sqlalchemy import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
 
 # Configure logging
@@ -64,7 +63,7 @@ async def send_msg(bot, user_id, text):
     if DRY_RUN:
         logger.info(f"[DRY RUN] Would send to {user_id}")
         return True
-    
+
     try:
         await bot.send_message(user_id, text, parse_mode="HTML")
         return True
@@ -82,33 +81,33 @@ async def send_msg(bot, user_id, text):
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     logger.info(f"Starting broadcast (DRY_RUN={DRY_RUN}, TEST_MODE={TEST_MODE})...")
-    
+
     stats = {"total": 0, "success": 0, "blocked": 0, "failed": 0, "curators": 0}
-    
+
     async for session in get_db():
         stmt = select(User)
         if TEST_MODE:
             stmt = stmt.where(User.id.in_(TEST_USER_IDS))
-            
+
         result = await session.execute(stmt)
         users = result.scalars().all()
         stats["total"] = len(users)
-        
+
         for user in users:
             text = USER_MESSAGE
             if user.role in ["curator", "admin"]:
                 text += "\n\n" + CURATOR_MESSAGE_ADDON
                 stats["curators"] += 1
-            
+
             if await send_msg(bot, user.id, text):
                 stats["success"] += 1
             else:
                 stats["blocked"] += 1 # Simplified check
-            
+
             await asyncio.sleep(0.05) # Rate limit protection
-            
+
     logger.info(f"Finished. Stats: {stats}")
     await bot.session.close()
 

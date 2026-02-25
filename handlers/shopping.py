@@ -57,7 +57,7 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> No
             select(ShoppingSession)
             .where(
                 ShoppingSession.user_id == callback.from_user.id,
-                ShoppingSession.is_active == True,  # noqa: E712
+                ShoppingSession.is_active,  # noqa: E712
             )
             .order_by(ShoppingSession.started_at.desc())
         )
@@ -125,8 +125,9 @@ async def scan_label(message: types.Message, bot: Bot, state: FSMContext) -> Non
         await message.answer("❌ Нет активной сессии покупок. Нажми «🛒 Иду в магазин».")
         return
 
-    from services.photo_queue import PhotoQueueManager
     import logging
+
+    from services.photo_queue import PhotoQueueManager
     logger = logging.getLogger(__name__)
     logger.info(f"DEBUG TIMING: calling add_item for {message.from_user.id}")
     await PhotoQueueManager.add_item(
@@ -145,9 +146,9 @@ async def process_single_label_shopping(message: types.Message, bot: Bot, state:
     session_id = data.get("shopping_session_id")
     # Note: state data might persist, but if flow canceled it might be stale.
     # But usually queue processes fast enough or we check validity.
-    
+
     if not session_id:
-        # Should checked inside worker? 
+        # Should checked inside worker?
         # Actually state might satisfy even if session cancelled?
         pass
 
@@ -175,7 +176,7 @@ async def process_single_label_shopping(message: types.Message, bot: Bot, state:
             )
             session.add(scan)
             await session.commit()
-            
+
             # Get consultant recommendations
             settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
             settings_result = await session.execute(settings_stmt)

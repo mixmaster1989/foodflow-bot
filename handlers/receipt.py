@@ -8,25 +8,22 @@ Contains:
 """
 import io
 import logging
-from typing import Any
 from datetime import datetime, timedelta
+from typing import Any
 
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy import select
 
 from database.base import get_db
-from database.models import Product, Receipt, UserSettings
+from database.models import Product, Receipt
 from handlers.shopping import ShoppingMode
-from services.consultant import ConsultantService
-from services.matching import MatchingService
 from services.normalization import NormalizationService
 from services.ocr import OCRService
 from services.photo_queue import PhotoQueueManager
-from sqlalchemy import select
-from utils.message_cleanup import schedule_message_deletion
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -38,12 +35,12 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> N
 
     Routes to shopping mode if in shopping state, otherwise shows
     action menu (receipt, price tag, food log).
-    
+
     NOW INTEGRATED WITH PHOTO QUEUE.
     """
     current_state = await state.get_state()
     user_id = message.from_user.id
-    
+
     # 1. Shopping Mode (Priority)
     # Если в режиме сканирования этикеток - не обрабатываем здесь (shopping.router)
     if current_state in (ShoppingMode.scanning_labels.state, ShoppingMode.waiting_for_label_photo.state):
@@ -66,17 +63,17 @@ async def handle_photo(message: types.Message, bot: Bot, state: FSMContext) -> N
     # 3. IF NO STATE -> Pass to Universal Handler!
     if current_state is None:
         return
-    
+
     # 3. Action Menu (Default for photos)
     # We don't queue the *menu* itself, but if they choose "Receipt", we queue THAT action.
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🧾 Это чек", callback_data="action_receipt")
     builder.button(text="❄️ В холодильник", callback_data="action_add_to_fridge")
     builder.button(text="🏷️ Это ценник (сравнить)", callback_data="action_price_tag")
     builder.button(text="🍽️ Я это съел", callback_data="action_log_food")
     builder.button(text="❌ Отмена", callback_data="action_cancel")
-    builder.adjust(1) 
+    builder.adjust(1)
 
     await message.reply(
         "📸 **Вижу фото!** Что с ним сделать?",
@@ -106,7 +103,7 @@ async def process_receipt_action(callback: types.CallbackQuery, bot: Bot, state:
     await callback.message.edit_text("⏳ Добавлено в очередь обработки чеков...")
 
     logger.info(f"[PhotoFlow] Q_ADD: User {user_id} added Receipt (MenuAction) to queue. FileID: {file_id[:10]}...")
-    
+
     await PhotoQueueManager.add_item(
         user_id=user_id,
         message=callback.message, # Pass bot's message to edit it later
@@ -132,10 +129,10 @@ async def process_receipt_worker_action(message: types.Message, bot: Bot, state:
     # In menu action, 'message' is the BOT's message (which we edited to "Added to queue...").
     # We use it as status_msg.
     # We need to find the original photo info not from message (it's text), but we passed file_id.
-    
-    # Re-construct a dummy message object if needed for _process_receipt_core context, 
+
+    # Re-construct a dummy message object if needed for _process_receipt_core context,
     # but _process_receipt_core mainly needs user_id and file_id.
-    
+
     # Update status
     try:
         await message.edit_text("⏳ Анализирую чек (Начало OCR)...")
@@ -144,9 +141,9 @@ async def process_receipt_worker_action(message: types.Message, bot: Bot, state:
 
     # We need a 'photo_message' context just for from_user.id usually.
     # 'message.chat.id' is the user chat (same as user_id mostly for private chats).
-    
+
     user_id = message.chat.id
-    
+
     await _process_receipt_core(message, bot, message, message, state, file_id, override_user_id=user_id)
 
 
@@ -163,7 +160,7 @@ async def _process_receipt_core(
 ) -> None:
     """Core receipt logic run by worker."""
     user_id = override_user_id or context_msg.from_user.id
-    
+
     logger.info(f"[PhotoFlow] OCR_START: User {user_id} processing file {file_id[:10]}...")
 
     try:
@@ -176,10 +173,10 @@ async def _process_receipt_core(
         # OCR
         data = await OCRService.parse_receipt(image_data)
         raw_items = data.get("items", [])
-        
+
         try:
             await status_message.edit_text(f"⏳ Чек распознан ({len(raw_items)} строк). Нормализация...")
-        except:
+        except Exception:
             pass
 
         normalized_items = await NormalizationService.normalize_products(raw_items)
@@ -187,7 +184,7 @@ async def _process_receipt_core(
 
         # 1. Save Header & Deduplicate
         receipt_id, is_duplicate = await _save_receipt_header(user_id, data)
-        
+
         logger.info(f"[PhotoFlow] DB_SAVE: Receipt ID {receipt_id} (Duplicate={is_duplicate})")
 
         if is_duplicate:
@@ -201,10 +198,10 @@ async def _process_receipt_core(
         # 2. Update FSM - RECEIPT CACHE (MULTI-SESSION SUPPORT)
         current_data = await state.get_data()
         receipt_cache = current_data.get("receipt_cache", {}) # Format: { "receipt_id": [items...] }
-        
+
         # Add new receipt (convert ID to str for JSON compatibility)
         receipt_cache[str(receipt_id)] = normalized_items
-        
+
         # Prune cache: Keep last 10 receipts to prevent state bloat
         if len(receipt_cache) > 10:
              # Remove oldest keys (Python 3.7+ preserves insertion order)
@@ -213,12 +210,12 @@ async def _process_receipt_core(
                  try:
                      first_key = next(iter(receipt_cache))
                      del receipt_cache[first_key]
-                 except:
+                 except Exception:
                      pass
 
         await state.update_data(receipt_cache=receipt_cache)
         await state.set_state(ReceiptStates.reviewing_items)
-        
+
         logger.info(f"[PhotoFlow] STATE_UPD: User {user_id} added Receipt {receipt_id} to cache. Total cached: {len(receipt_cache)}")
 
         # 3. Send Review Interface (With ID protection)
@@ -228,14 +225,14 @@ async def _process_receipt_core(
         logger.error(f"[PhotoFlow] ERROR: User {user_id} receipt processing failed: {exc}", exc_info=True)
         try:
             await status_message.edit_text(f"❌ Ошибка при обработке: {exc}")
-        except:
+        except Exception:
             await reply_target.answer(f"❌ Ошибка при обработке: {exc}")
 
 
 async def _save_receipt_header(user_id: int, data: dict[str, Any]) -> tuple[int, bool]:
     """Save receipt header. Returns (id, is_duplicate)."""
     total_amount = data.get("total", 0.0)
-    
+
     async for session in get_db():
         # Check duplicate: same user, same total, last 3 mins
         time_threshold = datetime.now() - timedelta(minutes=3)
@@ -249,7 +246,7 @@ async def _save_receipt_header(user_id: int, data: dict[str, Any]) -> tuple[int,
             .order_by(Receipt.id.desc())
         )
         existing = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if existing:
             return existing.id, True
 
@@ -282,7 +279,7 @@ async def _send_item_review(reply_target: types.Message, items: list[dict], tota
         name = item.get("name", "Unknown")
         price = item.get("price", 0.0)
         cal = item.get("calories", 0.0)
-        
+
         builder = InlineKeyboardBuilder()
         # INCLUDE RECEIPT ID IN CALLBACK
         builder.button(text="✅ Добавить", callback_data=f"r_add_{receipt_id}_{idx}")
@@ -295,7 +292,7 @@ async def _send_item_review(reply_target: types.Message, items: list[dict], tota
             parse_mode="HTML",
             reply_markup=builder.as_markup()
         )
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🗑️ Очистить все активные чеки", callback_data="r_finish")
     await reply_target.answer("Завершить работу:", reply_markup=builder.as_markup())
@@ -307,14 +304,14 @@ async def receipt_item_add(callback: types.CallbackQuery, state: FSMContext) -> 
     try:
         parts = callback.data.split("_")
         # Format: r_add_{receipt_id}_{idx}
-        
+
         if len(parts) < 4:
             await callback.answer("⚠️ Кнопка устарела (формат).", show_alert=True)
             return
-            
+
         btn_receipt_id_str = parts[2] # String key for dict lookup
         idx = int(parts[3])
-        
+
         data = await state.get_data()
         receipt_cache = data.get("receipt_cache", {})
 
@@ -323,7 +320,7 @@ async def receipt_item_add(callback: types.CallbackQuery, state: FSMContext) -> 
         if btn_receipt_id_str not in receipt_cache:
             await callback.answer(
                 f"🚫 Чек #{btn_receipt_id_str} устарел.\n\n"
-                f"Я хранил его, но место кончилось (последние 10 чеков) или сессия была сброшена.", 
+                f"Я хранил его, но место кончилось (последние 10 чеков) или сессия была сброшена.",
                 show_alert=True
             )
             return
@@ -333,9 +330,9 @@ async def receipt_item_add(callback: types.CallbackQuery, state: FSMContext) -> 
         if idx >= len(items):
             await callback.answer("❌ Товар не найден в списке.", show_alert=True)
             return
-        
+
         item = items[idx]
-        
+
         # 2. Save
         async for session in get_db():
             product = Product(
@@ -358,7 +355,7 @@ async def receipt_item_add(callback: types.CallbackQuery, state: FSMContext) -> 
         # 3. UI Update
         await callback.message.edit_text(
             f"✅ <b>Добавлено: {item.get('name')}</b>",
-            parse_mode="HTML", 
+            parse_mode="HTML",
             reply_markup=None
         )
         await callback.answer("Добавлено!")
@@ -371,7 +368,7 @@ async def receipt_item_add(callback: types.CallbackQuery, state: FSMContext) -> 
 @router.callback_query(F.data.startswith("r_del_"))
 async def receipt_item_del(callback: types.CallbackQuery) -> None:
     """Delete item (Visual only, no strict check needed but good practice)."""
-    await callback.message.edit_text(f"🗑️ <b>Удалено</b>", parse_mode="HTML", reply_markup=None)
+    await callback.message.edit_text("🗑️ <b>Удалено</b>", parse_mode="HTML", reply_markup=None)
     await callback.answer("Удалено")
 
 
@@ -399,11 +396,10 @@ async def price_tag_action(callback: types.CallbackQuery, bot: Bot) -> None:
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
 
+
         from database.models import PriceTag
-        from services.price_search import PriceSearchService
         from services.price_tag_ocr import PriceTagOCRService
-        from rapidfuzz import fuzz
-        
+
         price_data = await PriceTagOCRService.parse_price_tag(photo_bytes.getvalue())
 
         if not price_data or not price_data.get("product_name") or not price_data.get("price"):
@@ -443,51 +439,51 @@ async def log_food_action(callback: types.CallbackQuery, bot: Bot, state: FSMCon
     if not photo_message or not photo_message.photo:
         await callback.message.edit_text("❌ Ошибка: не могу найти исходное фото.")
         return
-    
+
     status_msg = await callback.message.edit_text("⏳ Анализирую блюдо...")
-    
+
     try:
         photo = photo_message.photo[-1]
         file_id = photo.file_id
         # BUG FIX: Use LAST 16 chars (unique part), not FIRST 12 (common prefix)
         file_id_short = file_id[-16:]
-        
+
         file_info = await bot.get_file(file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
-        
+
         from services.ai import AIService
         product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
-        
+
         if not product_data or not product_data.get("name"):
             product_data = {"name": "Неизвестное блюдо", "calories": 200, "protein": 10, "fat": 10, "carbs": 20, "fiber": 0}
-        
+
         # ISOLATED STORAGE: Store in pending_foods dict by file_id
         current_data = await state.get_data()
         pending_foods = current_data.get("pending_foods", {})
         pending_foods[file_id_short] = product_data
-        
+
         # Prune old entries (keep max 20)
         if len(pending_foods) > 20:
             keys = list(pending_foods.keys())
             for old_key in keys[:-20]:
                 del pending_foods[old_key]
-        
+
         await state.update_data(
             pending_foods=pending_foods,
             active_food_id=file_id_short  # Track which food is currently being weighed
         )
         await state.set_state(ReceiptStates.waiting_for_portion_weight)
-        
+
         builder = InlineKeyboardBuilder()
         # Two clear options per user feedback
         builder.button(text="🍽️ Средняя порция (300г)", callback_data=f"food_no_scale:{file_id_short}")
         builder.button(text="✏️ Изменить название", callback_data=f"food_edit_name:{file_id_short}")
         builder.button(text="❌ Отмена", callback_data="action_cancel")
         builder.adjust(1)
-        
+
         logger.info(f"[FoodLog] User {callback.from_user.id} recognized '{product_data['name']}' (ID: {file_id_short})")
-        
+
         await status_msg.edit_text(
             f"🍽️ <b>{product_data['name']}</b>\n\n"
             f"📏 <b>Введите вес в граммах</b> (например: 150)\n\n"
@@ -506,26 +502,26 @@ async def log_food_no_scale(callback: types.CallbackQuery, state: FSMContext) ->
     if len(parts) < 2:
         await callback.answer("⚠️ Кнопка устарела.", show_alert=True)
         return
-    
+
     file_id_short = parts[1]
-    
+
     data = await state.get_data()
     pending_foods = data.get("pending_foods", {})
     product_data = pending_foods.get(file_id_short)
-    
+
     if not product_data:
         await callback.answer("⚠️ Данные о блюде не найдены (возможно, устарели).", show_alert=True)
         return
-    
+
     await _save_consumption(callback.message, callback.from_user.id, product_data, 300.0)
-    
+
     # Clean up this entry
     if file_id_short in pending_foods:
         del pending_foods[file_id_short]
         await state.update_data(pending_foods=pending_foods)
-    
+
     await state.set_state(None)  # Clear state but keep pending_foods
-    
+
     # Show button to add weight to other pending foods if any left
     if pending_foods:
         builder = InlineKeyboardBuilder()
@@ -548,14 +544,14 @@ async def edit_food_name_start(callback: types.CallbackQuery, state: FSMContext)
     if len(parts) < 2:
         await callback.answer("⚠️ Ошибка", show_alert=True)
         return
-    
+
     file_id_short = parts[1]
     await state.update_data(editing_food_id=file_id_short)
     await state.set_state(ReceiptStates.editing_food_name)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ Отмена", callback_data="action_cancel")
-    
+
     await callback.message.edit_text(
         "✏️ <b>Введите правильное название блюда:</b>\n\n"
         "<i>Например: Горбуша, Творог 5%, Салат Цезарь</i>",
@@ -571,20 +567,20 @@ async def edit_food_name_input(message: types.Message, state: FSMContext) -> Non
     data = await state.get_data()
     file_id_short = data.get("editing_food_id")
     pending_foods = data.get("pending_foods", {})
-    
+
     if not file_id_short or file_id_short not in pending_foods:
         await message.answer("⚠️ Данные устарели. Отправьте фото заново.")
         await state.clear()
         return
-    
+
     new_name = message.text.strip()
-    
+
     # Get KBJU for new name from AI
     from services.normalization import NormalizationService
     normalizer = NormalizationService()
-    
+
     status_msg = await message.answer("🔄 Ищу данные о продукте...")
-    
+
     try:
         enriched = await normalizer.normalize_products([{"name": new_name}])
         if enriched and len(enriched) > 0:
@@ -594,18 +590,18 @@ async def edit_food_name_input(message: types.Message, state: FSMContext) -> Non
             # Fallback - keep old KBJU but change name
             product_data = pending_foods[file_id_short]
             product_data["name"] = new_name
-        
+
         # Update pending foods
         pending_foods[file_id_short] = product_data
         await state.update_data(pending_foods=pending_foods, active_food_id=file_id_short)
         await state.set_state(ReceiptStates.waiting_for_portion_weight)
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Средняя порция (300г)", callback_data=f"food_no_scale:{file_id_short}")
         builder.button(text="✏️ Изменить название", callback_data=f"food_edit_name:{file_id_short}")
         builder.button(text="❌ Отмена", callback_data="action_cancel")
         builder.adjust(1)
-        
+
         await status_msg.edit_text(
             f"🍽️ <b>{product_data['name']}</b>\n\n"
             f"<b>Напишите вес в граммах</b> (например: 150)\n\n"
@@ -623,33 +619,33 @@ async def log_food_weight_input(message: types.Message, state: FSMContext) -> No
     """Handle weight input - uses active_food_id from state."""
     current_state = await state.get_state()
     logger.info(f"[FoodLog] Weight input received: '{message.text}' from user {message.from_user.id}, state={current_state}")
-    
+
     data = await state.get_data()
     active_food_id = data.get("active_food_id")
     pending_foods = data.get("pending_foods", {})
-    
+
     logger.info(f"[FoodLog] active_food_id={active_food_id}, pending_foods_keys={list(pending_foods.keys())}")
-    
+
     if not active_food_id or active_food_id not in pending_foods:
         logger.warning(f"[FoodLog] Weight input but no active food. User {message.from_user.id}, active_id={active_food_id}")
         await message.answer("⚠️ Не могу найти блюдо для записи. Попробуйте снова отправить фото.")
         await state.set_state(None)
         return
-    
+
     try:
         weight = float(message.text.replace(",", ".").strip())
         if weight <= 0:
             await message.answer("❌ Введите положительное число.")
             return
-            
+
         product_data = pending_foods[active_food_id]
         await _save_consumption(message, message.from_user.id, product_data, weight)
-        
+
         # Clean up
         del pending_foods[active_food_id]
         await state.update_data(pending_foods=pending_foods, active_food_id=None)
         await state.set_state(None)
-        
+
     except ValueError:
         await message.answer("❌ Введите число (например: 150 или 200.5)")
 
@@ -671,14 +667,14 @@ async def _save_consumption(reply_target: types.Message, user_id: int, product_d
         )
         session.add(log)
         await session.commit()
-    
+
     try:
         text = f"✅ Записано: {product_data.get('name')} ({int(weight)}г, {int(cal)} ккал)"
         if reply_target.from_user.is_bot:
              await reply_target.edit_text(text)
         else:
              await reply_target.answer(text)
-    except:
+    except Exception:
         pass
 
 
@@ -693,31 +689,31 @@ async def add_to_fridge_action(callback: types.CallbackQuery, bot: Bot, state: F
     status_msg = await callback.message.edit_text("⏳ Анализирую...")
     try:
         file_id = photo_message.photo[-1].file_id
-        
+
         from services.ai import AIService
         file_info = await bot.get_file(file_id)
         photo_bytes = io.BytesIO()
         await bot.download_file(file_info.file_path, photo_bytes)
-        
+
         product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
-        
+
         if not product_data:
              await status_msg.edit_text("❌ Не распознано.")
              return
 
         await state.update_data(manual_product=product_data)
         await state.set_state(ReceiptStates.confirming_manual_add)
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="✅ Добавить", callback_data="manual_confirm")
         builder.button(text="❌ Отмена", callback_data="manual_cancel")
         builder.adjust(2)
-        
+
         await status_msg.edit_text(
-            f"Добавить {product_data.get('name')}?\n{product_data.get('calories')} ккал\n(Kлетчатка: {product_data.get('fiber', 0)}г)", 
+            f"Добавить {product_data.get('name')}?\n{product_data.get('calories')} ккал\n(Kлетчатка: {product_data.get('fiber', 0)}г)",
             reply_markup=builder.as_markup()
         )
-        
+
     except Exception as e:
         await status_msg.edit_text(f"Ошибка: {e}")
 
@@ -730,9 +726,9 @@ async def manual_add_confirm(callback: types.CallbackQuery, state: FSMContext) -
     if product_data:
         async for session in get_db():
             product = Product(
-                user_id=callback.from_user.id, 
-                source="manual_chat", 
-                name=product_data.get("name", "Продукт"), 
+                user_id=callback.from_user.id,
+                source="manual_chat",
+                name=product_data.get("name", "Продукт"),
                 calories=float(product_data.get("calories") or 0),
                 protein=float(product_data.get("protein") or 0),
                 fat=float(product_data.get("fat") or 0),
@@ -759,23 +755,23 @@ async def list_pending_foods(callback: types.CallbackQuery, state: FSMContext) -
     """Show list of pending foods that need weight input."""
     data = await state.get_data()
     pending_foods = data.get("pending_foods", {})
-    
+
     if not pending_foods:
         await callback.answer("Нет фото, ожидающих ввода веса.", show_alert=True)
         return
-    
+
     builder = InlineKeyboardBuilder()
     text = "📏 <b>Выберите продукт для ввода веса:</b>\n\n"
-    
+
     for file_id, product_data in pending_foods.items():
         name = product_data.get("name", "Продукт")[:25]
         cal_100 = int(product_data.get("calories", 0) or 0)
         text += f"▫️ {name} ({cal_100} ккал/100г)\n"
         builder.button(text=f"📏 {name}", callback_data=f"select_pending:{file_id}")
-    
+
     builder.button(text="🔙 В меню", callback_data="main_menu")
     builder.adjust(1)
-    
+
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception:
@@ -787,26 +783,26 @@ async def list_pending_foods(callback: types.CallbackQuery, state: FSMContext) -
 async def select_pending_food(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Select a pending food to enter weight for."""
     file_id_short = callback.data.split(":")[1]
-    
+
     data = await state.get_data()
     pending_foods = data.get("pending_foods", {})
     product_data = pending_foods.get(file_id_short)
-    
+
     if not product_data:
         await callback.answer("⚠️ Продукт не найден (возможно, устарел).", show_alert=True)
         return
-    
+
     await state.update_data(active_food_id=file_id_short)
     await state.set_state(ReceiptStates.waiting_for_portion_weight)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🍽️ Средняя порция (300г)", callback_data=f"food_no_scale:{file_id_short}")
     builder.button(text="🔙 К списку", callback_data="list_pending_foods")
     builder.adjust(1)
-    
+
     name = product_data.get("name", "Продукт")
     cal_100 = int(product_data.get("calories", 0) or 0)
-    
+
     await callback.message.edit_text(
         f"🍽️ <b>{name}</b>\n"
         f"<i>{cal_100} ккал на 100г</i>\n\n"

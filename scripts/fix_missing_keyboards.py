@@ -7,11 +7,11 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from aiogram import Bot
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
 
 # Setup logging
@@ -21,21 +21,21 @@ logger = logging.getLogger(__name__)
 async def fix_keyboards():
     bot = Bot(token=settings.BOT_TOKEN)
     await init_db()
-    
+
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="🏠 Главное меню")]],
         resize_keyboard=True,
         persistent=True
     )
-    
+
     logger.info("Starting keyboard distribution...")
-    
+
     count = 0
     async for session in get_db():
-        stmt = select(User).where(User.is_verified == True)
+        stmt = select(User).where(User.is_verified)
         result = await session.execute(stmt)
         users = result.scalars().all()
-        
+
         for user in users:
             try:
                 # Send a silent message just to update the keyboard
@@ -47,7 +47,7 @@ async def fix_keyboards():
                 )
                 count += 1
                 logger.info(f"Updated user {user.id}")
-                await asyncio.sleep(0.1) 
+                await asyncio.sleep(0.1)
             except Exception as e:
                 logger.error(f"Failed to update user {user.id}: {e}")
 

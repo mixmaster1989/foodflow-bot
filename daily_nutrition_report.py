@@ -10,22 +10,23 @@ Daily Nutrition Report - Ежедневный отчёт нутрициолог�
 """
 
 import asyncio
-import re
-import html
 import logging
-import aiohttp
-from datetime import datetime, timedelta
-from pathlib import Path
+import re
 import sys
+from datetime import datetime, timedelta
 from io import BytesIO
+from pathlib import Path
+
+import aiohttp
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
+
+from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog, User, UserSettings
-from config import settings
 from services.image_renderer import draw_daily_card
 
 # Logging
@@ -53,7 +54,7 @@ MODELS = [
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Разрешённые HTML-теги для Telegram
-ALLOWED_TAGS = {'b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 
+ALLOWED_TAGS = {'b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del',
                 'code', 'pre', 'a', 'tg-spoiler'}
 
 # =====================================================
@@ -91,7 +92,7 @@ NUTRITION_PROMPT = """Ты — AI-нутрициолог, анализирующ
 ПРАВИЛА ФОРМАТИРОВАНИЯ:
 1. Используй ТОЛЬКО эти HTML-теги: <b>, <i>, <u>, <s>, <code>, <a>, <tg-spoiler>
 2. Для переноса строки используй обычный перенос (Enter)
-3. Для списков используй • или - 
+3. Для списков используй • или -
 4. НЕ используй: <p>, <div>, <span>, <ul>, <li>, <h1>-<h6>, <font>, <br>
 5. Тон: дружелюбный, профессиональный, без осуждения.
 6. Длина: 10-12 строк. БЕЗ приветствий и заголовков (они есть на картинке).
@@ -109,16 +110,16 @@ def sanitize_telegram_html(text: str) -> str:
     text = re.sub(r'^```html?\s*\n?', '', text, flags=re.MULTILINE)
     text = re.sub(r'\n?```\s*$', '', text, flags=re.MULTILINE)
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-    
+
     def replace_tag(match):
         full_tag = match.group(0)
         tag_name = match.group(1).lower().split()[0]
         if tag_name.startswith('/'): tag_name = tag_name[1:]
         if tag_name in ALLOWED_TAGS: return full_tag
         return ''
-    
+
     text = re.sub(r'<(/?\w+)[^>]*>', replace_tag, text)
-    
+
     # Simple escape check (not perfect but sufficient for now)
     return text.strip()
 
@@ -185,12 +186,12 @@ async def get_nutrition_report(food_data: dict, retries: int = 2) -> str:
 async def get_yesterday_data(user_id: int):
     """Получает полные данные за вчера: логи, цели, имя."""
     yesterday = datetime.now().date() - timedelta(days=1)
-    
+
     async for session in get_db():
         # 1. Get User Name
         user = await session.get(User, user_id)
         user_name = user.first_name if user else "User"
-        
+
         # 2. Get Settings (Goals)
         stmt_settings = select(UserSettings).where(UserSettings.user_id == user_id)
         users_settings = (await session.execute(stmt_settings)).scalar_one_or_none()
@@ -212,20 +213,20 @@ async def get_yesterday_data(user_id: int):
         )
         result = await session.execute(stmt)
         logs = result.scalars().all()
-    
+
     if not logs:
         return None
-    
+
     # Aggregate
     total_cal = sum(log.calories or 0 for log in logs)
     total_prot = sum(log.protein or 0 for log in logs)
     total_fat = sum(log.fat or 0 for log in logs)
     total_carb = sum(log.carbs or 0 for log in logs)
     total_fiber = sum(log.fiber or 0 for log in logs)
-    
+
     # Format for AI Prompt
     food_list_text = "\n".join([f"• {l.product_name}: {int(l.calories or 0)} ккал" for l in logs])
-    
+
     return {
         "user_name": user_name,
         "date": yesterday,
@@ -255,14 +256,14 @@ async def get_yesterday_data(user_id: int):
 async def send_telegram_photo(user_id: int, image_bio: BytesIO, caption: str) -> bool:
     """Отправляет фото с описанием пользователю."""
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendPhoto"
-    
+
     # We use aiohttp.FormData to send multipart/form-data
     data = aiohttp.FormData()
     data.add_field('chat_id', str(user_id))
     data.add_field('caption', caption)
     data.add_field('parse_mode', 'HTML')
     data.add_field('photo', image_bio, filename='report.png', content_type='image/png')
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=data, timeout=30) as resp:
@@ -281,27 +282,28 @@ async def send_telegram_photo(user_id: int, image_bio: BytesIO, caption: str) ->
 async def get_users_with_daily_report_access() -> list[int]:
     """Получает список user_id у кого есть данные за вчера и уровень подписки PRO."""
     yesterday = datetime.now().date() - timedelta(days=1)
-    
+
     # We need to consider IS_BETA_TESTING if we want it to work in testing
     # But this script runs standalone, so let's use the DB state.
-    
+
     async for session in get_db():
         from sqlalchemy import distinct
+
         from database.models import Subscription
-        
+
         # Subquery to find users with PRO tier
         pro_users_stmt = select(Subscription.user_id).where(
             and_(
                 Subscription.tier == "pro",
-                Subscription.is_active == True
+                Subscription.is_active
             )
         )
         pro_user_ids = (await session.execute(pro_users_stmt)).scalars().all()
-        
-        # If we are in pre-launch mode, maybe we want all users? 
+
+        # If we are in pre-launch mode, maybe we want all users?
         # The user said: "до дня запуска проекта в массы всем будет про по умолчанию".
         # So we should probably ensure everyone HAS a subscription record.
-        
+
         stmt = select(distinct(ConsumptionLog.user_id)).where(
             and_(
                 ConsumptionLog.user_id.in_(pro_user_ids),
@@ -317,7 +319,7 @@ async def run_daily_report():
     logger.info("Starting Visual Daily Nutrition Report")
     logger.info(f"Test Mode: {TEST_MODE}")
     logger.info("=" * 50)
-    
+
     # 1. Determine Target Users
     user_ids = []
     if TEST_MODE:
@@ -344,13 +346,13 @@ async def run_daily_report():
             # A. Get Data
             data = await get_yesterday_data(user_id)
             if not data: continue
-            
+
             # B. Generate AI Text Report
             report_text = await get_nutrition_report(data['prompt_data'])
             if not report_text:
                 # Fallback text if AI fails
                 report_text = "📊 <b>Ваш отчет готов!</b>\nПодробности на изображении 👆"
-            
+
             # C. Generate Image (Pillow)
             image_bio = draw_daily_card(
                 user_name=data['user_name'],
@@ -359,17 +361,17 @@ async def run_daily_report():
                 total_metrics=data['totals'],
                 goals=data['goals']
             )
-            
+
             # D. Send
             success = await send_telegram_photo(user_id, image_bio, report_text)
             if success:
                 logger.info(f"✅ Report sent to {user_id}")
             else:
                 logger.error(f"❌ Failed to send to {user_id}")
-                
+
         except Exception as e:
             logger.error(f"Error processing user {user_id}: {e}", exc_info=True)
-        
+
         await asyncio.sleep(1.0) # Rate limit protection
 
 if __name__ == "__main__":
@@ -385,5 +387,5 @@ if __name__ == "__main__":
     elif args.admin:
         TEST_MODE = True
         TARGET_TEST_ID = ADMIN_ID
-        
+
     asyncio.run(run_daily_report())

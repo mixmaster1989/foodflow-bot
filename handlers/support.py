@@ -1,8 +1,10 @@
 import logging
-from aiogram import Router, F, types, Bot
+
+from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from config import settings
 
 router = Router()
@@ -15,10 +17,10 @@ class SupportStates(StatesGroup):
 async def contact_dev_start(callback: types.CallbackQuery, state: FSMContext):
     """Start contact developer flow."""
     await state.set_state(SupportStates.waiting_for_message)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    
+
     await callback.message.edit_caption(
         caption=(
             "📩 <b>Написать разработчику</b>\n\n"
@@ -35,11 +37,11 @@ async def process_support_message(message: types.Message, state: FSMContext, bot
     """Forward user message to admins."""
     user_info = f"User: {message.from_user.full_name} (@{message.from_user.username}) [ID: {message.from_user.id}]"
     text = message.text or "[Not text message]"
-    
+
     for admin_id in settings.ADMIN_IDS:
         try:
             await bot.send_message(
-                admin_id, 
+                admin_id,
                 f"📩 <b>Новое обращение от пользователя:</b>\n{user_info}\n\n"
                 f"📝 Текст:\n{text}",
                 parse_mode="HTML"
@@ -49,7 +51,7 @@ async def process_support_message(message: types.Message, state: FSMContext, bot
 
     await message.answer("✅ <b>Сообщение отправлено!</b> Разработчик ответит вам лично, если потребуется.", parse_mode="HTML")
     await state.clear()
-    
+
     # Return to menu
     from handlers.menu import show_main_menu
     await show_main_menu(message, message.from_user.first_name, message.from_user.id)

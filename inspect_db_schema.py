@@ -1,7 +1,10 @@
 
 import asyncio
+
 from sqlalchemy import text
+
 from database.base import get_db
+
 
 async def inspect():
     print("--- DB INSPECTION START ---")
@@ -9,7 +12,7 @@ async def inspect():
         # Get all tables
         res = await session.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
         tables = [row[0] for row in res.fetchall()]
-        
+
         for table in tables:
             print(f"TABLE: {table}")
             # Get columns for each table

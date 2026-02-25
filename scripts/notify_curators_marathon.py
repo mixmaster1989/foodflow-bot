@@ -1,14 +1,14 @@
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aiogram import Bot
 from sqlalchemy import select
-from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+
 from config import settings
 from database.base import get_db
 from database.models import User
@@ -33,19 +33,19 @@ CURATOR_MESSAGE = """
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     logger.info("Starting Curator notification...")
-    
+
     success_count = 0
     fail_count = 0
-    
+
     async for session in get_db():
         # Get all curators
         result = await session.execute(select(User.id).where(User.role == 'curator'))
         user_ids = result.scalars().all()
-        
+
         logger.info(f"Found {len(user_ids)} curators.")
-        
+
         for user_id in user_ids:
             try:
                 await bot.send_message(user_id, CURATOR_MESSAGE, parse_mode="HTML")
@@ -55,7 +55,7 @@ async def main():
             except Exception as e:
                 logger.error(f"Failed to send to {user_id}: {e}")
                 fail_count += 1
-        
+
     logger.info(f"Curator Notification finished. Success: {success_count}, Failed: {fail_count}")
     await bot.session.close()
 

@@ -7,11 +7,11 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from aiogram import Bot
+from sqlalchemy.future import select
 
 from config import settings
-from database.base import init_db, get_db
+from database.base import get_db, init_db
 from database.models import User
-from sqlalchemy.future import select
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -19,23 +19,23 @@ logger = logging.getLogger(__name__)
 
 async def notify_users():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     # Init DB
     await init_db()
-    
+
     logger.info("Starting notification script...")
-    
+
     async for session in get_db():
         stmt = select(User)
         result = await session.execute(stmt)
         users = result.scalars().all()
-        
+
         logger.info(f"Found {len(users)} users to notify.")
-        
+
         for user in users:
             # Generate password
             password = f"MYSELF{user.id}"
-            
+
             try:
                 await bot.send_message(
                     chat_id=user.id,

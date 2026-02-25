@@ -10,23 +10,20 @@ Contains:
 - finish_onboarding: Save data and complete onboarding
 """
 import io
-from typing import Any
+import logging
 
 from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from database.base import get_db
-from database.models import Product, Receipt, UserSettings
+from database.models import Product, UserSettings
 from handlers.menu import show_main_menu
-import logging
-
 from services.consultant import ConsultantService
-from services.photo_queue import PhotoQueueManager
-from services.label_ocr import LabelOCRService
 from services.nutrition_calculator import NutritionCalculator
+from services.photo_queue import PhotoQueueManager
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +232,7 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
 
     """
     goal = callback.data.split(":")[1]  # "lose_weight", "maintain", "healthy", "gain_mass"
-    
+
     # Store goal in state
     await state.update_data(goal=goal)
     data = await state.get_data()
@@ -245,20 +242,20 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
     age = data.get("age", 30)
     height = data.get("height", 170)
     weight = data.get("weight", 70)
-    
+
     targets = NutritionCalculator.calculate_targets(gender, weight, height, age, goal)
-    
+
     # Store calculated targets in state as "pending"
     await state.update_data(pending_targets=targets)
-    
+
     await state.set_state(OnboardingStates.waiting_for_calorie_confirmation)
-    
+
     # Show recommendations
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
     builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
     builder.adjust(1)
-    
+
     goal_names = {
         "lose_weight": "Похудение",
         "maintain": "Поддержание",
@@ -275,7 +272,7 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
         f"🍞 Углеводы: <code>{targets['carbs']} г</code>\n\n"
         "<b>Согласен с этим расчетом?</b>"
     )
-    
+
     try:
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     except Exception:
@@ -289,11 +286,11 @@ async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -
     """Accept calculated goals and finish."""
     data = await state.get_data()
     targets = data.get("pending_targets")
-    
+
     if not targets:
         await callback.answer("Ошибка данных, начните заново", show_alert=True)
         return
-        
+
     await finish_onboarding_process(callback.message, state, targets)
     await callback.answer()
 
@@ -302,16 +299,16 @@ async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -
 async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Ask for manual calories."""
     await state.set_state(OnboardingStates.waiting_for_manual_calories)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="onboarding_back:goals") # We need to handle this back
-    
+
     text = (
         "<b>✏️ Ввод своей нормы</b>\n\n"
         "Введите желаемое количество калорий в день (например: <code>1800</code>).\n"
         "Я автоматически пересчитаю БЖУ под твою цель."
     )
-    
+
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
@@ -324,16 +321,16 @@ async def handle_manual_calories_input(message: types.Message, state: FSMContext
         if calories < 500 or calories > 10000:
             await message.answer("Пожалуйста, введите разумное число (500-10000).")
             return
-            
+
         data = await state.get_data()
         weight = data.get("weight", 70)
         goal = data.get("goal", "healthy")
-        
+
         # Recalculate macros based on NEW calories
         targets = NutritionCalculator.calculate_macros(calories, weight, goal)
-        
+
         await finish_onboarding_process(message, state, targets)
-        
+
     except ValueError:
         await message.answer("Пожалуйста, введите целое число.")
 
@@ -342,17 +339,17 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
     """Save all data to DB and show finish screen."""
     data = await state.get_data()
     user_id = message.chat.id # Use chat.id because message.from_user is bot in callbacks
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         gender = data.get("gender", "male")
         age = data.get("age", 30)
         height = data.get("height", 170)
         weight = data.get("weight", 70)
         goal = data.get("goal", "healthy")
-        
+
         # Calculate water goal
         water_goal = int(weight * 30)
         if goal in ["lose_weight", "gain_mass"]:
@@ -388,15 +385,16 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 is_initialized=True,
             )
             session.add(settings)
-            
+
         # --- NEW: TRIAL LOGIC ---
-        from database.models import Subscription
         from datetime import datetime, timedelta
-        
+
+        from database.models import Subscription
+
         # Check if they already have one
         stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
         sub = (await session.execute(stmt_sub)).scalar_one_or_none()
-        
+
         if not sub:
             # Grant 3 days of PRO by default for new users
             sub = Subscription(
@@ -406,9 +404,9 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 is_active=True
             )
             session.add(sub)
-            
+
         await session.commit()
-            
+
     await state.clear()
 
     goal_text = {
@@ -500,25 +498,25 @@ async def start_fridge_initialization(callback: types.CallbackQuery, state: FSMC
         "Я распознаю их и добавлю в твой виртуальный холодильник.\n\n"
         "Отправляй фото по одному или группой."
     )
-    
+
     # Check if we can edit or need to send new message
     try:
         await callback.message.edit_text(text, parse_mode="HTML")
     except Exception:
         await callback.message.answer(text, parse_mode="HTML")
-        
+
     await callback.answer()
 
 
 @router.message(OnboardingStates.initializing_fridge, F.photo)
 async def process_fridge_product_photo(message: types.Message, bot: Bot, state: FSMContext) -> None:
     """Handle product photo by adding it to the processing queue.
-    
+
     This ensures sequential processing and prevents database locking issues.
     """
     photo = message.photo[-1]
     user_id = message.from_user.id
-    
+
     # Notify user that we received the photo
     # (Optional, but good UX if processing is slow)
     # await message.answer("📸 Фото принято в обработку...")
@@ -535,7 +533,7 @@ async def process_fridge_product_photo(message: types.Message, bot: Bot, state: 
 
 async def process_single_photo(message: types.Message, bot: Bot, state: FSMContext, file_id: str) -> None:
     """Actual verification logic (extracted from handler).
-    
+
     Args:
         message: Original message
         bot: Bot instance
@@ -552,7 +550,7 @@ async def process_single_photo(message: types.Message, bot: Bot, state: FSMConte
         # Try to recognize product (label or photo) using Shared AI Service
         from services.ai import AIService
         product_data = await AIService.recognize_product_from_image(photo_bytes.getvalue())
-        
+
         if not product_data or not product_data.get("name"):
             raise ValueError("Не удалось распознать продукт. Попробуй сфотографировать этикетку или продукт более четко.")
 
@@ -731,7 +729,7 @@ async def force_onboarding(callback: types.CallbackQuery, state: FSMContext) -> 
     """
     # Clear any existing state
     await state.clear()
-    
+
     # Start fresh onboarding
     await state.set_state(OnboardingStates.waiting_for_gender)
 

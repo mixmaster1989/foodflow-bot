@@ -1,14 +1,15 @@
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aiogram import Bot
-from sqlalchemy import select
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+from sqlalchemy import select
+
 from config import settings
 from database.base import get_db
 from database.models import User
@@ -33,21 +34,21 @@ BROADCAST_MESSAGE = """
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     logger.info("Starting broadcast...")
-    
+
     users_count = 0
     success_count = 0
     block_count = 0
-    
+
     async for session in get_db():
         # Get all users
         result = await session.execute(select(User.id))
         user_ids = result.scalars().all()
-        
+
         users_count = len(user_ids)
         logger.info(f"Found {users_count} users.")
-        
+
         for user_id in user_ids:
             try:
                 await bot.send_message(user_id, BROADCAST_MESSAGE, parse_mode="HTML")
@@ -68,7 +69,7 @@ async def main():
                     pass
             except Exception as e:
                 logger.error(f"Failed to send to {user_id}: {e}")
-        
+
     logger.info(f"Broadcast finished. Total: {users_count}, Success: {success_count}, Blocked: {block_count}")
     await bot.session.close()
 
