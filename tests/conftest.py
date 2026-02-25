@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 os.environ['DATABASE_URL'] = "sqlite+aiosqlite:///:memory:"
 os.environ['BOT_TOKEN'] = "test-token"
 os.environ['OPENROUTER_API_KEY'] = "test-key"
+os.environ['JWT_SECRET_KEY'] = "test-secret"
+os.environ['GLOBAL_PASSWORD'] = "test-password"
 
 # Import all models to ensure they are registered with Base.metadata
 # Import engine from database.base once it's configured
