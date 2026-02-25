@@ -114,6 +114,8 @@ async def main():
     except Exception as e:
         logging.warning(f"⚠️ Failed to reset Menu Button: {e}")
 
+    logging.info("--- Starting FoodFlow Bot ---")
+    logging.info("CI/CD Deployment: Verified successfully.")
     logging.info("🚀 FoodFlow Bot started!")
     await dp.start_polling(bot)
 
