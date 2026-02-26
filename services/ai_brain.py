@@ -14,7 +14,7 @@ logger = logging.getLogger("ai.brain")
 class AIBrainService:
     """Core AI Brain Service for semantic understanding of user input."""
 
-    MODEL = "google/gemini-2.5-flash-lite" # Fast, Smart enough
+    MODEL = "google/gemini-2.5-flash-lite-preview-09-2025" # Fast, Smart enough
 
     SYSTEM_PROMPT = """
 Ты — Мозг бота FoodFlow. Твоя задача — понять намерение пользователя и извлечь данные.
@@ -233,9 +233,9 @@ class AIBrainService:
             }
 
             vision_models = [
-                "google/gemini-2.0-flash-exp:free",
-                "google/gemini-pro-vision",
-                "qwen/qwen2.5-vl-72b-instruct:free" # Fallback
+                "google/gemini-2.5-flash-lite-preview-09-2025",
+                "qwen/qwen2.5-vl-72b-instruct",
+                "qwen/qwen3-vl-8b-instruct"
             ]
 
             async with aiohttp.ClientSession() as session:
