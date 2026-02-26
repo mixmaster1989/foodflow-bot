@@ -11,6 +11,7 @@ from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog
 from services.normalization import NormalizationService
+from utils.parsing import safe_float
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -143,11 +144,11 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         result = await NormalizationService.analyze_food_intake(description)
 
         name = result.get("name", description)
-        calories = float(result.get("calories") or 0)
-        protein = float(result.get("protein") or 0)
-        fat = float(result.get("fat") or 0)
-        carbs = float(result.get("carbs") or 0)
-        fiber = float(result.get("fiber") or 0)
+        calories = safe_float(result.get("calories"))
+        protein = safe_float(result.get("protein"))
+        fat = safe_float(result.get("fat"))
+        carbs = safe_float(result.get("carbs"))
+        fiber = safe_float(result.get("fiber"))
         weight_grams = result.get("weight_grams")
         weight_missing = result.get("weight_missing", True)
         base_name = result.get("base_name")
@@ -163,7 +164,8 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                     "protein100": protein,
                     "fat100": fat,
                     "carbs100": carbs,
-                    "fiber100": fiber
+                    "fiber100": fiber,
+                    "original_text": description
                 }
             )
             await state.set_state(IAteStates.waiting_for_weight)
@@ -189,7 +191,8 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
                 "protein100": protein,
                 "fat100": fat,
                 "carbs100": carbs,
-                "fiber100": fiber
+                "fiber100": fiber,
+                "original_text": description
             }
         )
 
@@ -302,8 +305,9 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     builder.button(text="🕓 Другое время", callback_data="i_ate_ask_time")
     builder.button(text="✏️ Ред. Вес", callback_data="edit_field_weight")
     builder.button(text="✏️ Ред. КБЖУ", callback_data="i_ate_edit_macros")
+    builder.button(text="❌ Это несколько продуктов", callback_data="u_split_to_batch")
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    builder.adjust(2, 2, 1)
+    builder.adjust(2, 2, 1, 1)
 
     await state.set_state(IAteStates.waiting_for_confirmation)
 

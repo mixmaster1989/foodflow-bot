@@ -17,50 +17,63 @@ class AIBrainService:
     MODEL = "google/gemini-2.5-flash-lite-preview-09-2025" # Fast, Smart enough
 
     SYSTEM_PROMPT = """
-Ты — Мозг бота FoodFlow. Твоя задача — понять намерение пользователя и извлечь данные.
+Ты — Мозг бота FoodFlow (AI диетолог). Твоя задача — понять намерение пользователя и извлечь данные.
+
+ПРАВИЛА ОПРЕДЕЛЕНИЯ НОМЕНКЛАТУРЫ (Один предмет vs Список):
+1. КУЛИНАРНЫЙ КОНТЕКСТ (Одно блюдо): Если продукты грамматически связаны (предлоги «с», «из», «под», «изу») или описывают компоненты одного блюда (салат, суп, рагу, каша, бутерброд, омлет) — это ОДНО блюдо.
+   - Пример: "Салат из огурцов и помидоров" -> intent: 'log_consumption', multi: false, product: 'Салат из огурцов и помидоров'.
+   - Пример: "Творог с ягодами и медом" -> intent: 'log_consumption', multi: false, product: 'Творог с ягодами и медом'.
+   - Пример: "Омлет из 3 яиц с сыром" -> intent: 'log_consumption', multi: false, product: 'Омлет из 3 яиц с сыром'.
+
+2. ПРОДУКТОВАЯ КОРЗИНА (Список/Batch): Если продукты явно разнородны, не могут находиться в одной тарелке или описывают закупку в магазине — это СПИСОК.
+   - Пример: "Купил молоко, хлеб и съел банан" -> multi: true.
+   - Пример: "Завтрак: яйца. Обед: борщ." -> multi: true.
+
 Доступные намерения (intents):
-1. 'log_consumption' — пользователь ЯВНО указал, что СЪЕЛ ("Съел яблоко", "На завтрак кофе", "Выпил чай", "Ужин: макароны").
-2. 'add_to_fridge' — пользователь ЯВНО указал, что КУПИЛ или хочет ДОБАВИТЬ ("Купил молока", "В холодильник сыр", "+ банан").
-3. 'unknown' — если нет явного глагола действия или контекста (просто название продукта: "Банан", "Молоко").
+1. 'log_consumption' — пользователь ЯВНО указал, что СЪЕЛ.
+2. 'add_to_fridge' — пользователь ЯВНО указал, что КУПИЛ или хочет ДОБАВИТЬ.
+3. 'unknown' — если нет явного глагола действия или просто название продукта.
 
 ЕСЛИ ОДИН ПРОДУКТ — верни JSON объект:
 {
   "intent": "log_consumption" | "add_to_fridge" | "unknown",
-  "product": "Название продукта" (или null),
-  "weight": 100 (число в граммах, или null если не указано),
-  "quantity": 1 (число штук, если указано, иначе 1),
+  "product": "Название блюда целиком",
+  "weight": 100 | null,
+  "quantity": 1,
+  "multi": false,
   "original_text": "исходный текст"
 }
 
-ЕСЛИ НЕСКОЛЬКО ПРОДУКТОВ (список, перечисление через строки, запятые или "и") — верни JSON:
+ЕСЛИ ПРОДУКТОВ НЕСКОЛЬКО — верни JSON:
 {
   "intent": "log_consumption",
   "multi": true,
   "items": [
-    {"product": "Помело", "weight": 230},
-    {"product": "Курица жареная", "weight": 130},
-    {"product": "Шампиньоны жареные", "weight": 20}
+    {"product": "Продукт 1", "weight": 100 | null},
+    {"product": "Продукт 2", "weight": null}
   ],
   "original_text": "исходный текст"
 }
 
-Правила:
-- Каждый product — название продукта (по-русски).
-- weight — число в граммах, или null если не указан.
-- Если пользователь говорит "два яблока", quantity=2, weight=null.
-- Если "яблоко 200г", product="яблоко", weight=200.
-- Если "полкило", weight=500.
-- СТРОГО: Если просто "Яблоко" (без "съел", "купил") -> intent="unknown".
-- СТРОГО: Если "2 яйца", "3 куска" (число + продукт) БЕЗ глаголов -> intent="unknown".
-- СТРОГО: Если Гербалайф ("Коктейль Ф1", "Алоэ") без глагола -> intent="unknown".
-- СТРОГО: multi=true ТОЛЬКО если реально 2+ разных продуктов. "Два яблока" = 1 продукт c quantity=2.
-
-НЕ ПИШИ НИЧЕГО КРОМЕ JSON.
+СТРОГО: Не пиши ничего кроме JSON.
 """
 
     @classmethod
-    async def analyze_text(cls, text: str) -> dict | None:
-        """Call LLM to analyze text and return structured data."""
+    async def analyze_text(cls, text: str, force_multi: bool = False, force_single: bool = False) -> dict | None:
+        """Call LLM to analyze text and return structured data.
+
+        Args:
+            text: Raw input text
+            force_multi: Force AI to split input into multiple items
+            force_single: Force AI to treat input as one single dish
+        """
+
+        # Prepare specialized instructions if forced
+        system_instruction = cls.SYSTEM_PROMPT
+        if force_multi:
+            system_instruction += "\n\nCRITICAL: You MUST split this input into multiple products (multi: true). Even if they look like one dish, find components."
+        elif force_single:
+            system_instruction += "\n\nCRITICAL: You MUST treat this target input as ONE SINGLE dish/product (multi: false). Combine everything into one product name."
 
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -72,7 +85,7 @@ class AIBrainService:
         payload = {
             "model": cls.MODEL,
             "messages": [
-                {"role": "system", "content": cls.SYSTEM_PROMPT},
+                {"role": "system", "content": system_instruction},
                 {"role": "user", "content": text}
             ],
             "response_format": {"type": "json_object"}
