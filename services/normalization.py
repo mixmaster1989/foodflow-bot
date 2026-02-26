@@ -23,11 +23,10 @@ class NormalizationService:
     """
 
     MODELS: list[str] = [
-        "perplexity/sonar",                                    # Free 1: Best quality with web search
-        "mistralai/mistral-small-3.2-24b-instruct:free",      # Free 2: Fast & Smart
-        "qwen/qwen2.5-vl-32b-instruct:free",                 # Free 3: Working Fallback
-        "google/gemini-2.5-flash-lite-preview-09-2025",       # Paid 1: Cheapest ($0.00016)
-        "openai/gpt-4.1-mini",                                 # Paid 2: Fastest (471ms)
+        "perplexity/sonar",                                    # Primary: Best quality with web search
+        "openai/gpt-4o-mini-search-preview",                   # Secondary Search: Reliable web fallback
+        "google/gemini-2.5-flash-lite-preview-09-2025",       # Fast: Smart KBJU fallback
+        "qwen/qwen2.5-vl-72b-instruct",                        # Robust: Final fallback
     ]
 
     @classmethod
