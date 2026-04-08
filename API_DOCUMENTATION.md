@@ -3,7 +3,35 @@
 > **Версия API**: 1.0.0  
 > **Base URL**: `http://your-server:8001`  
 > **Формат данных**: JSON (UTF-8)  
-> **Авторизация**: Bearer Token (JWT)
+> **Авторизация**: Bearer Token (JWT)  
+> **Swagger UI**: `http://your-server:8001/docs`  
+> **Health Check**: `GET /api/health`  
+> **Обновлено**: 2026-04-08
+
+---
+
+## Все роутеры API (актуально на апрель 2026)
+
+| Префикс | Файл | Описание |
+|---------|------|----------|
+| `/api/auth` | `routers/auth.py` | Авторизация (JWT, Telegram, Web) |
+| `/api/products` | `routers/products.py` | Холодильник (CRUD продуктов) |
+| `/api/consumption` | `routers/consumption.py` | Логи съеденного |
+| `/api/recipes` | `routers/recipes.py` | AI-рецепты |
+| `/api/weight` | `routers/weight.py` | Трекинг веса |
+| `/api/shopping-list` | `routers/shopping_list.py` | Список покупок |
+| `/api/reports` | `routers/reports.py` | Дневные отчёты |
+| `/api/receipts` | `routers/receipts.py` | OCR чеков |
+| `/api/recognize` | `routers/recognize.py` | Распознавание еды/этикеток |
+| `/api/smart` | `routers/smart.py` | Умный анализ текста |
+| `/api/search` | `routers/search.py` | Поиск по холодильнику |
+| `/api/herbalife` | `routers/herbalife.py` | База Herbalife |
+| `/api/universal` | `routers/universal.py` | Универсальный ввод |
+| `/api/assets` | `routers/assets.py` | Иконки и фоны (Flux) |
+| `/api/saved-dishes` | `routers/saved_dishes.py` | Сохранённые блюда |
+| `/api/water` | `routers/water.py` | Трекинг воды |
+| `/api/ai` | `routers/ai_insight.py` | AI Insight (SSE stream) |
+| `/api/referrals` | `routers/referrals.py` | Реферальная система |
 
 ---
 
@@ -19,8 +47,16 @@
 8. [Вес](#-вес)
 9. [Список покупок](#-список-покупок)
 10. [Отчёты](#-отчёты)
-11. [Коды ошибок](#-коды-ошибок)
-12. [TypeScript типы](#-typescript-типы)
+11. [Вода](#-вода)
+12. [Smart анализ текста](#-smart-анализ-текста)
+13. [Assets (иконки и фоны)](#-assets)
+14. [Сохранённые блюда](#-сохранённые-блюда)
+15. [AI Insight (SSE)](#-ai-insight-sse)
+16. [Реферальная система](#-реферальная-система)
+17. [Herbalife](#-herbalife)
+18. [Поиск](#-поиск)
+19. [Коды ошибок](#-коды-ошибок)
+20. [TypeScript типы](#-typescript-типы)
 
 ---
 
@@ -65,6 +101,20 @@ API использует **JWT (JSON Web Token)**. Токен действует
 ```
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyMzQ1Njc4OSwiZXhwIjoxNzM5MTg5NjAwfQ.xyz
 ```
+
+---
+
+### Эндпоинты авторизации (актуальный список)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/auth/register` | Регистрация через Telegram ID |
+| POST | `/api/auth/login` | Логин через Telegram ID |
+| GET | `/api/auth/me` | Профиль и настройки текущего пользователя |
+| PATCH | `/api/auth/settings` | Обновить настройки пользователя |
+| POST | `/api/auth/login-password` | Логин через пароль (GLOBAL_PASSWORD) |
+| POST | `/api/auth/web-register` | Регистрация через Telegram WebApp initData |
+| POST | `/api/auth/web-login` | Логин через Telegram WebApp initData |
 
 ---
 
@@ -160,6 +210,20 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEyMzQ1Njc4O
 ---
 
 ## 🧊 Продукты (Холодильник)
+
+### Эндпоинты продуктов (актуальный список)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/products` | Список продуктов (пагинация) |
+| GET | `/api/products/summary` | Краткая сводка холодильника |
+| POST | `/api/products/scan-label` | Распознать этикетку (OCR), добавить продукт |
+| GET | `/api/products/{product_id}` | Один продукт по ID |
+| POST | `/api/products` | Добавить продукт вручную |
+| DELETE | `/api/products/{product_id}` | Удалить продукт |
+| POST | `/api/products/{product_id}/consume` | Записать потребление |
+
+---
 
 ### `GET /api/products`
 
@@ -376,6 +440,18 @@ logged_calories = product.calories * factor
 ---
 
 ## 📝 Потребление (Логи еды)
+
+### Эндпоинты потребления (актуальный список)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/consumption` | История съеденного |
+| POST | `/api/consumption` | Записать еду вручную |
+| POST | `/api/consumption/manual` | Записать блюдо вручную (расширенная форма) |
+| DELETE | `/api/consumption/{log_id}` | Удалить запись |
+| PATCH | `/api/consumption/{log_id}` | Обновить запись |
+
+---
 
 ### `GET /api/consumption`
 
@@ -876,6 +952,165 @@ const progress = (report.calories_consumed / report.calories_goal) * 100;
 
 ---
 
+## 💧 Вода
+
+### `GET /api/water`
+
+Получить логи воды за день.
+
+**Query Parameters:**
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `date` | string (YYYY-MM-DD) | Дата (по умолчанию — сегодня по MSK) |
+
+**Response (200 OK):**
+```json
+[
+  { "id": 1, "amount_ml": 250, "date": "2026-04-08T08:00:00" }
+]
+```
+
+---
+
+### `POST /api/water`
+
+Записать потребление воды.
+
+**Request Body:**
+```json
+{ "amount_ml": 300 }
+```
+
+**Response (201 Created):**
+```json
+{ "id": 2, "amount_ml": 300, "date": "2026-04-08T09:30:00" }
+```
+
+---
+
+### `DELETE /api/water/{log_id}`
+
+Удалить запись о воде. **Response (204 No Content).**
+
+---
+
+## 🧠 Smart анализ текста
+
+### `POST /api/smart/analyze`
+
+Анализировать текстовое описание еды — получить КБЖУ.
+
+**Request Body:**
+```json
+{ "text": "тарелка борща 300г" }
+```
+
+**Response (200 OK):**
+```json
+{
+  "name": "Борщ",
+  "calories": 135.0,
+  "protein": 4.2,
+  "fat": 3.8,
+  "carbs": 18.5,
+  "fiber": 2.1,
+  "weight_g": 300.0
+}
+```
+
+---
+
+## 🖼 Assets
+
+### `GET /api/assets/icon/{name}`
+
+Получить или сгенерировать иконку для продукта (Flux/Pollinations.ai).
+
+**Response**: изображение PNG.
+
+---
+
+### `GET /api/assets/daily-bg`
+
+Получить или сгенерировать ежедневный AI-фон на основе содержимого холодильника.
+
+**Response**: изображение PNG.
+
+---
+
+## 🍽 Сохранённые блюда
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/saved-dishes/` | Список сохранённых блюд |
+| POST | `/api/saved-dishes/` | Сохранить блюдо |
+| DELETE | `/api/saved-dishes/{dish_id}` | Удалить блюдо |
+| POST | `/api/saved-dishes/{dish_id}/log` | Залогировать сохранённое блюдо как приём пищи |
+
+---
+
+## 🤖 AI Insight (SSE)
+
+### `GET /api/ai/insight`
+
+Получить AI-комментарий (Server-Sent Events, стриминг).
+
+**Query Parameters:**
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `action` | string | Тип события (напр. `greeting`, `food_log`, `water_logged`) |
+| `detail` | string | Детали события |
+
+**Response**: `text/event-stream` (SSE)
+
+```
+data: Отличный выбор! Борщ — 
+
+data: хорошее сочетание 
+
+data: овощей для вашей цели.
+
+```
+
+При активном AI Guide (Pro) — возвращает развёрнутый совет от AIGuideService.
+
+---
+
+## 🔗 Реферальная система
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/referrals/me` | Мои рефералы, вознаграждения, ссылка |
+| POST | `/api/referrals/generate_link` | Сгенерировать реферальную ссылку |
+| POST | `/api/referrals/activate_reward` | Активировать реферальное вознаграждение |
+
+---
+
+## 🌿 Herbalife
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/herbalife/search` | Поиск продукта в базе Herbalife |
+| GET | `/api/herbalife/products` | Все продукты Herbalife |
+| POST | `/api/herbalife/calculate` | Рассчитать КБЖУ порции Herbalife |
+
+---
+
+## 🔍 Поиск
+
+### `GET /api/search/fridge`
+
+Умный поиск по холодильнику.
+
+**Query Parameters:**
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `q` | string | Поисковый запрос |
+
+**Response (200 OK):** список продуктов (формат как `GET /api/products`).
+
+---
+
 ## ❌ Коды ошибок
 
 | Код | Описание | Что делать |
@@ -1132,4 +1367,4 @@ console.log(`Сегодня: ${report.calories_consumed}/${report.calories_goal}
 ---
 
 *Документация актуальна для API версии 1.0.0*  
-*Последнее обновление: 2026-01-10*
+*Последнее обновление: 2026-04-08 (актуализировано по реальным роутерам в `api/routers/`)*

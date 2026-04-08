@@ -1,0 +1,375 @@
+//@version=5
+indicator("📦 Order Block Visualizer PRO v5", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+
+// ============ 🎯 ВЫБОР ПРЕСЕТА ============
+group_presets = "🎯 ПРЕСЕТЫ"
+preset_choice = input.string("🎯 ICT Классический", "📋 Выбрать пресет", 
+     options=["Custom", "🎯 ICT Классический", "⚡ Агрессивный Скальпер", "💎 Premium Confluence", 
+              "📈 Трендовый Охотник", "🔄 Mitigation Specialist", "🌙 Ночной Трейдер",
+              "💰 Prop Firm Режим", "🚀 Pre-Momo", "🎭 Низкая Волатильность",
+              "💪 Высокая Волатильность", "🎓 Обучающий", "🎰 Экспертный"], 
+     group=group_presets)
+
+// ============ ФУНКЦИЯ ЗАГРУЗКИ ПАРАМЕТРОВ ПРЕСЕТА ============
+get_preset_params(preset_name) =>
+    var float _ob_strength = 1.5
+    var int _ob_lookback = 3
+    var int _confirmation_bars = 1
+    var int _max_ob_count = 3
+    var int _zone_extend = 20
+    var bool _use_volume_filter = true
+    var float _volume_mult = 1.3
+    var float _min_ob_size = 0.15
+    var bool _use_momentum_filter = true
+    var int _momentum_threshold = 50
+    var bool _show_strong_only = false
+    
+    if preset_name == "🎯 ICT Классический"
+        _ob_strength := 1.8
+        _ob_lookback := 3
+        _confirmation_bars := 2
+        _max_ob_count := 3
+        _zone_extend := 30
+        _use_volume_filter := true
+        _volume_mult := 1.4
+        _min_ob_size := 0.2
+        _use_momentum_filter := true
+        _momentum_threshold := 55
+        _show_strong_only := false
+    
+    else if preset_name == "⚡ Агрессивный Скальпер"
+        _ob_strength := 1.0
+        _ob_lookback := 1
+        _confirmation_bars := 1
+        _max_ob_count := 5
+        _zone_extend := 15
+        _use_volume_filter := false
+        _volume_mult := 1.2
+        _min_ob_size := 0.05
+        _use_momentum_filter := false
+        _momentum_threshold := 50
+        _show_strong_only := false
+    
+    else if preset_name == "💎 Premium Confluence"
+        _ob_strength := 2.0
+        _ob_lookback := 3
+        _confirmation_bars := 3
+        _max_ob_count := 2
+        _zone_extend := 40
+        _use_volume_filter := true
+        _volume_mult := 1.5
+        _min_ob_size := 0.25
+        _use_momentum_filter := true
+        _momentum_threshold := 58
+        _show_strong_only := true
+    
+    else if preset_name == "📈 Трендовый Охотник"
+        _ob_strength := 1.6
+        _ob_lookback := 2
+        _confirmation_bars := 2
+        _max_ob_count := 3
+        _zone_extend := 40
+        _use_volume_filter := true
+        _volume_mult := 1.35
+        _min_ob_size := 0.18
+        _use_momentum_filter := true
+        _momentum_threshold := 52
+        _show_strong_only := false
+    
+    else if preset_name == "🔄 Mitigation Specialist"
+        _ob_strength := 1.7
+        _ob_lookback := 3
+        _confirmation_bars := 2
+        _max_ob_count := 5
+        _zone_extend := 35
+        _use_volume_filter := true
+        _volume_mult := 1.3
+        _min_ob_size := 0.16
+        _use_momentum_filter := true
+        _momentum_threshold := 54
+        _show_strong_only := false
+    
+    else if preset_name == "🌙 Ночной Трейдер"
+        _ob_strength := 1.5
+        _ob_lookback := 2
+        _confirmation_bars := 1
+        _max_ob_count := 4
+        _zone_extend := 20
+        _use_volume_filter := false
+        _volume_mult := 1.2
+        _min_ob_size := 0.12
+        _use_momentum_filter := true
+        _momentum_threshold := 50
+        _show_strong_only := false
+    
+    else if preset_name == "💰 Prop Firm Режим"
+        _ob_strength := 1.9
+        _ob_lookback := 3
+        _confirmation_bars := 3
+        _max_ob_count := 2
+        _zone_extend := 45
+        _use_volume_filter := true
+        _volume_mult := 1.45
+        _min_ob_size := 0.22
+        _use_momentum_filter := true
+        _momentum_threshold := 56
+        _show_strong_only := true
+    
+    else if preset_name == "🚀 Pre-Momo"
+        _ob_strength := 2.2
+        _ob_lookback := 4
+        _confirmation_bars := 1
+        _max_ob_count := 2
+        _zone_extend := 50
+        _use_volume_filter := true
+        _volume_mult := 1.6
+        _min_ob_size := 0.3
+        _use_momentum_filter := false
+        _momentum_threshold := 50
+        _show_strong_only := false
+    
+    else if preset_name == "🎭 Низкая Волатильность"
+        _ob_strength := 1.3
+        _ob_lookback := 2
+        _confirmation_bars := 1
+        _max_ob_count := 4
+        _zone_extend := 25
+        _use_volume_filter := false
+        _volume_mult := 1.2
+        _min_ob_size := 0.08
+        _use_momentum_filter := true
+        _momentum_threshold := 50
+        _show_strong_only := false
+    
+    else if preset_name == "💪 Высокая Волатильность"
+        _ob_strength := 2.5
+        _ob_lookback := 3
+        _confirmation_bars := 2
+        _max_ob_count := 3
+        _zone_extend := 50
+        _use_volume_filter := true
+        _volume_mult := 1.2
+        _min_ob_size := 0.4
+        _use_momentum_filter := true
+        _momentum_threshold := 55
+        _show_strong_only := false
+    
+    else if preset_name == "🎓 Обучающий"
+        _ob_strength := 2.1
+        _ob_lookback := 3
+        _confirmation_bars := 3
+        _max_ob_count := 2
+        _zone_extend := 50
+        _use_volume_filter := true
+        _volume_mult := 1.5
+        _min_ob_size := 0.25
+        _use_momentum_filter := true
+        _momentum_threshold := 57
+        _show_strong_only := true
+    
+    else if preset_name == "🎰 Экспертный"
+        _ob_strength := 1.0
+        _ob_lookback := 1
+        _confirmation_bars := 1
+        _max_ob_count := 5
+        _zone_extend := 30
+        _use_volume_filter := false
+        _volume_mult := 1.2
+        _min_ob_size := 0.05
+        _use_momentum_filter := false
+        _momentum_threshold := 50
+        _show_strong_only := false
+    
+    [_ob_strength, _ob_lookback, _confirmation_bars, _max_ob_count, _zone_extend,
+     _use_volume_filter, _volume_mult, _min_ob_size, _use_momentum_filter, _momentum_threshold, _show_strong_only]
+
+[preset_ob_strength, preset_ob_lookback, preset_confirmation_bars, preset_max_ob_count, preset_zone_extend,
+ preset_use_volume_filter, preset_volume_mult, preset_min_ob_size, preset_use_momentum_filter, preset_momentum_threshold, preset_show_strong_only] = get_preset_params(preset_choice)
+
+// ============ 📊 НАСТРОЙКИ ============
+group_main = "📊 ОСНОВНЫЕ"
+ob_strength = preset_choice == "Custom" ? input.float(1.5, "🎯 Сила импульса", minval=0.5, maxval=3.0, step=0.1, group=group_main) : preset_ob_strength
+ob_lookback = preset_choice == "Custom" ? input.int(3, "📍 Глубина анализа", minval=1, maxval=5, group=group_main) : preset_ob_lookback
+confirmation_bars = preset_choice == "Custom" ? input.int(1, "✅ Подтверждение", minval=1, maxval=3, group=group_main) : preset_confirmation_bars
+max_ob_count = preset_choice == "Custom" ? input.int(3, "🔢 Максимум блоков", minval=1, maxval=10, group=group_main) : preset_max_ob_count
+zone_extend = preset_choice == "Custom" ? input.int(20, "→ Длина зон", minval=5, maxval=100, group=group_main) : preset_zone_extend
+
+group_filters = "🔧 ФИЛЬТРЫ"
+use_volume_filter = preset_choice == "Custom" ? input.bool(true, "📊 Фильтр объема", group=group_filters) : preset_use_volume_filter
+volume_mult = preset_choice == "Custom" ? input.float(1.3, "🔼 Множитель объема", minval=1.0, step=0.1, group=group_filters) : preset_volume_mult
+min_ob_size = preset_choice == "Custom" ? input.float(0.15, "📏 Минимум размер %", minval=0.0, step=0.05, group=group_filters) : preset_min_ob_size
+use_momentum_filter = preset_choice == "Custom" ? input.bool(true, "⚡ Фильтр momentum", group=group_filters) : preset_use_momentum_filter
+momentum_threshold = preset_choice == "Custom" ? input.int(50, "⚡ Порог RSI", minval=30, maxval=70, step=5, group=group_filters) : preset_momentum_threshold
+
+group_visual = "🎨 ВИЗУАЛ"
+show_detailed_info = input.bool(true, "📝 Детальная инфо на блоке", group=group_visual)
+show_impulse_strength = input.bool(true, "⚡ Сила импульса", group=group_visual)
+show_distance_to_ob = input.bool(true, "📏 Расстояние до ОБ", group=group_visual)
+show_age_bars = input.bool(true, "📅 Возраст блока", group=group_visual)
+
+// ============ 🔧 РАСЧЕТЫ ============
+atr = ta.atr(14)
+rsi = ta.rsi(close, 14)
+vol_avg = ta.sma(volume, 20)
+high_volume = volume > vol_avg * volume_mult
+momentum_bull = rsi > momentum_threshold
+momentum_bear = rsi < (100 - momentum_threshold)
+min_block_size = close * min_ob_size / 100
+
+// ============ ORDER BLOCK DETECTION ============
+lookback_high = ta.highest(high, ob_lookback + 1)
+lookback_low = ta.lowest(low, ob_lookback + 1)
+block_size = lookback_high - lookback_low
+
+bullish_impulse = close > close[1] and (close - close[1]) > atr * ob_strength
+bearish_before = close[ob_lookback] < open[ob_lookback]
+size_ok_bull = block_size >= min_block_size
+bullish_ob_detected = bullish_impulse and bearish_before and size_ok_bull and (not use_volume_filter or high_volume) and (not use_momentum_filter or momentum_bull)
+
+bearish_impulse = close < close[1] and (close[1] - close) > atr * ob_strength
+bullish_before = close[ob_lookback] > open[ob_lookback]
+size_ok_bear = block_size >= min_block_size
+bearish_ob_detected = bearish_impulse and bullish_before and size_ok_bear and (not use_volume_filter or high_volume) and (not use_momentum_filter or momentum_bear)
+
+// ============ ХРАНЕНИЕ ORDER BLOCKS ============
+type OrderBlock
+    float top
+    float bottom
+    int start_bar
+    bool is_bullish
+    bool is_valid
+    int retest_count
+    bool is_confirmed
+    float impulse_strength
+    int formed_bar
+
+var OrderBlock[] bull_obs = array.new<OrderBlock>()
+var OrderBlock[] bear_obs = array.new<OrderBlock>()
+var int[] bull_retests = array.new<int>()
+var int[] bear_retests = array.new<int>()
+
+if bullish_ob_detected
+    impulse = (close - close[1]) / atr
+    new_ob = OrderBlock.new(lookback_high, lookback_low, bar_index - ob_lookback, true, true, 0, false, impulse, bar_index)
+    array.unshift(bull_obs, new_ob)
+    array.unshift(bull_retests, 0)
+    if array.size(bull_obs) > max_ob_count * 2
+        array.pop(bull_obs)
+        array.pop(bull_retests)
+
+if bearish_ob_detected
+    impulse = (close[1] - close) / atr
+    new_ob = OrderBlock.new(lookback_high, lookback_low, bar_index - ob_lookback, false, true, 0, false, impulse, bar_index)
+    array.unshift(bear_obs, new_ob)
+    array.unshift(bear_retests, 0)
+    if array.size(bear_obs) > max_ob_count * 2
+        array.pop(bear_obs)
+        array.pop(bear_retests)
+
+// ============ ПРОВЕРКА РЕТЕСТОВ И МИТИГАЦИИ ============
+for i = 0 to array.size(bull_obs) - 1
+    if array.size(bull_obs) > 0
+        ob = array.get(bull_obs, i)
+        if ob.is_valid
+            if low <= ob.top and low >= ob.bottom
+                array.set(bull_retests, i, array.get(bull_retests, i) + 1)
+                ob.retest_count := array.get(bull_retests, i)
+            if ob.retest_count >= confirmation_bars
+                ob.is_confirmed := true
+            if close < ob.bottom
+                ob.is_valid := false
+
+for i = 0 to array.size(bear_obs) - 1
+    if array.size(bear_obs) > 0
+        ob = array.get(bear_obs, i)
+        if ob.is_valid
+            if high >= ob.bottom and high <= ob.top
+                array.set(bear_retests, i, array.get(bear_retests, i) + 1)
+                ob.retest_count := array.get(bear_retests, i)
+            if ob.retest_count >= confirmation_bars
+                ob.is_confirmed := true
+            if close > ob.top
+                ob.is_valid := false
+
+// ============ ВИЗУАЛИЗАЦИЯ ORDER BLOCKS ============
+var box[] all_boxes = array.new_box()
+var label[] all_labels = array.new_label()
+
+if array.size(all_boxes) > 0
+    for i = 0 to array.size(all_boxes) - 1
+        box.delete(array.get(all_boxes, i))
+    array.clear(all_boxes)
+
+if array.size(all_labels) > 0
+    for i = 0 to array.size(all_labels) - 1
+        label.delete(array.get(all_labels, i))
+    array.clear(all_labels)
+
+// Рисуем Bullish OBs
+int bull_count = 0
+for i = 0 to array.size(bull_obs) - 1
+    if array.size(bull_obs) > 0 and bull_count < max_ob_count
+        ob = array.get(bull_obs, i)
+        if ob.is_valid
+            transparency = ob.is_confirmed ? 60 : 75
+            color_strength = color.new(color.green, transparency)
+            border_color = ob.is_confirmed ? color.new(color.lime, 20) : color.new(color.green, 40)
+            
+            ob_box = box.new(ob.start_bar, ob.top, bar_index + zone_extend, ob.bottom, border_color=border_color, bgcolor=color_strength, border_width=3)
+            array.push(all_boxes, ob_box)
+            
+            // Детальная информация
+            center_y = (ob.top + ob.bottom) / 2
+            size_percent = ((ob.top - ob.bottom) / close) * 100
+            size_dollar = ob.top - ob.bottom
+            age_bars = bar_index - ob.formed_bar
+            
+            // Основная метка
+            info_text = "OB↑"
+            if show_detailed_info
+                info_text += "\n$" + str.tostring(math.round(ob.bottom, 2)) + "-" + str.tostring(math.round(ob.top, 2))
+                info_text += "\n" + str.tostring(math.round(size_percent, 2)) + "%"
+            if show_impulse_strength
+                info_text += "\n" + "Imp:" + str.tostring(math.round(ob.impulse_strength, 1)) + "x"
+            if show_age_bars
+                info_text += "\n" + str.tostring(age_bars) + "bars"
+            if ob.is_confirmed
+                info_text += "\n✓" + str.tostring(ob.retest_count)
+            
+            ob_label = label.new(ob.start_bar + 2, center_y, info_text, color=color.new(color.green, 40), textcolor=color.white, style=label.style_label_left, size=size.tiny)
+            array.push(all_labels, ob_label)
+            
+            bull_count += 1
+
+// Рисуем Bearish OBs
+int bear_count = 0
+for i = 0 to array.size(bear_obs) - 1
+    if array.size(bear_obs) > 0 and bear_count < max_ob_count
+        ob = array.get(bear_obs, i)
+        if ob.is_valid
+            transparency = ob.is_confirmed ? 60 : 75
+            color_strength = color.new(color.red, transparency)
+            border_color = ob.is_confirmed ? color.new(color.maroon, 20) : color.new(color.red, 40)
+            
+            ob_box = box.new(ob.start_bar, ob.top, bar_index + zone_extend, ob.bottom, border_color=border_color, bgcolor=color_strength, border_width=3)
+            array.push(all_boxes, ob_box)
+            
+            center_y = (ob.top + ob.bottom) / 2
+            size_percent = ((ob.top - ob.bottom) / close) * 100
+            age_bars = bar_index - ob.formed_bar
+            
+            info_text = "OB↓"
+            if show_detailed_info
+                info_text += "\n$" + str.tostring(math.round(ob.bottom, 2)) + "-" + str.tostring(math.round(ob.top, 2))
+                info_text += "\n" + str.tostring(math.round(size_percent, 2)) + "%"
+            if show_impulse_strength
+                info_text += "\n" + "Imp:" + str.tostring(math.round(ob.impulse_strength, 1)) + "x"
+            if show_age_bars
+                info_text += "\n" + str.tostring(age_bars) + "bars"
+            if ob.is_confirmed
+                info_text += "\n✓" + str.tostring(ob.retest_count)
+            
+            ob_label = label.new(ob.start_bar + 2, center_y, info_text, color=color.new(color.red, 40), textcolor=color.white, style=label.style_label_right, size=size.tiny)
+            array.push(all_labels, ob_label)
+            
+            bear_count += 1

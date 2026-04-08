@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Annotated
 
+import pytz
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -36,7 +37,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     if "sub" in to_encode:
         to_encode["sub"] = str(to_encode["sub"])
 
-    expire = datetime.now() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
+    msk_tz = pytz.timezone("Europe/Moscow")
+    expire = datetime.now(msk_tz).replace(tzinfo=None) + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

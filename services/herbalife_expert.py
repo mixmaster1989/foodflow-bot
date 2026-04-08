@@ -1,7 +1,10 @@
 import json
 import os
 import re
+import logging
 from typing import Any
+
+logger = logging.getLogger("services.herbalife_expert")
 
 
 class HerbalifeExpertService:
@@ -15,18 +18,38 @@ class HerbalifeExpertService:
         return cls._instance
 
     def _load_db(self):
-        db_path = "/home/user1/foodflow-bot/herbalife_db.json"
+        db_path = "/home/user1/foodflow-bot_new/herbalife_db.json"
         if os.path.exists(db_path):
             with open(db_path, encoding="utf-8") as f:
                 self._db = json.load(f)
+            logger.info(f"🌿 [HERBALIFE] Database loaded successfully. Products: {len(self._db.get('products', []))}")
         else:
+            logger.error(f"❌ [HERBALIFE] Database NOT FOUND at {db_path}")
             self._db = {"products": []}
 
     async def find_product_by_alias(self, text: str) -> dict | None:
-        """Use AI Brain to find the most likely product from the database."""
-        from services.ai_brain import AIBrainService
-
+        """Find the most likely product from the database using aliases or AI fallback."""
         products = self._db.get("products", [])
+        if not products:
+            return None
+
+        clean_text = text.lower().strip()
+        # Normalize: common Latin letters used in Herbalife abbreviations
+        key_norm = clean_text.replace('f', 'ф').replace('n', 'н')
+        
+        # 1. Fast Path: Straight alias match
+        for p in products:
+            aliases = [a.lower() for a in p.get("aliases", [])]
+            for alias in aliases:
+                # Check original and normalized
+                if alias == clean_text or alias == key_norm or \
+                   f" {alias}" in clean_text or f" {alias}" in key_norm or \
+                   clean_text.startswith(f"{alias} ") or key_norm.startswith(f"{alias} ") or \
+                   clean_text.endswith(f" {alias}") or key_norm.endswith(f" {alias}"):
+                    return p
+
+        # 2. AI Fallback: Semantic resolution
+        from services.ai_brain import AIBrainService
         matched_id = await AIBrainService.resolve_herbalife_product(text, products)
 
         if matched_id:

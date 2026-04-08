@@ -119,6 +119,10 @@ def mock_telegram_message(mock_telegram_user):
     message.edit_text = AsyncMock()
     message.edit_media = AsyncMock()
     message.delete = AsyncMock()
+    # Minimal bot mock for handlers that call message.bot.get_me()
+    bot = MagicMock()
+    bot.get_me = AsyncMock(return_value=type("BotInfo", (), {"username": "TestBot"})())
+    message.bot = bot
     return message
 
 

@@ -36,6 +36,7 @@ class ShoppingMode(StatesGroup):
 
 @router.callback_query(F.data == "start_shopping_mode")
 async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     """Initialize shopping session.
 
     Creates or reuses active shopping session and sets FSM state
@@ -112,6 +113,12 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> No
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
+
+    from database.base import get_db
+    from services.ai_guide import AIGuideService
+    async for session in get_db():
+        await AIGuideService.track_activity(callback.from_user.id, "shopping_list", session)
+        break
 
     await callback.answer()
 
@@ -249,12 +256,14 @@ async def finish_shopping(callback: types.CallbackQuery, state: FSMContext) -> N
         None
 
     """
+    await callback.answer() # Moved to the beginning
+
     current_state = await state.get_state()
     data = await state.get_data()
     session_id: int | None = data.get("shopping_session_id")
 
     if current_state != ShoppingMode.scanning_labels.state or not session_id:
-        await callback.answer("Нет активной сессии покупок.", show_alert=True)
+        await callback.answer("Нет активной сессии покупок.", show_alert=True) # This will be a second answer, but with show_alert
         return
 
     await state.set_state(ShoppingMode.waiting_for_receipt)
@@ -277,6 +286,7 @@ async def link_label(callback: types.CallbackQuery) -> None:
         None
 
     """
+    await callback.answer()
     try:
         _, product_id_str, label_id_str = callback.data.split(":")
         product_id: int = int(product_id_str)
@@ -326,7 +336,7 @@ async def link_label(callback: types.CallbackQuery) -> None:
         f"📄 {linked_product.name}\n"
         f"📦 {linked_label.name}"
     )
-    await callback.answer("Готово!")
+    # await callback.answer("Готово!") - moved to top
 
 
 @router.callback_query(F.data.startswith("sm_skip:"))
@@ -346,6 +356,7 @@ async def skip_label(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("sm_request_label:"))
 async def request_label_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     """Request label photo for unmatched product.
 
     Sets FSM state to waiting_for_label_photo and asks user to send photo.
@@ -387,6 +398,7 @@ async def request_label_photo(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("sm_remove_product:"))
 async def remove_product(callback: types.CallbackQuery) -> None:
+    await callback.answer()
     """Remove unmatched product from database.
 
     Args:
@@ -509,21 +521,14 @@ async def cancel_shopping_session(callback: types.CallbackQuery, state: FSMConte
     data = await state.get_data()
     session_id = data.get("shopping_session_id")
 
-    if session_id:
-        async for session in get_db():
-            shopping_session = await session.get(ShoppingSession, session_id)
-            if shopping_session:
-                shopping_session.is_active = False
-                await session.commit()
-            break
-
-    await state.clear()
     await callback.answer("Сессия отменена")
+    await state.clear()
     await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("shopping_delete_scan:"))
 async def delete_scan(callback: types.CallbackQuery) -> None:
+    await callback.answer()
     """Delete scanned label from shopping session.
 
     Args:
@@ -545,9 +550,9 @@ async def delete_scan(callback: types.CallbackQuery) -> None:
             await session.delete(scan)
             await session.commit()
             await callback.message.edit_text(f"🗑️ Товар '{scan.name}' удален из списка.")
-            await callback.answer("Товар удален")
+            # await callback.answer("Товар удален") - moved to top
         else:
             await callback.message.edit_text("❌ Товар уже удален или не найден.")
-            await callback.answer("Не найдено", show_alert=True)
+            # await callback.answer("Не найдено", show_alert=True)
         break
 

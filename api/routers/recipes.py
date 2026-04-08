@@ -57,8 +57,34 @@ async def generate_recipes(
     settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)
     settings = (await session.execute(settings_stmt)).scalar_one_or_none()
 
+    if not settings:
+        settings = UserSettings(user_id=user.id)
+        session.add(settings)
+
+    # === Daily Refresh Limit Check (3 per day) ===
+    from datetime import date
+    today_str = date.today().isoformat()
+
+    if request.refresh:
+        # Check if the limit is reached for today
+        if settings.last_recipe_refresh_date == today_str:
+            if settings.recipe_refresh_count >= 3:
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=429,
+                    detail="Лимит обновлений (3 в день) исчерпан. Попробуйте завтра!"
+                )
+            settings.recipe_refresh_count += 1
+        else:
+            # Reset for a new day
+            settings.last_recipe_refresh_date = today_str
+            settings.recipe_refresh_count = 1
+        
+        await session.commit()
+
     # Generate via AI
-    recipes = await AIService.generate_recipes(ingredients, request.category, settings)
+    ai_response = await AIService.generate_recipes(ingredients, request.category, settings)
+    recipes = ai_response.get("recipes", []) if ai_response else []
 
     # Store in cache
     if recipes:
@@ -67,8 +93,8 @@ async def generate_recipes(
     return [
         RecipeRead(
             title=r.get("title", "Без названия"),
-            description=r.get("description"),
-            calories=r.get("calories"),
+            description=r.get("description", ""),
+            calories=r.get("calories", 0),
             ingredients=r.get("ingredients", []),
             steps=r.get("steps", []),
         )

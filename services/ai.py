@@ -6,7 +6,7 @@ Contains:
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 
@@ -26,6 +26,13 @@ class AIService:
         "google/gemma-3-27b-it:free",                     # Good but unstable
         "deepseek/deepseek-chat-v3-0324:free",            # Good but unstable
         "openai/gpt-oss-20b:free"                         # Working fallback
+    ]
+
+    GUIDE_MODELS: list[str] = [
+        "nvidia/nemotron-3-super-120b-a12b:free",         # Primary (Powerful 120B)
+        "google/gemma-4-31b-it:free",                      # Fallback (User insisted)
+        "qwen/qwen-2.5-72b-instruct:free",                # Backup 2
+        "google/gemini-2.0-flash-lite-preview-09-2025"    # Paid fallback
     ]
 
     @classmethod
@@ -151,7 +158,7 @@ class AIService:
 
         models = [
             "qwen/qwen2.5-vl-32b-instruct:free",
-            "google/gemini-2.0-flash-exp:free",
+            "qwen/qwen3.6-plus:free",
             "openai/gpt-4.1-mini",
         ]
 
@@ -231,3 +238,110 @@ class AIService:
                             await asyncio.sleep(retry_delay)
                         continue
         return None
+    @classmethod
+    async def get_completion(cls, prompt: str, model: Optional[str] = None) -> str | None:
+        """Get a generic text completion from AI (G guide/general)."""
+        if model:
+            target_models = [model]
+        else:
+            target_models = cls.GUIDE_MODELS
+            
+        for target_model in target_models:
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://foodflow.app",
+                "X-Title": "FoodFlow Bot"
+            }
+
+            payload = {
+                "model": target_model,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=15
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            return result['choices'][0]['message']['content'].strip()
+                        else:
+                            logger.warning(f"AI Completion ({target_model}) failed: {response.status}")
+                except Exception as e:
+                    logger.error(f"Exception in AI Completion ({target_model}): {e}")
+        return None
+
+    @classmethod
+    async def get_completion_stream(cls, prompt: str, model: Optional[str] = None):
+        """Get a streamed text completion from AI."""
+        import json
+        if model:
+            target_models = [model]
+        else:
+            target_models = cls.GUIDE_MODELS
+            
+        for target_model in target_models:
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://foodflow.app",
+                "X-Title": "FoodFlow Bot"
+            }
+
+            payload = {
+                "model": target_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": True,
+                "temperature": 0.8
+            }
+
+            # Retry each model 3 times before moving to next fallback
+            for attempt in range(3):
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=30
+                        ) as response:
+                            if response.status != 200:
+                                logger.warning(f"AI Stream ({target_model}) attempt {attempt+1} failed: {response.status}")
+                                if attempt < 2:
+                                    await asyncio.sleep(0.5)
+                                    continue
+                                break # Move to next model
+                                
+                            async for line in response.content:
+                                if not line:
+                                    continue
+                                
+                                decoded_line = line.decode("utf-8").strip()
+                                if decoded_line.startswith("data: "):
+                                    data_str = decoded_line[6:].strip()
+                                    if data_str == "[DONE]":
+                                        break
+                                    
+                                    try:
+                                        data = json.loads(data_str)
+                                        if "choices" in data and len(data["choices"]) > 0:
+                                            delta = data["choices"][0].get("delta", {})
+                                            if "content" in delta:
+                                                yield delta["content"]
+                                    except Exception:
+                                        continue
+                            return # Stream finished successfully
+                    except Exception as e:
+                        logger.error(f"Exception in AI Stream ({target_model}) attempt {attempt+1}: {e}")
+                        if attempt < 2:
+                            await asyncio.sleep(0.5)
+                            continue
+                        break # Move to next model
+        
+        # If all models fail, yield empty
+        yield ""

@@ -35,7 +35,7 @@ class PriceTagOCRService:
     MODELS: list[str] = [
         # Free models (try first)
         "qwen/qwen2.5-vl-32b-instruct:free",
-        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen3.6-plus:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
         "nvidia/nemotron-nano-12b-v2-vl:free",
 

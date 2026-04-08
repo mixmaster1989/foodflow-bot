@@ -14,6 +14,7 @@ from sqlalchemy import or_, select
 
 from database.base import get_db
 from database.models import Product, Receipt
+from services.kbju_core import KBJUCoreService
 
 # Placeholder for future AI Brain integration
 # from services.ai_brain import AIBrainService
@@ -146,12 +147,22 @@ async def fridge_search_start(callback: types.CallbackQuery, state: FSMContext) 
     await callback.answer()
 
 
+    await callback.answer()
+
 @router.callback_query(F.data.startswith("fridge_search_tag:"))
 async def fridge_search_tag_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle click on AI search tag."""
     tag = callback.data.split(":")[1]
     await state.update_data(search_query=tag)
     await show_search_results(callback.message, state, page=0, is_edit=True)
+    await callback.answer()
+
+@router.callback_query(F.data == "fridge_search_back")
+async def fridge_search_back_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle 'Back' from product detail to search results."""
+    data = await state.get_data()
+    page = data.get("search_page", 0)
+    await show_search_results(callback.message, state, page=page, is_edit=True, use_session_query=True)
     await callback.answer()
 
 
@@ -176,11 +187,12 @@ async def fridge_search_pagination(callback: types.CallbackQuery, state: FSMCont
     except (IndexError, ValueError):
         page = 0
 
-    await show_search_results(callback.message, state, page=page, is_edit=True)
+    await state.update_data(search_page=page)
+    await show_search_results(callback.message, state, page=page, is_edit=True, use_session_query=True)
     await callback.answer()
 
 
-async def show_search_results(message: types.Message, state: FSMContext, page: int = 0, is_edit: bool = False) -> None:
+async def show_search_results(message: types.Message, state: FSMContext, page: int = 0, is_edit: bool = False, use_session_query: bool = False) -> None:
     """Render search results with pagination."""
 
     data = await state.get_data()
@@ -191,11 +203,14 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
         await message.answer("⚠️ Ошибка поиска: пустой запрос.")
         return
 
-    # 1. Smart Search Logic (Python-side filtering for Cyrillic support)
-    keywords = query.lower().split()
+        # 1. Smart Search Logic (Python-side filtering)
+        keywords = query.lower().split()
+        
+        # 🚀 IMPROVEMENT: Use KBJUCore for query normalization
+        core_query = await KBJUCoreService.get_product_nutrition(query, session)
+        base_query = core_query.base_name.lower() if core_query.base_name else ""
 
-    async for session in get_db():
-        # Fetch ALL products for user (Fridge is usually small < 200 items)
+        # Fetch ALL products for user
         stmt = select(Product).outerjoin(Receipt).where(
             or_(Receipt.user_id == user_id, Product.user_id == user_id)
         ).order_by(Product.id.desc())
@@ -204,14 +219,15 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
 
         # Filter in Python
         filtered_products = []
-        if not keywords:
-            filtered_products = all_products
-        else:
-            for p in all_products:
-                name_norm = p.name.lower()
-                # Check if ALL keywords are in name (AND logic)
-                if all(kw in name_norm for kw in keywords):
-                    filtered_products.append(p)
+        for p in all_products:
+            name_norm = p.name.lower()
+            p_base_name = p.base_name.lower() if p.base_name else ""
+            
+            # Match if:
+            # 1. ALL keywords are in name
+            # 2. OR base_name matches base_query
+            if all(kw in name_norm for kw in keywords) or (base_query and base_query in p_base_name):
+                filtered_products.append(p)
 
         total_items = len(filtered_products)
 
@@ -253,8 +269,8 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
 
     for p in products:
         cal_info = f"({int(p.calories)} ккал)" if p.calories else ""
-        # FIXED: Callback uses fridge_item, not fridge_product
-        builder.button(text=f"📦 {p.name[:20]} {cal_info}", callback_data=f"fridge_item:{p.id}:0")
+        # 🚀 SOURCE FLAG: 1 = Search
+        builder.button(text=f"📦 {p.name[:20]} {cal_info}", callback_data=f"fridge_item:{p.id}:{page}:1")
 
     builder.adjust(1)
 

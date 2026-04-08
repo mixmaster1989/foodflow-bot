@@ -12,14 +12,17 @@ from handlers import (
     correction,
     curator,
     errors,
+    feedback,
     fridge,
     fridge_search,
     herbalife,
     i_ate,
     menu,
     onboarding,
+    payments,
     receipt,
     recipes,
+    referrals,
     saved_dishes,
     shopping,
     shopping_list,
@@ -32,6 +35,10 @@ from handlers import (
     # global_input,
     water,
     weight,
+    marketing,
+    pilot_commands,
+    guide,
+    testers,
 )
 from handlers.marathon import curator_menu
 
@@ -58,9 +65,33 @@ async def main():
     from middleware.admin_logger import AdminLoggerMiddleware
     from middleware.paywall import PaywallMiddleware
     from middleware.user_enrichment import UserEnrichmentMiddleware
+    from aiogram import BaseMiddleware
+    from aiogram.types import Update
 
+    class GroupFilterMiddleware(BaseMiddleware):
+        """Drop group messages early — only allow /mstats and mkt_ callbacks through."""
+        async def __call__(self, handler, event, data):
+            if isinstance(event, Update):
+                # Allow private chats through unconditionally
+                if event.message and event.message.chat.type == "private":
+                    return await handler(event, data)
+                # Allow /mstats command in groups
+                if event.message and event.message.text and event.message.text.startswith("/mstats"):
+                    return await handler(event, data)
+                # Allow marketing callbacks in groups
+                if event.callback_query and event.callback_query.data and event.callback_query.data.startswith("mkt_"):
+                    return await handler(event, data)
+                # Allow callback queries from private chats
+                if event.callback_query and event.callback_query.message and event.callback_query.message.chat.type == "private":
+                    return await handler(event, data)
+                # Drop everything else (group messages, channel posts, etc.)
+                return
+            return await handler(event, data)
+
+    dp.update.outer_middleware(GroupFilterMiddleware())
     dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
     dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
+    
     dp.update.middleware(AuthMiddleware())
 
     # Paywall should intercept messages and callbacks
@@ -73,10 +104,12 @@ async def main():
     dp.include_router(errors.router) # Catch errors globally
     dp.include_router(common.router)
     dp.include_router(admin.router) # Admin commands
+    dp.include_router(pilot_commands.router) # Pilot-only commands (MUST BE EARLY)
     dp.include_router(support.router) # Contact Dev
     dp.include_router(onboarding.router)  # Onboarding must be after common
     dp.include_router(user_settings.router)
     dp.include_router(subscription.router)
+    dp.include_router(payments.router)  # Telegram Stars payments
     dp.include_router(menu.router)
     dp.include_router(water.router)  # Central menu router
     dp.include_router(i_ate.router)  # Quick food logging
@@ -89,13 +122,18 @@ async def main():
     dp.include_router(fridge_search.router) # New Smart Search
     dp.include_router(recipes.router)
     dp.include_router(stats.router)
+    dp.include_router(referrals.router)
+    dp.include_router(feedback.router)
     dp.include_router(shopping_list.router)
     dp.include_router(weight.router)
     dp.include_router(correction.router)
     dp.include_router(saved_dishes.router)
     dp.include_router(ward_interactions.router)
+    dp.include_router(marketing.router) # Marketing analytics for group
     # dp.include_router(global_input.router) # DEPRECATED
     dp.include_router(universal_input.router) # Universal Handler (Text/Voice/Photo)
+    dp.include_router(guide.router)
+    dp.include_router(testers.router) # Beta testers recruitment
 
     # Start reminder scheduler
     from services.scheduler import start_scheduler
@@ -104,10 +142,11 @@ async def main():
     # Reset Menu Button to Default (remove Web App from input field)
     from aiogram.types import MenuButtonDefault
     try:
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonDefault()
-        )
-        logging.info("✅ Global Menu Button reset to Default")
+        # NOTE: Temporarily commented out due to network timeouts to api.telegram.org
+        # await bot.set_chat_menu_button(
+        #     menu_button=MenuButtonDefault()
+        # )
+        logging.info("✅ Skip Menu Button reset (restored code, network bypass)")
     except Exception as e:
         logging.warning(f"⚠️ Failed to reset Menu Button: {e}")
 

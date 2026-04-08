@@ -15,6 +15,19 @@ module.exports = {
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             merge_logs: true,
             time: true
+        },
+        {
+            name: 'foodflow-api',
+            script: 'venv/bin/python',
+            args: '-m uvicorn api.main:app --host 127.0.0.1 --port 8001',
+            cwd: '/home/user1/foodflow-bot_new',
+            instances: 1,
+            autorestart: true,
+            watch: false,
+            max_memory_restart: '300M',
+            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+            merge_logs: true,
+            time: true
         }
     ]
 };

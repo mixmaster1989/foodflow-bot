@@ -28,7 +28,7 @@ class LabelOCRService:
         # Paid earlier to avoid long stalls on free limits
         "google/gemini-2.5-flash-lite",
         # Remaining fallbacks
-        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen3.6-plus:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
         "mistralai/pixtral-12b",
         "qwen/qwen-vl-plus",

@@ -28,8 +28,11 @@ from handlers.i_ate import show_confirmation_interface
 from services.ai_brain import AIBrainService
 from services.herbalife_expert import herbalife_expert
 from services.normalization import NormalizationService
+from services.kbju_core import KBJUCoreService
+from services.ai_guide import AIGuideService
 from services.voice_stt import SpeechToText
 from utils.parsing import safe_float
+from config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -713,11 +716,33 @@ async def handle_universal_weight_input(message: types.Message, state: FSMContex
         factor = weight / 100.0
 
         product['name'] = f"{product['base_name']} ({int(weight)}г)"
+        before = {
+            "calories100": product.get("calories100"),
+            "protein100": product.get("protein100"),
+            "fat100": product.get("fat100"),
+            "carbs100": product.get("carbs100"),
+            "fiber100": product.get("fiber100"),
+        }
         product['calories100'] = product['calories100'] * factor
         product['protein100'] = product['protein100'] * factor
         product['fat100'] = product['fat100'] * factor
         product['carbs100'] = product['carbs100'] * factor
         product['fiber100'] = product['fiber100'] * factor
+        logger.info(
+            "KBJU_FLOW universal_weight_input user_id=%s intent=%s weight=%s factor=%s before=%s after=%s",
+            message.from_user.id,
+            intent,
+            weight,
+            factor,
+            before,
+            {
+                "calories100": product.get("calories100"),
+                "protein100": product.get("protein100"),
+                "fat100": product.get("fat100"),
+                "carbs100": product.get("carbs100"),
+                "fiber100": product.get("fiber100"),
+            },
+        )
 
         await state.update_data(pending_product=product)
 
@@ -808,9 +833,45 @@ async def process_text_food_logging(
             weight_grams = None
             weight_missing = False
             base_name = name
+        elif user_id in settings.PILOT_USER_IDS:
+            # 🚀 PILOT FLOW: Use KBJUCoreService
+            async for session in get_db():
+                core_result = await KBJUCoreService.get_product_nutrition(text, session, weight_grams=weight_override)
+                break
+            
+            logger.info(f"🚀 KBJUCore Pilot Result for '{text}': {core_result}")
+            
+            # Add [ЭТАЛОН] label if it's from cache
+            prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
+            name = prefix + core_result.display_name
+            base_name = core_result.base_name
+            calories = core_result.calories
+            protein = core_result.protein
+            fat = core_result.fat
+            carbs = core_result.carbs
+            fiber = core_result.fiber
+            weight_grams = core_result.weight_grams
+            weight_missing = core_result.weight_missing
         else:
+            # STANDARD FLOW: NormalizationService
             result = await NormalizationService.analyze_food_intake(text)
             logger.info(f"🍌 Normalization Result for '{text}': {result}")
+
+            logger.info(
+                "KBJU_FLOW universal_text analyzed user_id=%s text=%r weight_override=%r -> name=%r base=%r weight_grams=%r weight_missing=%r kbju_raw={kcal:%s p:%s f:%s c:%s fi:%s}",
+                user_id,
+                text,
+                weight_override,
+                result.get("name"),
+                result.get("base_name"),
+                result.get("weight_grams"),
+                result.get("weight_missing", True),
+                result.get("calories"),
+                result.get("protein"),
+                result.get("fat"),
+                result.get("carbs"),
+                result.get("fiber"),
+            )
 
             name = result.get("name", text)
             calories = safe_float(result.get("calories"))
@@ -818,111 +879,130 @@ async def process_text_food_logging(
             fat = safe_float(result.get("fat"))
             carbs = safe_float(result.get("carbs"))
             fiber = safe_float(result.get("fiber"))
-
-            # --- WATER INTERCEPTION ---
-            # If the user literally just drank water (or mineral water, hot water)
-            if name.lower() in ["вода", "минеральная вода", "кипяток", "water"]:
-                weight_grams = weight_override if weight_override else result.get("weight_grams")
-
-                # If we don't know the amount, we should ask
-                if not weight_grams or result.get("weight_missing", True):
-                    await state.update_data(
-                        pending_water=True,
-                        intent="log"
-                    )
-                    await state.set_state(UniversalInputStates.waiting_for_weight)
-
-                    builder = InlineKeyboardBuilder()
-                    builder.button(text="❌ Отмена", callback_data="u_action_cancel")
-
-                    await msg.edit_text(
-                        f"🧐 Вы сказали: {text}\n"
-                        f"Это похоже на: <b>{name}</b>\n\n"
-                        f"💧 <b>Сколько миллилитров?</b> (Напишите число)",
-                        parse_mode="HTML",
-                        reply_markup=builder.as_markup()
-                    )
-                    return
-
-                # We have the amount, log it
-                amount_ml = int(weight_grams)
-                from database.models import WaterLog
-                async for session in get_db():
-                    log = WaterLog(
-                        user_id=user_id,
-                        amount_ml=amount_ml
-                    )
-                    session.add(log)
-                    await session.commit()
-
-                await target.answer(f"✅ Добавлено {amount_ml} мл воды!")
-
-                # Show updated dashboard
-                from handlers.menu import show_main_menu
-                await show_main_menu(msg, target.from_user.first_name, user_id)
-                return
-            # --------------------------
-
-            # Validate name quality
-            invalid_names = ["не указано", "unknown", "продукт", "еда", "блюдо"]
-            if name.lower() in invalid_names or len(name) < 2:
-                # Save context to ask for name
-                await state.update_data(
-                    pending_clarification={
-                        "weight_override": weight_override if weight_override else result.get("weight_grams"),
-                        "intent": "log"
-                    }
-                )
-                await state.set_state(UniversalInputStates.waiting_for_product_name)
-
-                await msg.edit_text(
-                    f"🤔 <b>Я понял вес ({weight_override if weight_override else '?' }г), но не понял, что это за продукт.</b>\n\n"
-                    "Пожалуйста, скажите или напишите название (или пришлите фото упаковки).",
-                    parse_mode="HTML"
-                )
-                return
-
             weight_grams = weight_override if weight_override else result.get("weight_grams")
-            weight_missing = result.get("weight_missing", True) if not weight_override else False
-            base_name = result.get("base_name")
+            weight_missing = result.get("weight_missing", True)
+            base_name = result.get("base_name", name)
 
-            if weight_missing:
+        # --- WATER INTERCEPTION ---
+        # If the user literally just drank water (or mineral water, hot water)
+        if name.lower() in ["вода", "минеральная вода", "кипяток", "water"]:
+            # If we don't know the amount, we should ask
+            if not weight_grams or weight_missing:
                 await state.update_data(
-                    pending_product={
-                        "name": name,
-                        "base_name": base_name,
-                        "calories100": calories,
-                        "protein100": protein,
-                        "fat100": fat,
-                        "carbs100": carbs,
-                        "fiber100": fiber
-                    },
+                    pending_water=True,
                     intent="log"
                 )
                 await state.set_state(UniversalInputStates.waiting_for_weight)
 
                 builder = InlineKeyboardBuilder()
-                builder.button(text="🔢 В штуках", callback_data="u_mode_qty")
                 builder.button(text="❌ Отмена", callback_data="u_action_cancel")
-                builder.adjust(1, 1)
 
                 await msg.edit_text(
-                    f"🧐 Вы сказали: <i>{text}</i>\n"
+                    f"🧐 Вы сказали: {text}\n"
                     f"Это похоже на: <b>{name}</b>\n\n"
-                    f"⚖️ <b>Сколько грамм?</b> (Напишите число)",
+                    f"💧 <b>Сколько миллилитров?</b> (Напишите число)",
                     parse_mode="HTML",
                     reply_markup=builder.as_markup()
                 )
                 return
 
-            # Recalculate if override
-            if weight_override:
-                factor = weight_override / 100.0
-                calories = calories * factor
-                protein = protein * factor
-                fat = fat * factor
-                carbs = carbs * factor
-                fiber = fiber * factor
+            # We have the amount, log it
+            amount_ml = int(weight_grams)
+            from database.models import WaterLog
+            async for session in get_db():
+                log = WaterLog(
+                    user_id=user_id,
+                    amount_ml=amount_ml
+                )
+                session.add(log)
+                await session.commit()
+
+            await target.answer(f"✅ Добавлено {amount_ml} мл воды!")
+
+            # Show updated dashboard
+            from handlers.menu import show_main_menu
+            await show_main_menu(msg, target.from_user.first_name, user_id)
+            return
+        # --------------------------
+
+        # Validate name quality
+        invalid_names = ["не указано", "unknown", "продукт", "еда", "блюдо"]
+        if name.lower() in invalid_names or len(name) < 2:
+            # Save context to ask for name
+            await state.update_data(
+                pending_clarification={
+                    "weight_override": weight_override if weight_override else weight_grams,
+                    "intent": "log"
+                }
+            )
+            await state.set_state(UniversalInputStates.waiting_for_product_name)
+
+            await msg.edit_text(
+                f"🤔 <b>Я понял вес ({weight_override if weight_override else '?' }г), но не понял, что это за продукт.</b>\n\n"
+                "Пожалуйста, скажите или напишите название (или пришлите фото упаковки).",
+                parse_mode="HTML"
+            )
+            return
+
+        # weight_grams, weight_missing, and base_name are already set in each flow above
+        if weight_missing:
+            await state.update_data(
+                pending_product={
+                    "name": name,
+                    "base_name": base_name,
+                    "calories100": calories,
+                    "protein100": protein,
+                    "fat100": fat,
+                    "carbs100": carbs,
+                    "fiber100": fiber
+                },
+                intent="log"
+            )
+            await state.set_state(UniversalInputStates.waiting_for_weight)
+
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🔢 В штуках", callback_data="u_mode_qty")
+            builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+            builder.adjust(1, 1)
+
+            await msg.edit_text(
+                f"🧐 Вы сказали: <i>{text}</i>\n"
+                f"Это похоже на: <b>{name}</b>\n\n"
+                f"⚖️ <b>Сколько грамм?</b> (Напишите число)",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            return
+
+        # Recalculate if override
+        if weight_override:
+            factor = weight_override / 100.0
+            logger.info(
+                "KBJU_FLOW universal_text apply_weight_override user_id=%s base=%r weight_override=%s factor=%s before={kcal:%s p:%s f:%s c:%s fi:%s}",
+                user_id,
+                base_name,
+                weight_override,
+                factor,
+                calories,
+                protein,
+                fat,
+                carbs,
+                fiber,
+            )
+            calories = calories * factor
+            protein = protein * factor
+            fat = fat * factor
+            carbs = carbs * factor
+            fiber = fiber * factor
+            logger.info(
+                "KBJU_FLOW universal_text apply_weight_override_done user_id=%s after={kcal:%s p:%s f:%s c:%s fi:%s}",
+                user_id,
+                calories,
+                protein,
+                fat,
+                carbs,
+                fiber,
+            )
 
         final_name = f"{name} ({weight_grams}г)" if weight_grams else name
 
@@ -938,6 +1018,19 @@ async def process_text_food_logging(
                 "carbs100": carbs,
                 "fiber100": fiber
             }
+        )
+
+        logger.info(
+            "KBJU_FLOW universal_text pending_product_ready user_id=%s final_name=%r base=%r saved_fields={kcal:%s p:%s f:%s c:%s fi:%s} weight_grams=%r",
+            user_id,
+            final_name,
+            base_name,
+            calories,
+            protein,
+            fat,
+            carbs,
+            fiber,
+            weight_grams,
         )
 
         # Redirect to I Ate Confirmation
@@ -1268,6 +1361,24 @@ async def process_herbalife_input(
             f"{warnings_text}",
             parse_mode="HTML"
         )
+
+        # AI Guide Contextual Advice (Separate Message)
+        async for session in get_db():
+            if await AIGuideService.is_active(user_id, session):
+                current_meal = {
+                    "name": final_name,
+                    "calories": nutr["calories"],
+                    "protein": nutr["protein"],
+                    "fat": nutr["fat"],
+                    "carbs": nutr["carbs"]
+                }
+                advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
+                if advice:
+                    await msg.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+            
+            # Track activity for Guide missions
+            await AIGuideService.track_activity(user_id, "log_herbalife", session)
+            break
 
     except Exception as e:
         logger.error(f"Herbalife Expert Error: {e}", exc_info=True)
@@ -1657,15 +1768,19 @@ def _render_batch_item_macros_menu(batch_items: list[dict], index: int) -> tuple
 @router.callback_query(F.data == "batch_confirm_now", StateFilter(UniversalInputStates.batch_confirmation, UniversalInputStates.batch_editing))
 async def batch_confirm_now(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Save all items with current time."""
+    await callback.answer()
     await batch_confirm_all(callback, state, datetime.now())
 
 @router.callback_query(F.data == "batch_ask_time", StateFilter(UniversalInputStates.batch_confirmation, UniversalInputStates.batch_editing))
 async def batch_ask_time(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Show time picker for the whole batch."""
+    await callback.answer()
     from utils.time_picker import get_time_picker_keyboard
     await state.set_state(UniversalInputStates.batch_time_selection)
     await callback.message.edit_text(
-        "🕓 <b>Когда вы это съели?</b>\n\nВыбранное время применится ко всем продуктам в списке:",
+        "🕓 <b>Когда вы это съели?</b>\n\n"
+        "Выбранное время применится ко всем продуктам в списке.\n"
+        "Выберите из пресетов или <b>введите время текстом</b> (например, <code>12:30</code>):",
         parse_mode="HTML",
         reply_markup=get_time_picker_keyboard("batch_time")
     )
@@ -1673,6 +1788,7 @@ async def batch_ask_time(callback: types.CallbackQuery, state: FSMContext) -> No
 @router.callback_query(F.data.startswith("batch_time:"), UniversalInputStates.batch_time_selection)
 async def process_batch_time_selection(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle time selection for batch."""
+    await callback.answer()
     if callback.data == "batch_time:back":
         # This is a placeholder for a potential back button in time picker,
         # but the current time picker doesn't have a "back" to batch summary.
@@ -1688,6 +1804,88 @@ async def process_batch_time_selection(callback: types.CallbackQuery, state: FSM
     from utils.time_picker import get_time_from_callback
     selected_time = get_time_from_callback(callback.data)
     await batch_confirm_all(callback, state, selected_time)
+
+@router.message(UniversalInputStates.batch_time_selection, F.text)
+async def process_batch_manual_time_input(message: types.Message, state: FSMContext) -> None:
+    """Handle manual text time input for batch."""
+    from utils.time_picker import parse_manual_time
+    
+    selected_time = parse_manual_time(message.text)
+    if not selected_time:
+        await message.reply(
+            "⚠️ <b>Некорректный формат времени</b>\n\n"
+            "Пожалуйста, введите время в формате <code>ЧЧ:ММ</code> (например, <code>12:30</code>) "
+            "или просто час (например, <code>15</code>).",
+            parse_mode="HTML"
+        )
+        return
+
+    await batch_confirm_all_from_message(message, state, selected_time)
+
+async def batch_confirm_all_from_message(message: types.Message, state: FSMContext, timestamp: datetime) -> None:
+    """Refactored batch save logic for message-based calls."""
+    data = await state.get_data()
+    batch_items = data.get("batch_items", [])
+    selected = [item for item in batch_items if item.get("selected", True)]
+
+    if not selected:
+        await message.answer("⚠️ Нет выбранных продуктов!")
+        return
+
+    user_id = message.from_user.id
+    saved_count = 0
+    total_cal = 0
+
+    async for session in get_db():
+        for item in selected:
+            log = ConsumptionLog(
+                user_id=user_id,
+                product_name=item['name'],
+                base_name=item.get('base_name'),
+                calories=item.get('calories'),
+                protein=item.get('protein'),
+                fat=item.get('fat'),
+                carbs=item.get('carbs'),
+                fiber=item.get('fiber', 0),
+                date=timestamp
+            )
+            session.add(log)
+            saved_count += 1
+            total_cal += (item.get('calories') or 0)
+        await session.commit()
+
+    await state.clear()
+    
+    time_str = timestamp.strftime("%H:%M")
+    await message.answer(
+        f"✅ <b>Записано {saved_count} поз.</b> ({time_str})\n"
+        f"🔥 Всего: <code>{int(total_cal)}</code> ккал",
+        parse_mode="HTML"
+    )
+
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(user_id, message.bot)
+
+    # AI Guide Contextual Advice (Follow-up message)
+    async for session in get_db():
+        if await AIGuideService.is_active(user_id, session):
+            # Sum up macros for the batch
+            sum_p = sum(item.get('protein', 0) for item in selected)
+            sum_f = sum(item.get('fat', 0) for item in selected)
+            sum_c = sum(item.get('carbs', 0) for item in selected)
+            current_meal = {
+                "name": f"Прием пищи ({saved_count} поз.)",
+                "calories": total_cal,
+                "protein": sum_p,
+                "fat": sum_f,
+                "carbs": sum_c
+            }
+            advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
+            if advice:
+                await message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+        
+        await AIGuideService.track_activity(user_id, "log_batch", session)
+        break
 
 async def batch_confirm_all(callback: types.CallbackQuery, state: FSMContext, timestamp: datetime) -> None:
     """Save all selected batch items to DB with specified timestamp."""
@@ -1730,6 +1928,28 @@ async def batch_confirm_all(callback: types.CallbackQuery, state: FSMContext, ti
         f"🔥 Общая калорийность: <b>{total_cal}</b> ккал",
         parse_mode="HTML"
     )
+
+    # AI Guide Contextual Advice (Follow-up message)
+    async for session in get_db():
+        if await AIGuideService.is_active(user_id, session):
+            # Sum up macros for the batch
+            sum_p = sum(item.get('protein', 0) for item in selected)
+            sum_f = sum(item.get('fat', 0) for item in selected)
+            sum_c = sum(item.get('carbs', 0) for item in selected)
+            current_meal = {
+                "name": f"Прием пищи ({saved_count} прод.)",
+                "calories": total_cal,
+                "protein": sum_p,
+                "fat": sum_f,
+                "carbs": sum_c,
+                "time": timestamp.strftime("%H:%M")
+            }
+            advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
+            if advice:
+                await callback.message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+        
+        await AIGuideService.track_activity(user_id, "log_batch", session)
+        break
 
     # NEW: Send visual progress card
     from services.reports import send_daily_visual_report

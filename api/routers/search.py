@@ -44,6 +44,8 @@ async def search_fridge(
             import json
             from datetime import datetime, timedelta
 
+            import pytz
+
             from database.models import UserSettings
 
             # Fetch User Settings
@@ -52,8 +54,11 @@ async def search_fridge(
 
             # Check Cache
             cached_data = None
+            msk_tz = pytz.timezone("Europe/Moscow")
+            now_msk = datetime.now(msk_tz).replace(tzinfo=None)
+
             if user_settings and user_settings.fridge_summary_cache and user_settings.fridge_summary_date:
-                if datetime.now() - user_settings.fridge_summary_date < timedelta(hours=24):
+                if now_msk - user_settings.fridge_summary_date < timedelta(hours=24):
                     try:
                         cached_data = json.loads(user_settings.fridge_summary_cache)
                         logger.info(f"AI Summary cache HIT for user {user.id}")
@@ -69,7 +74,7 @@ async def search_fridge(
                     if summary_data and user_settings:
                         # Update Cache
                         user_settings.fridge_summary_cache = json.dumps(summary_data, ensure_ascii=False)
-                        user_settings.fridge_summary_date = datetime.now()
+                        user_settings.fridge_summary_date = now_msk
                         session.add(user_settings)
                         await session.commit()
                         logger.info(f"AI Summary cache UPDATED for user {user.id}")

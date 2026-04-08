@@ -9,6 +9,7 @@ Contains:
 from datetime import datetime
 
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -24,6 +25,66 @@ class WeightStates(StatesGroup):
     """FSM states for weight tracking."""
     waiting_for_weight = State()
     waiting_for_morning_weight = State()
+
+
+def _try_parse_weight_value(text: str | None) -> float | None:
+    if not text:
+        return None
+    s = text.strip().replace(",", ".")
+    # Only accept pure number (avoid "58 кг", "вес 58", etc. for safety)
+    # Accept formats like "58", "58.5"
+    import re
+    if not re.fullmatch(r"\d+(?:\.\d+)?", s):
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+def is_weight_value(message: types.Message) -> bool:
+    """Filter to check if message text is a valid weight number."""
+    val = _try_parse_weight_value(message.text)
+    return val is not None and 20 <= val <= 300
+
+@router.message(StateFilter(None), is_weight_value)
+async def fallback_numeric_weight(message: types.Message) -> None:
+    """Fallback: if user sends just a number, treat as weight.
+    
+    This prevents losing morning-weight flow after bot restarts (in-memory FSM state is wiped).
+    """
+    weight = _try_parse_weight_value(message.text)
+    # Filter above ensures weight is not None and in range
+    
+    async for session in get_db():
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
+        settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        if not settings or not settings.reminder_time: # Changed from reminders_enabled as it might not exist or be different
+            # If no settings or reminders not configured, maybe still record?
+            # Actually, let's stick to the logic but be safer
+            pass
+
+        log = WeightLog(
+            user_id=message.from_user.id,
+            weight=weight,
+            recorded_at=datetime.now()
+        )
+        session.add(log)
+        
+        if settings:
+            settings.weight = weight
+        await session.commit()
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⚖️ К весу", callback_data="menu_weight")
+    builder.button(text="🏠 В меню", callback_data="main_menu")
+    builder.adjust(2)
+
+    await message.answer(
+        f"✅ Вес <b>{weight} кг</b> записан!",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data == "menu_weight")
@@ -72,6 +133,9 @@ async def show_weight_menu(callback: types.CallbackQuery) -> None:
         except Exception:
             await callback.message.delete()
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        from services.ai_guide import AIGuideService
+        await AIGuideService.track_activity(user_id, "weight", session)
+        
         await callback.answer()
 
 
@@ -135,6 +199,9 @@ async def save_weight(message: types.Message, state: FSMContext) -> None:
                 settings.weight = weight
 
             await session.commit()
+            
+            from services.ai_guide import AIGuideService
+            await AIGuideService.track_activity(message.from_user.id, "weight", session)
 
         await state.clear()
 

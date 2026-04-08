@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
+:root {
+    --ff-bg-dark: #0f1115;
+    --ff-surface: rgba(26, 29, 36, 0.6);
+    --ff-surface-border: rgba(255, 255, 255, 0.05);
+    --ff-accent: #10b981;
+    --ff-accent-glow: rgba(16, 185, 129, 0.4);
+}
+
 body {
-    background: #0a0a0a;
-    /* Fallback */
+    background: var(--ff-bg-dark);
     margin: 0;
     padding: 0;
+    font-family: 'Inter', sans-serif;
+    color: #f3f4f6;
+    -webkit-font-smoothing: antialiased;
 }
 
 .dynamic-bg {
-    @apply fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-neutral-950;
+    @apply fixed inset-0 z-[-1] overflow-hidden pointer-events-none;
+    background: radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.04), transparent 40%),
+        var(--ff-bg-dark);
 }
 
 .dynamic-bg img {
-    @apply w-full h-full object-cover scale-110 blur-[40px] opacity-60 transition-opacity duration-1000;
+    @apply w-full h-full object-cover scale-110 blur-[60px] opacity-30 transition-opacity duration-1000 mix-blend-screen;
 }
 
 .dynamic-bg::after {
     content: "";
-    @apply absolute inset-0 bg-gradient-to-b from-neutral-950/10 via-neutral-950/60 to-neutral-950;
+    @apply absolute inset-0 bg-neutral-950/60;
+}
+
+.glass-panel {
+    background: var(--ff-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--ff-surface-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.glass-pill {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-button {
+    background: rgba(16, 185, 129, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+    transition: all 0.2s ease;
+}
+
+.glass-button:active {
+    background: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+    transform: scale(0.96);
 }
 
 /* Grayscale filter fix if needed */
 .grayscale-30 {
     filter: grayscale(30%);
+}
+
+/* Premium Animations for Tier Badges */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.animate-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+}
+
+@keyframes neon-pulse {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.4)) drop-shadow(0 0 5px rgba(255, 215, 0, 0.2));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 15px rgba(255, 215, 0, 0.4));
+    }
+}
+
+.animate-pro-glow {
+    animation: neon-pulse 2s infinite ease-in-out;
+}
+
+.text-gold-shimmer {
+    background: linear-gradient(135deg, #ffd700 0%, #fffacb 25%, #ffd700 50%, #fffacb 75%, #ffd700 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 3s infinite linear;
 }

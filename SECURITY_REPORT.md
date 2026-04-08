@@ -1,181 +1,131 @@
-# 🔐 GitHub Push Security Report
-**Generated:** 2025-11-20 14:22  
-**Project:** FoodFlow Bot
+# Отчёт по безопасности FoodFlow Bot
+
+**Обновлён**: 2026-04-08 (актуализация по реальному коду)  
+**Оригинал**: 2025-11-20  
+**Проект**: FoodFlow Bot (`/home/user1/foodflow-bot_new/`)
 
 ---
 
-## ✅ SECURITY SCAN RESULTS
+## Результаты сканирования
 
-### 1. Sensitive Data Protection
-- ✅ **`.env` file excluded** from git via `.gitignore`
-- ✅ **`.env.example` created** with placeholder values
-- ✅ **No hardcoded credentials** found in Python source files
-- ✅ **API keys properly externalized** to environment variables
+### 1. Защита чувствительных данных
 
-### 2. Files Excluded from Git
-The following sensitive/temporary files are properly ignored:
-- `.env` (contains BOT_TOKEN, OPENROUTER_API_KEY)
-- `*.db` (SQLite databases)
-- `*.log` (log files)
-- `__pycache__/` and `*.pyc` (Python cache)
-- Temporary test files (ocr_results.json, test scripts)
+- `.env` файл исключён из git через `.gitignore` — статус неизменен
+- `.env.example` с плейсхолдерами присутствует
+- Жёстко закодированных секретов в Python-коде не обнаружено — всё вынесено в `config.py` через `pydantic-settings`
+- `config.py` содержит `ADMIN_IDS` и `PILOT_USER_IDS` — это не секреты, а конфигурация
 
-### 3. Git History Check
-- ✅ **Clean history** - no sensitive data in previous commits
-- ✅ **Initial commit** properly structured
+### 2. Переменные окружения
 
----
+Все чувствительные значения загружаются через `.env`:
+- `BOT_TOKEN`
+- `OPENROUTER_API_KEY`
+- `JWT_SECRET_KEY`
+- `GLOBAL_PASSWORD`
+- `YOOKASSA_SHOP_ID` / `YOOKASSA_SECRET_KEY`
 
-## 📋 CHANGES SUMMARY
+Файл БД (`foodflow.db`, `*.db-wal`, `*.db-shm`) — в `.gitignore`.
 
-### New Files Created
-1. **`.gitignore`** - Comprehensive Python/IDE/OS patterns
-2. **`.env.example`** - Template for environment variables
-3. **`README.md`** - Full project documentation
-4. **`LICENSE`** - MIT License
-5. **`SHOPPING_MODE_PLAN.md`** - Feature implementation plan
+### 3. Авторизация API (FastAPI)
 
-### Modified Files
-- `FoodFlow/database/models.py` - Added ConsumptionLog model
-- `FoodFlow/handlers/` - Updated receipt, fridge, common handlers
-- `FoodFlow/services/` - Updated OCR and normalization services
-- `FoodFlow/main.py` - Added correction router
-- `FoodFlow/requirements.txt` - Updated dependencies
-
-### Files Properly Excluded
-- `.env` (200 bytes) - **CRITICAL: Contains live credentials**
-- `foodflow.db` (69 KB) - Local database
-- `*.log` files - Runtime logs
-- Test/temporary files - OCR results, PDF extracts
+- JWT токены, срок действия 30 дней
+- Все защищённые эндпоинты используют зависимость `get_current_user` (`api/dependencies.py`)
+- Telegram Mini App авторизация через `initData` и `AUTH_TOKEN` header (`api/auth.py`)
 
 ---
 
-## ⚠️ SECURITY WARNINGS
+## Активные уязвимости
 
-### Critical Items
-1. **`.env` file exists** in project root with live credentials:
-   - `BOT_TOKEN=8587231248:AAEjcAj5N...` 
-   - `OPENROUTER_API_KEY=sk-or-v1-b5bcbc...`
-   
-   ✅ **Status:** Properly excluded via `.gitignore`
+### CORS wildcards (Серьёзно)
 
-### Recommendations
-1. ✅ Never commit `.env` file
-2. ✅ Rotate API keys if accidentally exposed
-3. ✅ Use `.env.example` for documentation
-4. ⚠️ Consider using secrets management (e.g., GitHub Secrets for CI/CD)
+**Файл**: `api/main.py` строка 56
 
----
-
-## 📦 DEPENDENCIES AUDIT
-
-### Current Dependencies (requirements.txt)
-- `aiogram` - Telegram Bot framework
-- `asyncpg` - PostgreSQL async driver
-- `aiosqlite` - SQLite async driver
-- `sqlalchemy` - ORM
-- `pydantic-settings` - Configuration management
-- `aiohttp` - HTTP client
-- `greenlet` - Async support
-
-### Security Status
-- ✅ No known critical vulnerabilities
-- ℹ️ Recommendation: Run `pip install --upgrade` periodically
-
----
-
-## 🧹 CODE QUALITY CHECKS
-
-### Completed Checks
-- ✅ No `console.log` statements (Python project)
-- ✅ No commented-out code blocks
-- ✅ No hardcoded credentials in source
-- ✅ Proper use of environment variables
-- ✅ Logging configured to file (`foodflow.log`)
-
-### Code Structure
-- ✅ Clear separation of concerns (handlers, services, database)
-- ✅ Async/await properly implemented
-- ✅ Type hints used in critical functions
-- ✅ Error handling in place
-
----
-
-## 📊 GIT STATUS
-
-### Staged Files (Ready to Commit)
-```
-new file:   .env.example
-new file:   .gitignore
-new file:   LICENSE
-new file:   README.md
-new file:   SHOPPING_MODE_PLAN.md
-modified:   FoodFlow/database/models.py
-modified:   FoodFlow/handlers/common.py
-modified:   FoodFlow/handlers/fridge.py
-modified:   FoodFlow/handlers/receipt.py
-modified:   FoodFlow/main.py
-modified:   FoodFlow/requirements.txt
-modified:   FoodFlow/services/ocr.py
-new file:   FoodFlow/handlers/correction.py
-new file:   FoodFlow/services/normalization.py
+```python
+allow_origins=["*"],
+allow_credentials=True,
 ```
 
-### Ignored Files (Not in Git)
-- `.env` (sensitive)
-- `*.db` (local data)
-- `*.log` (runtime logs)
-- `__pycache__/` (Python cache)
-- Test files (ocr_results.json, etc.)
+**Статус**: НЕ исправлено с аудита 2026-03-12.
+
+**Риск**: Любой сайт может выполнять кросс-origin запросы к API от имени авторизованного пользователя (CSRF). Сочетание `allow_origins=["*"]` с `allow_credentials=True` — классическая CORS-уязвимость.
+
+**Рекомендация**: Заменить `"*"` на конкретные домены вашего фронтенда и домен Telegram.
 
 ---
 
-## ✅ FINAL CHECKLIST
+### Нет rate limiting на AI-эндпоинты (Серьёзно)
 
-- [x] Security scan completed
-- [x] `.gitignore` comprehensive and tested
-- [x] `.env.example` created
-- [x] `README.md` with full documentation
-- [x] `LICENSE` file added (MIT)
-- [x] No sensitive data in staged files
-- [x] Code quality checks passed
-- [x] Project structure clean
-- [x] Dependencies documented
+**Файл**: `api/main.py`
+
+**Статус**: НЕ исправлено.
+
+**Риск**: Финансовый DoS. Один пользователь может вызвать сотни запросов к `/api/recognize/food`, `/api/recognize/label`, `/api/receipts/upload` — каждый запрос платный (Gemini, GPT-4).
+
+**Рекомендация**: `slowapi` или `fastapi-limiter`. Например: 10 req/min на `/recognize`, 5 req/min на `/receipts/upload`.
 
 ---
 
-## 🎯 READY TO PUSH
+## Статус зависимостей
 
-### Recommended Commit Message
-```
-feat: initial commit - FoodFlow Telegram Bot MVP
+### Текущие зависимости (requirements.txt, апрель 2026)
 
-- Telegram bot with receipt OCR processing
-- Virtual fridge management
-- AI-powered recipe generation
-- Product correction UI
-- Shopping mode planning (in progress)
-- Comprehensive documentation and security setup
-```
+| Пакет | Версия (установлена) | Назначение |
+|-------|---------------------|-----------|
+| aiogram | 3.26.0 | Telegram Bot Framework |
+| fastapi | 0.135.1 | REST API |
+| sqlalchemy | 2.0.48 | ORM (async) |
+| aiohttp | 3.13.3 | HTTP-клиент |
+| pydantic-settings | 2.13.1 | Конфигурация |
+| rapidfuzz | 3.14.3 | Fuzzy matching |
+| apscheduler | 3.11.2 | Планировщик задач |
+| yookassa | ≥3.3.0 | Платёжный провайдер |
+| asyncpg | ≥0.29.0 | PostgreSQL async (в зависимостях, но SQLite используется) |
 
-### Next Steps
-1. Review staged files: `git status`
-2. Commit changes: `git commit -m "feat: initial commit - FoodFlow Telegram Bot MVP"`
-3. Add remote: `git remote add origin https://github.com/yourusername/foodflow-bot.git`
-4. Push to GitHub: `git push -u origin master`
+**Примечание**: `asyncpg` в requirements.txt, но используется `aiosqlite`. Это лишняя зависимость.
 
----
-
-## 🔒 POST-PUSH SECURITY
-
-After pushing to GitHub:
-1. Verify `.env` is NOT in repository
-2. Enable GitHub Secret Scanning (if private repo)
-3. Consider adding GitHub Actions for CI/CD
-4. Set up Dependabot for security updates
+**Статус**: Критических CVE не выявлено (проверка по установленным версиям). Рекомендуется периодически выполнять `pip audit`.
 
 ---
 
-**Report Status:** ✅ APPROVED FOR PUSH  
-**Security Level:** 🟢 SECURE  
-**Documentation:** 🟢 COMPLETE
+## Качество кода (с точки зрения безопасности)
+
+- Нет синхронных HTTP-запросов (`requests`) в async-контексте — `requirements.txt` содержит комментарий об удалении `requests`
+- Async/await используется корректно в handlers и services
+- FSM состояния (aiogram) изолируют пользовательский контекст
+- Middleware `GroupFilterMiddleware` блокирует нежелательные групповые сообщения
+
+---
+
+## Логирование
+
+- Все события логируются в `foodflow.log`
+- `AdminLoggerMiddleware` пересылает апдейты администратору
+- **Проблема**: нет ротации логов — файл растёт неограниченно
+
+---
+
+## Чеклист безопасности
+
+- [x] `.env` исключён из git
+- [x] `.env.example` задокументирован
+- [x] Нет жёстко закодированных ключей в коде
+- [x] JWT авторизация в API
+- [x] Telegram `initData` верификация для Mini App
+- [ ] CORS: убрать wildcard, указать конкретные домены
+- [ ] Rate limiting на AI-эндпоинты
+- [ ] Ротация логов
+- [ ] `pip audit` / Dependabot для мониторинга CVE
+
+---
+
+## Рекомендуемые следующие шаги
+
+1. Исправить CORS: `allow_origins=["https://your-domain.com"]`
+2. Добавить `slowapi` rate limiting на `/api/recognize/*` и `/api/receipts/upload`
+3. Добавить `RotatingFileHandler` в main.py
+4. Удалить `asyncpg` из requirements.txt если PostgreSQL не используется
+5. Настроить `pip audit` или Dependabot в GitHub Actions
+
+---
+
+*Отчёт обновлён Claude Sonnet 4.6 на основе анализа реального кода. 2026-04-08.*

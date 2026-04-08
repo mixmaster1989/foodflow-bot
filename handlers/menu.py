@@ -16,14 +16,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 router = Router()
 
 
-@router.message(Command("start"))
-async def command_start_handler(message: Message, user_tier: str = "free") -> None:
-    """Handle /start command.
-
-    Args:
-        message: Telegram message object
-    """
-    await show_main_menu(message, message.from_user.first_name, message.from_user.id, user_tier)
 
 
 @router.message(F.text.in_({"🏠 Главное меню", "Меню", "Главное меню", "menu", "Menu"}))
@@ -36,9 +28,9 @@ async def menu_button_handler(message: types.Message, state: FSMContext, user_ti
 @router.callback_query(F.data == "main_menu")
 async def main_menu_callback_handler(callback: types.CallbackQuery, state: FSMContext, user_tier: str = "free") -> None:
     """Handle 'main_menu' callback to return to the dashboard."""
+    await callback.answer()
     await state.clear()  # Clear any active state!
     await show_main_menu(callback.message, callback.from_user.first_name, callback.from_user.id, user_tier)
-    await callback.answer()
 
 
 async def show_main_menu(message: types.Message, user_name: str, user_id: int, user_tier: str = "free") -> None:
@@ -66,7 +58,11 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     from sqlalchemy import and_, func, select
 
     from database.base import get_db
-    from database.models import ConsumptionLog, User, UserSettings, WaterLog
+    from database.models import ConsumptionLog, User, UserSettings, WaterLog, Subscription
+    
+    today = date.today()
+    logs = []
+    
     async for session in get_db():
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
@@ -75,12 +71,11 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
 
         # Check gender from settings
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
-        settings = (await session.execute(settings_stmt)).scalar_one_or_none()
-        if settings and settings.gender == "female":
+        settings_obj = (await session.execute(settings_stmt)).scalar_one_or_none()
+        if settings_obj and settings_obj.gender == "female":
             is_female = True
 
         # Get daily metrics (calories, macros) for display
-        today = date.today()
         metrics_stmt = select(
             func.sum(ConsumptionLog.calories),
             func.sum(ConsumptionLog.protein),
@@ -113,9 +108,43 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
         water_total = (await session.execute(water_stmt)).scalar() or 0
 
         goals = {
-            "calories": settings.calorie_goal if settings else 2000,
-            "water": settings.water_goal if settings else 2000
+            "calories": settings_obj.calorie_goal if settings_obj else 2000,
+            "water": settings_obj.water_goal if settings_obj else 2000
         }
+        
+        # 5. Get user subscription for the menu text
+        from datetime import datetime
+        sub_stmt = select(Subscription).where(Subscription.user_id == user_id)
+        sub = (await session.execute(sub_stmt)).scalar_one_or_none()
+        
+        sub_text_block = "🆓 FREE"
+        if sub and sub.is_active:
+            tier_icons = {"pro": "💎 PRO", "basic": "🌟 BASIC", "curator": "👑 CURATOR"}
+            tier_display = tier_icons.get(sub.tier, "🆓 FREE")
+            
+            if not sub.expires_at:
+                 sub_text_block = f"{tier_display} | Бессрочно ∞"
+            else:
+                 now_dt = datetime.now()
+                 if sub.expires_at < now_dt:
+                     sub_text_block = f"{tier_display} (Истекла)"
+                 else:
+                     diff = sub.expires_at - now_dt
+                     if diff.days > 0:
+                         sub_text_block = f"{tier_display} | Осталось: {diff.days} дн."
+                     else:
+                         hours = diff.seconds // 3600
+                         sub_text_block = f"{tier_display} | Осталось: {hours} ч."
+        
+        # 6. Get recent logs for the card
+        logs_stmt = select(ConsumptionLog).where(
+            and_(
+                ConsumptionLog.user_id == user_id,
+                func.date(ConsumptionLog.date) == today
+            )
+        ).order_by(ConsumptionLog.date.desc()).limit(10)
+        logs = (await session.execute(logs_stmt)).scalars().all()
+        break # One session is enough
 
     # Row 0: BIG "I ATE" button - gender aware
     ate_text = "🍽️ Я СЪЕЛА!" if is_female else "🍽️ Я СЪЕЛ!"
@@ -135,15 +164,27 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Row 3: Stats
     builder.button(text="📊 Статистика", callback_data="menu_stats")
     builder.button(text="⚖️ Вес", callback_data="menu_weight")
+    
+    # Row 3.5: AI Guide
+    builder.button(text="🤖 Личный Гид", callback_data="menu_guide")
 
     # Row 4: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
+    builder.button(text="💎 Подписки", callback_data="show_subscriptions")
+    builder.button(text="🎁 Рефералка", callback_data="referrals_menu")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
 
     # Row 5: Web App
-    if user_tier != "free":
-        from aiogram.types import WebAppInfo
-        builder.button(text="📱 FoodFlow App", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+    from aiogram.types import WebAppInfo
+    from api.auth import create_access_token
+    
+    token = create_access_token(data={"sub": user_id})
+    vk_app_link = f"https://vk.com/app54530169#token={token}"
+    
+    builder.button(text="🚀 FoodFlow в VK", url=vk_app_link)
+    builder.button(text="📱 App (TG)", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+    builder.button(text="🔑 Вход в App", callback_data="menu_web_login")
+
 
     # Row 6: Contact
     builder.button(text="📩 Написать разработчику", callback_data="menu_contact_dev")
@@ -151,29 +192,23 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Row 6: Admin
     from config import settings
     if message.from_user.id in settings.ADMIN_IDS:
-        builder.button(text="🔄 RESTART BOT", callback_data="admin_restart_bot")
-        builder.button(text="📨 НАПИСАТЬ ЮЗЕРУ", callback_data="admin_send_message")
+        builder.button(text="🔄 RESTART", callback_data="admin_restart_bot")
+        builder.button(text="📨 ЮЗЕРУ", callback_data="admin_send_message")
+        builder.button(text="💰 ЗВЕЗДЫ", callback_data="admin_view_stars")
+        builder.button(text="🖥️ HEALTH", callback_data="admin_healthcheck")
 
     # Layout depends on curator status
     if is_curator:
-        rows = [2, 1, 1, 1, 2, 2, 1, 1]  # I ATE/Water, Curator, Fridge, Recipes(1), Stats(2), System(2), WebApp(1), Contact(1)
+        rows = [2, 1, 1, 1, 2, 1, 3, 3, 2, 1]  # Added row for Guide
     else:
-        rows = [2, 1, 1, 2, 2, 1, 1]  # I ATE/Water, Fridge, Recipes(1), Stats(2), System(2), WebApp(1), Contact(1)
+        rows = [2, 1, 1, 1, 2, 1, 3, 2, 1]  # Added row for Guide
+    
     if message.from_user.id in settings.ADMIN_IDS:
-        rows.append(2)
-
+        # If admin, the last row (Row 6) has 4 buttons now
+        rows.append(4)
+    
     builder.adjust(*rows)
 
-    # Get recent logs for the card
-    logs = []
-    async for session in get_db():
-        stmt = select(ConsumptionLog).where(
-            and_(
-                ConsumptionLog.user_id == user_id,
-                func.date(ConsumptionLog.date) == today
-            )
-        ).order_by(ConsumptionLog.date.desc()).limit(10)
-        logs = (await session.execute(stmt)).scalars().all()
 
     # Generate the dynamic dashboard card
     from services.image_renderer import draw_daily_card
@@ -184,7 +219,8 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
 
     caption = (
         f"🍽️ <b>FoodFlow</b>\n\n"
-        f"Привет, <b>{user_name}</b>! 👋\n\n"
+        f"Привет, <b>{user_name}</b>! 👋\n"
+        f"💳 Уровень доступа: <b>{sub_text_block}</b>\n\n"
         f"📊 <b>Показатели сегодня:</b>\n"
         f"🔥 <code>{total_metrics['calories']:.0f} / {goals['calories']} ккал</code>\n"
         f"💧 <code>{water_total} / {goals['water']} мл</code>\n"
@@ -213,6 +249,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
 
 @router.callback_query(F.data == "menu_check")
 async def menu_check_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     """Show receipt upload instructions.
 
     Displays information about how to upload receipts
@@ -300,3 +337,61 @@ async def menu_help_handler(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "menu_web_login")
+async def menu_web_login_handler(callback: types.CallbackQuery) -> None:
+    """Show Telegram ID and individual password for web access."""
+    from utils.auth_utils import generate_user_password
+    from aiogram.types import WebAppInfo
+
+    user_id = callback.from_user.id
+    password = generate_user_password(user_id)
+    
+    # We use a special URL that might pre-fill the data or just the login page
+    web_app_url = "https://tretyakov-igor.tech/foodflow/"
+
+    text = (
+        "🔐 <b>Данные для входа в App</b>\n\n"
+        "Используй эти данные, если заходишь через ярлык на рабочем столе или PWA:\n\n"
+        f"👤 <b>Telegram ID:</b> <code>{user_id}</code>\n"
+        f"🔑 <b>Пароль:</b> <code>{password}</code>\n\n"
+        "☝️ <i>Нажми на ID или Пароль, чтобы скопировать.</i>\n\n"
+        "После ввода этих данных браузер запомнит тебя на 30 дней."
+    )
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📱 Открыть App", web_app=WebAppInfo(url=web_app_url))
+    builder.button(text="🔙 Назад", callback_data="main_menu")
+    builder.adjust(1, 1)
+
+    try:
+        # Try to delete original dashboard if it was a photo, to avoid confusion
+        # But here it's better to just answer or send new message if it was a photo
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.answer()
+    except Exception:
+        await callback.answer(text, show_alert=True)
+
+
+@router.message(Command("web"))
+async def web_link_command(message: types.Message) -> None:
+    """Generate a magic link for web access without Telegram."""
+    from api.auth import create_access_token
+    from utils.auth_utils import generate_user_password
+
+    user_id = message.from_user.id
+    token = create_access_token(data={"sub": user_id})
+    password = generate_user_password(user_id)
+
+    link = f"https://tretyakov-igor.tech/?token={token}"
+
+    text = (
+        "🌐 <b>Вход в Web-версию</b>\n\n"
+        "1. <b>Быстрый вход</b> (ссылка):</b>\n"
+        f"<code>{link}</code>\n\n"
+        "2. <b>Прямой вход</b> (для ярлыка):\n"
+        f"👤 ID: <code>{user_id}</code>\n"
+        f"🔑 Пароль: <code>{password}</code>\n\n"
+        "💡 <i>Совет: Сохрани ID и Пароль, они понадобятся, если браузер «забудет» тебя.</i>"
+    )
+
+    await message.answer(text, parse_mode="HTML")

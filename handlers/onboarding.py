@@ -3,6 +3,7 @@
 Contains:
 - OnboardingStates: FSM states for onboarding flow
 - start_onboarding: Start onboarding process
+- handle_source_selection: Handle acquisition source survey
 - handle_gender_selection: Handle gender selection
 - handle_height_input: Handle height input
 - handle_weight_input: Handle weight input
@@ -10,6 +11,7 @@ Contains:
 - finish_onboarding: Save data and complete onboarding
 """
 import io
+import json
 import logging
 
 from aiogram import Bot, F, Router, types
@@ -19,7 +21,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 
 from database.base import get_db
-from database.models import Product, UserSettings
+from database.models import Product, UserSettings, User, Subscription, UserFeedback
 from handlers.menu import show_main_menu
 from services.consultant import ConsultantService
 from services.nutrition_calculator import NutritionCalculator
@@ -29,18 +31,30 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
+# Acquisition source options
+ACQUISITION_SOURCES = {
+    "tg_ads": "📢 Реклама в Телеграм",
+    "friend": "👤 Рекомендация друга",
+    "social": "📱 Соцсети (Inst/VK/YT)",
+    "search": "🔍 Поиск в интернете",
+    "blogger": "🗣️ Блогер / инфлюенсер",
+    "herbalife": "🌿 Мероприятие Herbalife",
+    "other": "🔗 Другое",
+}
+
 
 class OnboardingStates(StatesGroup):
     """FSM states for onboarding flow."""
 
+    waiting_for_source = State()   # Acquisition source survey
     waiting_for_gender = State()
-    waiting_for_age = State()  # NEW: Age input
+    waiting_for_age = State()
     waiting_for_height = State()
     waiting_for_weight = State()
     waiting_for_goal = State()
-    waiting_for_calorie_confirmation = State() # NEW: Confirm calculated values
-    waiting_for_manual_calories = State()      # NEW: Manual calorie input
-    initializing_fridge = State()  # Scanning products for initial fridge setup
+    waiting_for_calorie_confirmation = State()
+    waiting_for_manual_calories = State()
+    initializing_fridge = State()
 
 
 async def start_onboarding(message: types.Message, state: FSMContext) -> None:
@@ -67,23 +81,78 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
             await show_main_menu(message, message.from_user.first_name, message.from_user.id)
             return
 
-        # Start onboarding
-        await state.set_state(OnboardingStates.waiting_for_gender)
+        # Start onboarding with acquisition source survey
+        await state.set_state(OnboardingStates.waiting_for_source)
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
-        builder.button(text="👩 Женский", callback_data="onboarding_gender:female")
+        for key, label in ACQUISITION_SOURCES.items():
+            builder.button(text=label, callback_data=f"onboarding_source:{key}")
         builder.adjust(2)
 
         welcome_text = (
             "👋 <b>Добро пожаловать в FoodFlow!</b>\n\n"
             "Я помогу тебе следить за питанием и управлять продуктами.\n\n"
-            "Для начала мне нужно узнать немного о тебе:\n\n"
-            "1️⃣ Выбери свой пол:"
+            "Для начала один вопрос:\n\n"
+            "📋 <b>Откуда вы о нас узнали?</b>"
         )
 
         await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
+
+@router.callback_query(F.data.startswith("onboarding_source:"))
+async def handle_source_selection(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle acquisition source survey answer.
+
+    Saves enriched user data (username, name, etc.) alongside the chosen source
+    to UserFeedback table for marketing analysis.
+    """
+    source_key = callback.data.split(":")[1]
+    source_label = ACQUISITION_SOURCES.get(source_key, source_key)
+    user = callback.from_user
+
+    # Save to UserFeedback with enriched profile
+    answer_data = json.dumps({
+        "source": source_key,
+        "source_label": source_label,
+        "user_id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "language_code": user.language_code,
+        "is_premium": getattr(user, "is_premium", False) or False,
+    }, ensure_ascii=False)
+
+    async for session in get_db():
+        fb = UserFeedback(
+            user_id=user.id,
+            feedback_type="acquisition_source",
+            answer=answer_data,
+        )
+        session.add(fb)
+        await session.commit()
+
+    logger.info(f"Acquisition source saved: user={user.id} source={source_key}")
+
+    # Transition to gender selection (step 1)
+    await state.set_state(OnboardingStates.waiting_for_gender)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
+    builder.button(text="👩 Женский", callback_data="onboarding_gender:female")
+    builder.adjust(2)
+
+    text = (
+        "<b>✅ Спасибо!</b>\n\n"
+        "Теперь мне нужно узнать немного о тебе:\n\n"
+        "1️⃣ Выбери свой пол:"
+    )
+
+    try:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("onboarding_gender:"))
 async def handle_gender_selection(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -106,7 +175,7 @@ async def handle_gender_selection(callback: types.CallbackQuery, state: FSMConte
 
     text = (
         "<b>✅ Пол сохранен!</b>\n\n"
-        "2️⃣ Введите свой <b>возраст</b> (полных лет):"
+        "2️⃣ Введите свой <b>возраст</b> (напишите числом прямо в чат ⌨️):"
     )
 
     try:
@@ -139,7 +208,7 @@ async def handle_age_input(message: types.Message, state: FSMContext) -> None:
 
         text = (
             "<b>✅ Возраст сохранен!</b>\n\n"
-            "3️⃣ Введите свой <b>рост</b> в сантиметрах (например: <code>175</code>):"
+            "3️⃣ Введите свой <b>рост</b> в сантиметрах (напишите числом прямо в чат ⌨️, например: <code>175</code>):"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -173,7 +242,7 @@ async def handle_height_input(message: types.Message, state: FSMContext) -> None
 
         text = (
             "<b>✅ Рост сохранен!</b>\n\n"
-            "4️⃣ Введите свой <b>вес</b> в килограммах (например: <code>70.5</code>):"
+            "4️⃣ Введите свой <b>вес</b> в килограммах (напишите прямо в чат ⌨️, например: <code>70.5</code>):"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -405,6 +474,11 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
             )
             session.add(sub)
 
+        # CRITICAL FIX: Mark user as verified so they never see password prompt again
+        user_db = await session.get(User, user_id)
+        if user_db:
+            user_db.is_verified = True
+
         await session.commit()
 
     await state.clear()
@@ -467,12 +541,42 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
         except Exception:
             await callback.message.delete()
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    elif step == "height":
-        await state.set_state(OnboardingStates.waiting_for_height)
+
+    elif step == "age":
+        await state.set_state(OnboardingStates.waiting_for_age)
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Назад", callback_data="onboarding_back:gender")
 
-        text = "2️⃣ Введите свой рост в сантиметрах (например: 175):"
+        text = "2️⃣ Введите свой возраст (напишите числом прямо в чат ⌨️):"
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+    elif step == "height":
+        await state.set_state(OnboardingStates.waiting_for_height)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 Назад", callback_data="onboarding_back:age")
+
+        text = "3️⃣ Введите свой рост в сантиметрах (напишите числом прямо в чат ⌨️, например: <code>175</code>):"
+        try:
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+    elif step == "goals":
+        # Goals selection step (before manual calories)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
+        builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
+        builder.button(text="🥗 Здоровое питание", callback_data="onboarding_goal:healthy")
+        builder.button(text="💪 Набрать массу", callback_data="onboarding_goal:gain_mass")
+        builder.adjust(2)
+
+        text = "5️⃣ Выбери свою <b>цель</b>:"
+        
         try:
             await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         except Exception:
@@ -499,11 +603,15 @@ async def start_fridge_initialization(callback: types.CallbackQuery, state: FSMC
         "Отправляй фото по одному или группой."
     )
 
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⏭️ Завершить (В Главное меню)", callback_data="onboarding_skip_fridge")
+    builder.adjust(1)
+
     # Check if we can edit or need to send new message
     try:
-        await callback.message.edit_text(text, parse_mode="HTML")
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML")
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
     await callback.answer()
 
@@ -653,7 +761,14 @@ async def process_single_photo(message: types.Message, bot: Bot, state: FSMConte
         )
 
     except Exception as exc:
-        await status_msg.edit_text(f"❌ Ошибка при распознавании: {exc}")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="⏭️ В Главное меню", callback_data="onboarding_skip_fridge")
+        builder.adjust(1)
+        await status_msg.edit_text(
+            f"❌ <b>Ошибка при распознавании:</b>\n<code>{exc}</code>\n\nПопробуйте ещё раз или перейдите в меню.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
 
 
 @router.callback_query(F.data == "onboarding_finish_fridge")

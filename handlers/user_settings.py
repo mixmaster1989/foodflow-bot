@@ -98,10 +98,11 @@ async def show_settings(callback: types.CallbackQuery) -> None:
         builder.button(text="✏️ Изменить профиль", callback_data="settings_edit_profile")
         builder.button(text="🎯 Изменить цели КБЖУ", callback_data="settings_edit_goals")
         builder.button(text="🚫 Изменить аллергии", callback_data="settings_edit_allergies")
+        builder.button(text="💎 Подписки", callback_data="show_subscriptions")
         builder.button(text="🕐 Время сводки", callback_data="settings_edit_summary_time")
         builder.button(text="⏰ Время напоминания", callback_data="settings_edit_reminder_time")
         builder.button(text="🔙 Назад", callback_data="main_menu")
-        builder.adjust(1, 1, 1, 2, 1)
+        builder.adjust(1, 1, 1, 1, 2, 1)
 
         # Image path
         photo_path = types.FSInputFile("assets/main_menu.png")

@@ -14,10 +14,9 @@ from sqlalchemy import select
 from database.base import get_db
 from database.models import Subscription
 
-logger = logging.getLogger(__name__)
+from config import settings
 
-# Development switch: set to True to unlock PRO features for everyone
-IS_BETA_TESTING = True
+logger = logging.getLogger(__name__)
 
 class PaywallMiddleware(BaseMiddleware):
     async def __call__(
@@ -42,7 +41,7 @@ class PaywallMiddleware(BaseMiddleware):
             break # Just need one session run
 
         # Global override for beta testing
-        if IS_BETA_TESTING:
+        if settings.IS_BETA_TESTING:
             tier = "pro"
 
         data["user_tier"] = tier
@@ -60,7 +59,10 @@ class PaywallMiddleware(BaseMiddleware):
                 return
 
             # Pro Tier requirements
-            # (Currently photo AI is via message, handled separately or here if we have a button)
+            pro_features = ["menu_guide", "guide_onboarding_start"]
+            if callback_data in pro_features and tier != "pro":
+                await self.show_paywall(event, "Личный ИИ-Гид", "Pro")
+                return
 
         return await handler(event, data)
 

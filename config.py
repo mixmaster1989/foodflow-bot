@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     GLOBAL_PASSWORD: str
     ADMIN_IDS: list[int] = [432823154]
+    PILOT_USER_IDS: list[int] = [33587682, 295543071, 432823154]  # Vasily, Olga, and Admin (User)
+    PAYMENT_PROVIDER_TOKEN: str | None = None  # Legacy Telegram payment token
+    YOOKASSA_SHOP_ID: str | None = None
+    YOOKASSA_SECRET_KEY: str | None = None
+    IS_BETA_TESTING: bool = True
+    MARKETING_GROUP_ID: int = 0
 
 
     # Paths

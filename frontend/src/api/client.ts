@@ -24,15 +24,44 @@ export const authApi = {
         });
         return response.data; // Returns { access_token: "..." }
     },
+    loginWithPassword: async (telegramId: number, password: string) => {
+        const response = await apiClient.post('/auth/login-password', {
+            telegram_id: telegramId,
+            password: password,
+        });
+        return response.data; // Returns { access_token: "..." }
+    },
+    loginWithEmail: async (email: string, password: string) => {
+        const response = await apiClient.post('/auth/web-login', { email, password });
+        return response.data; // Returns { access_token: "..." }
+    },
+    registerWithEmail: async (email: string, password: string, name: string) => {
+        const response = await apiClient.post('/auth/web-register', { email, password, name });
+        return response.data; // Returns { access_token: "..." }
+    },
     getMe: async () => {
         const response = await apiClient.get('/auth/me');
         return response.data;
     },
+    updateSettings: async (settings: any) => {
+        const response = await apiClient.patch('/auth/settings', settings);
+        return response.data;
+    }
 };
 
 export const fridgeApi = {
-    getProducts: async () => {
-        const response = await apiClient.get('/products');
+    getProducts: async (params?: { query?: string; page?: number; page_size?: number }) => {
+        const response = await apiClient.get('/products', { params });
+        return response.data;
+    },
+    getSummary: async () => {
+        const response = await apiClient.get('/products/summary');
+        return response.data;
+    },
+    scanLabel: async (file: Blob) => {
+        const formData = new FormData();
+        formData.append('file', file, 'label.jpg');
+        const response = await apiClient.post('/products/scan-label', formData);
         return response.data;
     },
     addProduct: async (data: any) => {
@@ -65,6 +94,10 @@ export const searchApi = {
 export const herbalifeApi = {
     search: async (q: string) => {
         const response = await apiClient.get('/herbalife/search', { params: { q } });
+        return response.data;
+    },
+    getProducts: async () => {
+        const response = await apiClient.get('/herbalife/products');
         return response.data;
     },
     calculate: async (productId: string, amount: number, unit: string) => {
@@ -108,21 +141,110 @@ export const shoppingApi = {
 };
 
 export const consumptionApi = {
-    getLogs: async (days: number = 7) => {
-        const response = await apiClient.get('/consumption', { params: { days } });
+    getLogs: async (params?: { days?: number, date?: string }) => {
+        const response = await apiClient.get('/consumption', { params });
         return response.data;
     },
     manualLog: async (data: any) => {
         const response = await apiClient.post('/consumption/manual', data);
         return response.data;
+    },
+    updateLog: async (id: number, data: any) => {
+        const response = await apiClient.patch(`/consumption/${id}`, data);
+        return response.data;
+    },
+    deleteLog: async (id: number) => {
+        await apiClient.delete(`/consumption/${id}`);
+    }
+};
+
+export const waterApi = {
+    getLogs: async (date?: string) => {
+        const response = await apiClient.get('/water', { params: { date } });
+        return response.data;
+    },
+    logWater: async (amount: number) => {
+        const response = await apiClient.post('/water', { amount_ml: amount });
+        return response.data;
+    },
+    deleteWater: async (id: number) => {
+        await apiClient.delete(`/water/${id}`);
+    }
+};
+
+export const recipesApi = {
+    getCategories: async () => {
+        const response = await apiClient.get('/recipes/categories');
+        return response.data;
+    },
+    generateRecipes: async (category: string, refresh: boolean = false) => {
+        const response = await apiClient.post('/recipes/generate', { category, refresh });
+        return response.data;
     }
 };
 
 export const statsApi = {
-    getDailyReport: async () => {
-        const response = await apiClient.get('/reports/daily');
+    getDailyReport: async (date?: string) => {
+        const response = await apiClient.get('/reports/daily', { params: { date } });
+        return response.data;
+    }
+};
+
+export const referralsApi = {
+    getMe: async () => {
+        const response = await apiClient.get('/referrals/me');
         return response.data;
     },
+    generateLink: async (days?: number) => {
+        const response = await apiClient.post('/referrals/generate_link', { days });
+        return response.data;
+    },
+    activateReward: async (rewardId: number) => {
+        const response = await apiClient.post('/referrals/activate_reward', { reward_id: rewardId });
+        return response.data;
+    }
+};
+
+export const weightApi = {
+    getLogs: async (limit: number = 30) => {
+        const response = await apiClient.get('/weight', { params: { limit } });
+        return response.data;
+    },
+    logWeight: async (weight: number) => {
+        const response = await apiClient.post('/weight', { weight });
+        return response.data;
+    }
+};
+
+export const receiptsApi = {
+    upload: async (file: Blob) => {
+        const formData = new FormData();
+        formData.append('file', file, 'receipt.jpg');
+        const response = await apiClient.post('/receipts/upload', formData);
+        return response.data;
+    },
+    addItem: async (receiptId: number, itemData: any) => {
+        const response = await apiClient.post(`/receipts/${receiptId}/items/add`, itemData);
+        return response.data;
+    }
+};
+
+export const savedDishesApi = {
+    getList: async () => {
+        const response = await apiClient.get('/saved-dishes');
+        return response.data;
+    },
+    create: async (data: any) => {
+        const response = await apiClient.post('/saved-dishes', data);
+        return response.data;
+    },
+    delete: async (id: number) => {
+        await apiClient.delete(`/saved-dishes/${id}`);
+    },
+    log: async (id: number, date?: string) => {
+        const response = await apiClient.post(`/saved-dishes/${id}/log`, { date });
+        return response.data;
+    }
 };
 
 export default apiClient;

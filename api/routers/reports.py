@@ -1,6 +1,6 @@
-"""Reports router for FoodFlow API."""
 from datetime import date, datetime
 
+import pytz
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
@@ -18,8 +18,10 @@ async def get_daily_report(
     target_date: date | None = Query(None, alias="date"),
 ):
     """Get daily nutrition summary."""
+    msk_tz = pytz.timezone("Europe/Moscow")
+
     if not target_date:
-        target_date = datetime.now().date()
+        target_date = datetime.now(msk_tz).date()
 
     # Fetch logs
     stmt = select(ConsumptionLog).where(
@@ -40,16 +42,22 @@ async def get_daily_report(
     settings = (await session.execute(settings_stmt)).scalar_one_or_none()
 
     calorie_goal = settings.calorie_goal if settings else 2000
+    protein_goal = settings.protein_goal if settings else 150
+    fat_goal = settings.fat_goal if settings else 70
+    carb_goal = settings.carb_goal if settings else 250
     fiber_goal = settings.fiber_goal if settings else 30
 
     return DailyReport(
         date=target_date.isoformat(),
-        calories_consumed=round(total_calories, 1),
+        calories_consumed=total_calories,
         calories_goal=calorie_goal,
-        protein=round(total_protein, 1),
-        fat=round(total_fat, 1),
-        carbs=round(total_carbs, 1),
-        fiber=round(total_fiber, 1),
+        protein=total_protein,
+        protein_goal=protein_goal,
+        fat=total_fat,
+        fat_goal=fat_goal,
+        carbs=total_carbs,
+        carb_goal=carb_goal,
+        fiber=total_fiber,
         fiber_goal=fiber_goal,
         meals_count=len(logs),
     )

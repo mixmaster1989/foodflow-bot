@@ -1,12 +1,21 @@
-"""Products router for FoodFlow API."""
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+import pytz
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 
 from api.auth import CurrentUser, DBSession
-from api.schemas import ConsumeRequest, ProductCreate, ProductList, ProductRead
+from api.schemas import (
+    ConsumeRequest,
+    FridgeSummary,
+    LabelParseResult,
+    ProductCreate,
+    ProductList,
+    ProductRead,
+)
 from database.models import ConsumptionLog, Product, Receipt
+from services.label_ocr import LabelOCRService
 
 router = APIRouter()
 
@@ -15,6 +24,7 @@ router = APIRouter()
 async def list_products(
     user: CurrentUser,
     session: DBSession,
+    query: str | None = Query(None, description="Search products by name"),
     page: int = Query(0, ge=0),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -24,16 +34,20 @@ async def list_products(
         select(func.count(Product.id))
         .where(Product.user_id == user.id)
     )
+    if query:
+        count_stmt = count_stmt.where(Product.name.ilike(f"%{query}%"))
+
     total = await session.scalar(count_stmt) or 0
 
     # Fetch page
     stmt = (
         select(Product)
         .where(Product.user_id == user.id)
-        .order_by(Product.id.desc())
-        .offset(page * page_size)
-        .limit(page_size)
     )
+    if query:
+        stmt = stmt.where(Product.name.ilike(f"%{query}%"))
+
+    stmt = stmt.order_by(Product.id.desc()).offset(page * page_size).limit(page_size)
     products = (await session.execute(stmt)).scalars().all()
 
     return ProductList(
@@ -42,6 +56,56 @@ async def list_products(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/summary", response_model=FridgeSummary)
+async def get_fridge_summary(user: CurrentUser, session: DBSession):
+    """Get fridge summary (bot parity)."""
+    # Total items
+    total_items = await session.scalar(
+        select(func.count(Product.id)).where(Product.user_id == user.id)
+    ) or 0
+
+    # Total calories (sum of calories * quantity)
+    total_calories = await session.scalar(
+        select(func.sum(Product.calories * Product.quantity)).where(Product.user_id == user.id)
+    ) or 0.0
+
+    # Recently added (last 5)
+    stmt = (
+        select(Product)
+        .where(Product.user_id == user.id)
+        .order_by(Product.id.desc())
+        .limit(5)
+    )
+    products = (await session.execute(stmt)).scalars().all()
+
+    return FridgeSummary(
+        total_items=total_items,
+        total_calories=total_calories,
+        recently_added=[ProductRead.model_validate(p) for p in products],
+    )
+
+
+@router.post("/scan-label", response_model=LabelParseResult)
+async def scan_product_label(
+    user: CurrentUser,
+    file: Annotated[UploadFile, File(description="Product label image")],
+):
+    """Scan product label (bot parity)."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_bytes = await file.read()
+    try:
+        result = await LabelOCRService.parse_label(image_bytes)
+        if not result:
+            raise HTTPException(status_code=422, detail="Failed to parse label")
+
+        return LabelParseResult(**result)
+    except Exception as e:
+        logger.error(f"Label OCR error: {e}")
+        raise HTTPException(status_code=500, detail="OCR processing error")
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -140,6 +204,8 @@ async def consume_product(
     carbs = product.carbs * factor if product.carbs else 0
     fiber = product.fiber * factor if product.fiber else 0
 
+    msk_tz = pytz.timezone("Europe/Moscow")
+
     # Create consumption log
     log = ConsumptionLog(
         user_id=user.id,
@@ -149,7 +215,7 @@ async def consume_product(
         fat=fat,
         carbs=carbs,
         fiber=fiber,
-        date=datetime.now(),
+        date=datetime.now(msk_tz).replace(tzinfo=None),
     )
     session.add(log)
 

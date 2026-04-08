@@ -128,10 +128,10 @@ async def main():
         duration = (datetime.now() - start_time).total_seconds()
 
         msg = (
-            f"📦 **Backup Created Successfully**\n"
+            f"📦 **Full Backup Created** (Bot, API, Frontend)\n"
             f"📂 Dir: `{timestamp}`\n"
             f"🗄️ DB: `{db_size_mb:.2f} MB`\n"
-            f"💻 Code: `{code_size_mb:.2f} MB`\n"
+            f"💻 Codebase: `{code_size_mb:.2f} MB`\n"
             f"⏱️ Time: `{duration:.1f}s`"
         )
         logger.info("Backup Completed Successfully")

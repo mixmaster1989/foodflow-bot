@@ -177,6 +177,8 @@ WEIGHT DETECTION RULES:
 - "банан 150" -> 150 grams
 - "банан 150г" -> 150 grams
 - "хлеб 40" -> 40 grams
+- "2 кг" -> 2000 grams (1 KG = 1000g, ALWAYS convert to grams)
+- "свинина 1.5 кг" -> 1500 grams
 - "2 яйца" -> ~120g (calculate based on count)
 - "тарелка борща" -> ~300g (estimate standard portion)
 - "банан" (no number) -> weight_missing: true (return per 100g)
@@ -215,13 +217,21 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
 
         import aiohttp
 
-        for model in cls.MODELS[:3]:  # Use first 3 models only
+        # Use gemini first because it strictly follows JSON-only instructions better than sonar/perplexity.
+        target_models = [
+            "google/gemini-2.5-flash-lite-preview-09-2025",
+            "openai/gpt-4o-mini",
+            "perplexity/sonar"
+        ]
+
+        for model in target_models:
             for attempt in range(2):
                 try:
                     payload = {
                         "model": model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.1
+                        "temperature": 0.1,
+                        "max_tokens": 3000
                     }
 
                     async with aiohttp.ClientSession() as session:
@@ -234,29 +244,45 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
                             if resp.status == 200:
                                 data = await resp.json()
                                 content = data["choices"][0]["message"]["content"].strip()
+                                logger.info(f"AI Raw Response ({model}): {content[:100]}")
 
-                                # Clean JSON
-                                if content.startswith("```"):
-                                    content = content.split("```")[1]
-                                    if content.startswith("json"):
-                                        content = content[4:]
-                                content = content.strip()
+                                # Robust JSON extraction
+                                first_brace = content.find('{')
+                                last_brace = content.rfind('}')
+                                if first_brace >= 0 and last_brace >= 0:
+                                    content = content[first_brace:last_brace+1]
+                                else:
+                                    # Basic cleaning
+                                    if content.startswith("```"):
+                                        content = content.split("```")[1]
+                                        if content.startswith("json"):
+                                            content = content[4:]
+                                    content = content.strip()
 
-                                result = json.loads(content)
-                                logger.info(f"Food intake analyzed: {result}")
-                                return result
+                                try:
+                                    result = json.loads(content)
+                                    logger.info(f"Food intake analyzed ({model}): {result}")
+                                    return result
+                                except json.JSONDecodeError as je:
+                                    logger.warning(f"JSON Decode Error ({model}): {je} Content: {content[:200]}")
+                                    continue
                 except Exception as e:
                     logger.error(f"analyze_food_intake error ({model}): {e}")
                     if attempt < 1:
                         await asyncio.sleep(0.3)
                         continue
 
-        # Fallback
+        # Fallback (Safety net with smart estimate if kg is present)
+        fallback_cal = 100
+        desc_low = description.lower()
+        if "кг" in desc_low or "kg" in desc_low:
+             fallback_cal = 500 # Slightly better guess than 100 for 'kg' inputs
+
         return {
             "name": description,
             "weight_grams": None,
             "weight_missing": True,
-            "calories": 100,
+            "calories": fallback_cal,
             "protein": 5,
             "fat": 3,
             "carbs": 15,
@@ -328,7 +354,8 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                     payload = {
                         "model": model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.1
+                        "temperature": 0.1,
+                        "max_tokens": 3000
                     }
 
                     async with aiohttp.ClientSession() as session:

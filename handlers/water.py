@@ -47,8 +47,18 @@ async def process_add_water(callback: types.CallbackQuery, state: FSMContext, us
         session.add(log)
         await session.commit()
 
+    from services.ai_guide import AIGuideService
+    
     await callback.answer(f"✅ Добавлено {amount_ml} мл воды!", show_alert=True)
-
-    # Return to main menu immediately to show updated dashboard
+    
+    # 1. Update main menu immediately First
     from handlers.menu import show_main_menu
     await show_main_menu(callback.message, callback.from_user.first_name, user_id, user_tier)
+
+    # 2. Get async advice in background and reply to the new menu
+    async for session_for_advice in get_db():
+        await AIGuideService.track_activity(user_id, "water", session_for_advice)
+        advice = await AIGuideService.get_water_advice(user_id, amount_ml, session_for_advice)
+        if advice:
+             await callback.message.answer(f"🤖 <b>Гид (Вода):</b> <i>{advice}</i>", parse_mode="HTML")
+

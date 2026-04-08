@@ -1,62 +1,102 @@
 import { useState, useEffect } from 'react'
-import { Loader2, ShoppingBasket, Apple, LayoutGrid, PlusCircle, Activity, Trash2, Utensils, Search as SearchIcon, X, Zap } from 'lucide-react'
+import { PlusCircle, Activity, Home } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
-import { fridgeApi, statsApi, searchApi } from './api/client'
+import { statsApi } from './api/client'
 import { AddProductModal } from './components/AddProductModal'
 import { ShoppingList } from './components/ShoppingList'
 import { ConsumptionHistory } from './components/ConsumptionHistory'
 import { QuickLogModal } from './components/QuickLogModal'
+import { WaterModal } from './components/WaterModal'
+import { Dashboard } from './components/Dashboard'
+import { Recipes } from './components/Recipes'
+import { Stats } from './components/Stats'
+import { Weight } from './components/Weight'
+import { Settings } from './components/Settings'
+import { Subscriptions } from './components/Subscriptions'
+import { Referrals } from './components/Referrals'
+import { CuratorDashboard } from './components/CuratorDashboard'
+import { AdminPanel } from './components/AdminPanel'
+import { Fridge } from './components/Fridge'
+import { HerbalifeCatalog } from './components/HerbalifeCatalog'
+import { PremiumSplashScreen } from './components/PremiumSplashScreen'
+import AIWhisper from './components/AIWhisper'
+import { LoginView } from './components/LoginView'
+import { WebOnboardingModal } from './components/WebOnboardingModal'
+const TierBadge: React.FC<{ tier: string }> = ({ tier }) => {
+  if (tier === 'pro') {
+    return (
+      <div className="flex flex-col items-end mr-2">
+        <span className="text-[8px] font-black text-amber-500 uppercase tracking-[0.2em] mb-0.5 animate-pulse">Ultimate</span>
+        <span className="text-lg font-black italic text-gold-shimmer animate-pro-glow leading-none">PRO 🚀</span>
+      </div>
+    );
+  }
+  if (tier === 'basic') {
+    return (
+      <div className="flex flex-col items-end mr-2">
+        <span className="text-[8px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Premium</span>
+        <span className="text-lg font-bold italic bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent leading-none drop-shadow-[0_0_10px_rgba(96,165,250,0.5)]">BASIC</span>
+      </div>
+    );
+  }
+  if (tier === 'curator') {
+    return (
+      <div className="flex flex-col items-end mr-2">
+        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-0.5 animate-pulse">Master</span>
+        <span className="text-lg font-black italic bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-600 bg-clip-text text-transparent leading-none drop-shadow-[0_0_15px_rgba(52,211,153,0.4)]">CURATOR</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end mr-2 opacity-60">
+      <span className="text-[8px] font-medium text-neutral-500 uppercase tracking-tighter mb-0.5">Standard</span>
+      <span className="text-lg font-bold text-neutral-400 leading-none">FREE</span>
+    </div>
+  );
+};
 
 function App() {
-  const { user, token, isLoading: authLoading, error: authError } = useAuth()
-  const [products, setProducts] = useState<any[]>([])
+  const {
+    user,
+    token,
+    isLoading: authLoading,
+    error: authError,
+    needsLogin,
+    loginWithPassword,
+    loginWithEmail,
+    registerWithEmail,
+    isCurator,
+    isPro,
+    isBasic,
+    isFree
+  } = useAuth()
+
   const [report, setReport] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
+  const [isWaterOpen, setIsWaterOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fridge' | 'shopping'>('fridge')
-
-  // Search & Summary State
-  const [searchQuery, setSearchQuery] = useState('')
-  const [aiSummary, setAiSummary] = useState<string | null>(null)
-  const [aiTags, setAiTags] = useState<any[]>([])
+  const [historyDate, setHistoryDate] = useState<Date | undefined>(undefined)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'fridge' | 'shopping' | 'recipes' | 'stats' | 'weight' | 'settings' | 'subscriptions' | 'referrals' | 'curator' | 'admin' | 'herbalife' | 'help' | 'contact'>('dashboard')
+  const [whisperTrigger, setWhisperTrigger] = useState<{ action: string; detail: string; timestamp: number } | null>(null)
   const [bgUrl, setBgUrl] = useState<string | null>(null)
 
-  // Fetch Data Function
-  const refreshData = async (query?: string) => {
+  // Fetch Data Function (Daily Report & BG)
+  const refreshData = async () => {
     if (!token) return
     setIsLoading(true)
     try {
-      // Background check - once per refresh
-      if (activeTab === 'fridge' && !query) {
+      // Background check
+      if (activeTab === 'fridge') {
         setBgUrl(`${import.meta.env.VITE_API_BASE_URL || ''}/api/assets/daily-bg?token=${token}&v=${new Date().getDate()}`)
       }
-
-      // Always fetch report to keep goals updated
-      const reportPromise = statsApi.getDailyReport()
-
-      if (query !== undefined || searchQuery) {
-        // Search Mode
-        const [searchData, reportData] = await Promise.all([
-          searchApi.fridge(query ?? searchQuery),
-          reportPromise
-        ])
-        setProducts(searchData.results || [])
-        setReport(reportData)
-      } else {
-        // Regular Mode + AI Summary
-        const [searchData, reportData] = await Promise.all([
-          searchApi.fridge('', true),
-          reportPromise
-        ])
-        setProducts(searchData.results || [])
-        setAiSummary(searchData.summary)
-        setAiTags(searchData.tags || [])
-        setReport(reportData)
-      }
+      const reportData = await statsApi.getDailyReport()
+      setReport(reportData)
     } catch (err) {
-      console.error('Data fetch error:', err)
+      console.error('Report fetch error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -64,62 +104,28 @@ function App() {
 
   useEffect(() => {
     refreshData()
-  }, [token])
+  }, [token, activeTab])
 
-  // Handle Search Input
+  // Force splash screen for at least 5s for "Wow Effect"
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        refreshData(searchQuery)
-      } else if (searchQuery === '') {
-        refreshData('')
-      }
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+    if (!authLoading) {
+      const timer = setTimeout(() => {
+        setShowSplash(false)
+        setWhisperTrigger({ action: 'greeting', detail: 'User just logged in', timestamp: Date.now() })
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [authLoading])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить продукт?')) return
-    try {
-      await fridgeApi.deleteProduct(id)
-      refreshData()
-    } catch (e) { alert('Ошибка удаления') }
-  }
-
-  const handleConsume = async (id: number, currentWeight: number) => {
-    const amount = prompt(`Сколько съесть (г)? (Всего: ${currentWeight}г)`, '100')
-    if (!amount) return
-    try {
-      await fridgeApi.consumeProduct(id, { amount: Number(amount), unit: 'grams' })
-      refreshData() // Update stats and fridge
-    } catch (e) { alert('Ошибка: ' + JSON.stringify(e)) }
-  }
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-emerald-500">
-        <Loader2 className="w-10 h-10 animate-spin mb-4" />
-        <p className="text-neutral-400 animate-pulse">Initializing FoodFlow...</p>
-      </div>
-    )
-  }
-
-  if (authError) {
+  if (authError && !needsLogin) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-8 text-center text-neutral-200">
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl mb-4">
           <p className="text-red-400 font-medium text-lg">Нет доступа</p>
           <p className="text-neutral-400 text-xs mt-2 font-mono break-all">{authError}</p>
         </div>
-        <p className="text-neutral-500 text-sm mb-6">
-          Телеграм не передал данные для входа.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full transition-colors"
-        >
-          Обновить
-        </button>
+        <p className="text-neutral-500 text-sm mb-6">Телеграм не передал данные для входа.</p>
+        <button onClick={() => window.location.reload()} className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full transition-colors">Обновить</button>
         <div className="mt-8">
           <a href="/foodflow/?mock=1" className="text-xs text-neutral-600 underline">Войти в демо-режим</a>
         </div>
@@ -127,252 +133,174 @@ function App() {
     )
   }
 
+  if (needsLogin) {
+    return <LoginView
+      onLogin={loginWithPassword}
+      onLoginEmail={loginWithEmail}
+      onRegister={registerWithEmail}
+    />
+  }
+
+  // Show onboarding modal for new web users who haven't set up their profile
+  const needsOnboarding = user && user.settings && user.settings.is_initialized === false
+
+  if (needsOnboarding) {
+    return <WebOnboardingModal onComplete={() => {
+      // Trigger auth reload to get fresh user data
+      window.location.reload()
+    }} />
+  }
+
   return (
-    <div className="min-h-screen text-neutral-100 font-sans p-4 pb-24 relative overflow-x-hidden">
-      {/* Dynamic Background Bomb 💣 */}
-      <div className="dynamic-bg">
-        {bgUrl && <img src={bgUrl} alt="" className={isLoading ? 'opacity-0' : 'opacity-40'} />}
-      </div>
+    <AnimatePresence mode="wait">
+      {showSplash ? (
+        <PremiumSplashScreen key="splash" tier={isCurator ? 'curator' : isPro ? 'pro' : isBasic ? 'basic' : 'free'} />
+      ) : (
+        <motion.div
+          key="main"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="min-h-screen text-neutral-100 font-sans p-4 pb-24 relative overflow-x-hidden"
+        >
+          <AIWhisper trigger={whisperTrigger} onComplete={() => setWhisperTrigger(null)} />
 
-      {/* Header */}
-      <header className="flex items-center justify-between mb-8 relative z-10">
-        <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-            FoodFlow
-          </h1>
-          <p className="text-neutral-500 text-sm">С возвращением, {user?.first_name || 'Шеф'}!</p>
-        </div>
-        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group overflow-hidden">
-          {/* Radiant avatar fallback */}
-          <div className="absolute inset-0 bg-emerald-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <Apple className="w-6 h-6 relative" />
-        </div>
-      </header>
+          <div className="dynamic-bg">
+            {bgUrl && <img src={bgUrl} alt="" className={isLoading ? 'opacity-0' : 'opacity-40'} />}
+          </div>
 
-      {activeTab === 'fridge' ? (
-        <>
-          {/* KBZU Overview */}
-          <section
-            onClick={() => setIsHistoryOpen(true)}
-            className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 mb-8 relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none"></div>
-
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-500" /> Цели на день
-              </h2>
-              <span className="text-emerald-500 text-sm font-bold">
-                {report && report.calories_goal ? Math.round((report.calories_consumed / report.calories_goal) * 100) : 0}%
-              </span>
+          <header className="flex items-center justify-between mb-8 relative z-10">
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">FoodFlow</h1>
+              <p className="text-neutral-500 text-sm">С возвращением, {user?.first_name || 'Шеф'}!</p>
             </div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-neutral-400">Калории</span>
-                  <span>{Math.round(report?.calories_consumed || 0)} / {report?.calories_goal || 2000} ккал</span>
-                </div>
-                <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                    style={{ width: `${Math.min(100, (report && report.calories_goal ? (report.calories_consumed / report.calories_goal) * 100 : 0))}%` }}
-                  ></div>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest leading-none mb-1">Ваш статус</p>
+                <TierBadge tier={isCurator ? 'curator' : isPro ? 'pro' : isBasic ? 'basic' : 'free'} />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: 'Белки', val: report?.protein, goal: report?.protein_goal || 150, color: 'bg-blue-400' },
-                  { label: 'Жиры', val: report?.fat, goal: report?.fat_goal || 70, color: 'bg-amber-400' },
-                  { label: 'Углев', val: report?.carbs, goal: report?.carb_goal || 250, color: 'bg-purple-400' }
-                ].map((p) => (
-                  <div key={p.label}>
-                    <p className="text-[10px] text-neutral-500 mb-1 font-medium uppercase tracking-wider">{p.label}</p>
-                    <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${p.color} transition-all duration-1000 ease-out`}
-                        style={{ width: `${Math.min(100, (p.val || 0) / (p.goal || 100) * 100) || 0}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-[10px] text-neutral-400 mt-1">{Math.round(p.val || 0)}г</p>
-                  </div>
-                ))}
+              <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden shadow-xl backdrop-blur-md">
+                <img
+                  src={`/logos/${isCurator ? 'curator' : isPro ? 'pro' : isBasic ? 'basic' : 'free'}.png`}
+                  alt="Tier"
+                  className="w-10 h-10 object-contain transition-transform group-hover:scale-110 duration-500"
+                />
               </div>
             </div>
-            <div className="mt-4 text-[10px] text-center text-neutral-600 uppercase tracking-widest font-bold">Нажми, чтобы увидеть историю</div>
-          </section>
+          </header>
 
-          {/* Fridge Section */}
-          <section>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-lg flex items-center gap-2">
-                <LayoutGrid className="w-5 h-5 text-amber-500" /> Холодильник
-              </h2>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="text-emerald-500 text-sm font-medium px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full"
-              >
-                + Добавить
+          <main className="max-w-2xl mx-auto space-y-6">
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                user={user}
+                report={report}
+                onNavigate={setActiveTab}
+                onOpenQuickLog={() => setIsQuickLogOpen(true)}
+                onOpenWater={() => setIsWaterOpen(true)}
+                onOpenHistory={() => setIsHistoryOpen(true)}
+              />
+            )}
+            {activeTab === 'fridge' && <Fridge user={user} onNavigate={setActiveTab} onRefresh={refreshData} />}
+            {activeTab === 'shopping' && (
+              <>
+                <div className="flex items-center gap-2 mb-6 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+                  <Home className="w-5 h-5 text-blue-500" />
+                  <span className="text-blue-500 font-medium text-sm">На главную</span>
+                </div>
+                <ShoppingList onBought={refreshData} />
+              </>
+            )}
+            {activeTab === 'recipes' && <Recipes onNavigate={setActiveTab} />}
+            {activeTab === 'stats' && <Stats onNavigate={setActiveTab} onOpenHistory={() => { setIsHistoryOpen(true); }} />}
+            {activeTab === 'weight' && <Weight user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'settings' && <Settings user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'subscriptions' && <Subscriptions user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'referrals' && <Referrals user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'curator' && <CuratorDashboard user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'admin' && <AdminPanel user={user} onNavigate={setActiveTab} />}
+            {activeTab === 'herbalife' && <HerbalifeCatalog />}
+            {activeTab === 'help' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                <h2 className="text-xl font-bold mb-4">Помощь и поддержка</h2>
+                <div className="space-y-4">
+                  <p className="text-neutral-300">Наш бот всегда поможет вам с вопросами питания.</p>
+                  <a href="https://t.me/FoodFlow2026bot" target="_blank" className="block p-4 bg-neutral-800 rounded-2xl hover:bg-neutral-700 transition-colors">Написать в поддержку</a>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer className="fixed bottom-6 left-4 right-4 bg-neutral-900/80 backdrop-blur-2xl border border-neutral-800 rounded-[2rem] py-3 px-8 flex justify-between items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50">
+            <button className={`p-2 transition-colors ${activeTab === 'dashboard' ? 'text-emerald-500' : 'text-neutral-500'}`} onClick={() => setActiveTab('dashboard')}>
+              <Home className="w-6 h-6" />
+            </button>
+            <button
+              className={`p-2 transition-colors ${activeTab === 'fridge' ? 'text-emerald-500' : 'text-neutral-500'} ${isFree ? 'opacity-30' : ''}`}
+              onClick={() => {
+                if (isFree) { alert('🧊 Умный Холодильник доступен в тарифе Basic и выше!'); return; }
+                setActiveTab('fridge');
+              }}
+            >
+              <div className="relative">
+                <div className="w-6 h-6 flex items-center justify-center">🧊</div>
+                {isFree && <div className="absolute -top-1 -right-1 text-[8px]">🔒</div>}
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                if (isFree) { setActiveTab('subscriptions'); return; }
+                setActiveTab('recipes');
+              }}
+              className={`p-2 transition-colors ${activeTab === 'recipes' ? 'text-emerald-500' : 'text-neutral-500'} ${isFree ? 'opacity-30' : ''}`}
+            >
+              <div className="relative">
+                <div className="w-6 h-6 flex items-center justify-center">👨‍🍳</div>
+                {isFree && <div className="absolute -top-1 -right-1 text-[8px]">🔒</div>}
+              </div>
+            </button>
+            <div className="relative">
+              <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20"></div>
+              <button className="relative bg-emerald-500 p-4 rounded-full -mt-12 border-[6px] border-neutral-950 shadow-lg active:scale-90 transition-transform hover:bg-emerald-400" onClick={() => setIsModalOpen(true)}>
+                <PlusCircle className="w-7 h-7 text-white" />
               </button>
             </div>
-
-            {/* AI Tags */}
-            {aiTags.length > 0 && !searchQuery && (
-              <div className="flex gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar">
-                {aiTags.map((tag, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSearchQuery(tag.tag)}
-                    className="flex-shrink-0 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 hover:border-emerald-500 transition-colors"
-                  >
-                    <span>{tag.emoji}</span>
-                    <span>{tag.tag}</span>
-                  </button>
-                ))}
+            <button
+              onClick={() => {
+                if (isFree) { setActiveTab('subscriptions'); return; }
+                setActiveTab('stats');
+              }}
+              className={`p-2 transition-colors ${activeTab === 'stats' ? 'text-emerald-500' : 'text-neutral-500'} ${isFree ? 'opacity-30' : ''}`}
+            >
+              <div className="relative">
+                <div className="w-6 h-6 flex items-center justify-center">📊</div>
+                {isFree && <div className="absolute -top-1 -right-1 text-[8px]">🔒</div>}
               </div>
-            )}
-
-            {/* Search Bar */}
-            <div className="relative mb-6">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск продуктов..."
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:border-emerald-500 transition-all font-medium"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2"
-                >
-                  <X className="w-4 h-4 text-neutral-500" />
-                </button>
-              )}
+            </button>
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20"></div>
+              <button
+                className={`relative z-10 p-3 rounded-full border transition-all active:scale-95 ${isHistoryOpen ? 'bg-blue-500 text-white border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-white hover:border-blue-500'}`}
+                onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+              >
+                <Activity className="w-5 h-5" />
+              </button>
             </div>
+          </footer>
 
-            {/* AI Summary Card */}
-            {aiSummary && !searchQuery && (
-              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 mb-6 relative group overflow-hidden">
-                <div className="absolute top-0 right-0 p-2 opacity-20"><Activity className="w-8 h-8" /></div>
-                <p className="text-xs text-emerald-400 font-medium mb-1 uppercase tracking-wider flex items-center gap-1.5">
-                  🤖 AI РЕВИЗИЯ
-                </p>
-                <p className="text-xs text-neutral-400 italic">"{aiSummary}"</p>
-              </div>
-            )}
+          <div className="fixed bottom-24 right-6 z-40 flex flex-col gap-3">
+            <button onClick={() => setIsWaterOpen(true)} className="p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 transform hover:scale-110 active:scale-95 transition-all">💧</button>
+            <button onClick={() => setIsQuickLogOpen(true)} className="p-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 transform hover:scale-110 active:scale-95 transition-all">⚡</button>
+          </div>
 
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-16 bg-neutral-900/50 border border-neutral-800 rounded-2xl animate-pulse"></div>
-                ))}
-              </div>
-            ) : products.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3">
-                {products.map((item) => (
-                  <div key={item.id} className="group flex items-center justify-between p-4 bg-neutral-900/40 backdrop-blur-md border border-white/5 rounded-2xl hover:border-emerald-500/30 transition-all hover:translate-x-1 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-neutral-950 border border-white/5 flex items-center justify-center group-hover:bg-emerald-500/10 transition-colors overflow-hidden relative">
-                        {item.photo_url ? (
-                          <img src={item.photo_url} className="w-full h-full object-cover" alt={item.name} />
-                        ) : (
-                          <div className="relative w-full h-full flex items-center justify-center">
-                            <img
-                              src={`${import.meta.env.VITE_API_BASE_URL || ''}/api/assets/icon/${encodeURIComponent(item.name)}?token=${token}`}
-                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                              alt={item.name}
-                              onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
-                            />
-                            <Apple className="w-5 h-5 text-neutral-600 absolute hidden" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
-                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{item.weight_g}г • {Math.round(item.calories)} ккал</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleConsume(item.id, item.weight_g || 100)}
-                        className="p-2 text-neutral-400 hover:text-emerald-500 bg-neutral-800 rounded-full"
-                      >
-                        <Utensils className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-2 text-neutral-400 hover:text-red-500 bg-neutral-800 rounded-full"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center bg-neutral-900/30 border border-dashed border-neutral-800 rounded-3xl">
-                <p className="text-neutral-500 text-sm">В холодильнике пусто</p>
-                <p className="text-xs text-neutral-600 mt-1">Добавьте продукты, чтобы следить за питанием</p>
-              </div>
-            )}
-          </section>
-        </>
-      ) : (
-        <ShoppingList onBought={refreshData} />
+          <QuickLogModal isOpen={isQuickLogOpen} onClose={() => setIsQuickLogOpen(false)} onSuccess={refreshData} />
+          <AddProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={refreshData} />
+          <ConsumptionHistory isOpen={isHistoryOpen} onClose={() => { setIsHistoryOpen(false); setHistoryDate(undefined); }} targetDate={historyDate} />
+          <WaterModal isOpen={isWaterOpen} onClose={() => setIsWaterOpen(false)} onSuccess={refreshData} />
+        </motion.div>
       )}
-
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-6 left-4 right-4 bg-neutral-900/80 backdrop-blur-2xl border border-neutral-800 rounded-[2rem] py-3 px-8 flex justify-between items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50">
-        <button
-          className={`p-2 transition-colors ${activeTab === 'fridge' ? 'text-emerald-500' : 'text-neutral-500'}`}
-          onClick={() => setActiveTab('fridge')}
-        >
-          <LayoutGrid className="w-6 h-6" />
-        </button>
-        <div className="relative">
-          <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20"></div>
-          <button
-            className="relative bg-emerald-500 p-4 rounded-full -mt-12 border-[6px] border-neutral-950 shadow-lg active:scale-90 transition-transform hover:bg-emerald-400"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <PlusCircle className="w-7 h-7 text-white" />
-          </button>
-        </div>
-        <button
-          className={`p-2 transition-colors ${activeTab === 'shopping' ? 'text-blue-500' : 'text-neutral-500'}`}
-          onClick={() => setActiveTab('shopping')}
-        >
-          <ShoppingBasket className="w-6 h-6" />
-        </button>
-        <div className="relative">
-          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20"></div>
-          <button
-            className="relative z-10 p-3 bg-neutral-800 rounded-full border border-neutral-700 text-neutral-400 hover:text-white hover:border-blue-500 transition-all active:scale-95"
-            onClick={() => setIsQuickLogOpen(true)}
-          >
-            <Zap className="w-5 h-5" />
-          </button>
-        </div>
-      </nav>
-
-      {/* Modals */}
-      <QuickLogModal
-        isOpen={isQuickLogOpen}
-        onClose={() => setIsQuickLogOpen(false)}
-        onSuccess={refreshData}
-      />
-      <AddProductModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={refreshData}
-      />
-      <ConsumptionHistory
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-      />
-    </div>
+    </AnimatePresence>
   )
 }
+
 
 export default App

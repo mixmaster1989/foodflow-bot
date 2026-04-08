@@ -17,7 +17,8 @@ from aiogram.types import (
 from sqlalchemy.future import select
 
 from database.base import get_db
-from database.models import User, UserSettings
+from database.models import User, UserSettings, ReferralEvent, ReferralReward
+from services.referral_service import ReferralService
 from handlers.menu import show_main_menu
 from handlers.onboarding import start_onboarding
 
@@ -71,6 +72,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """
     # Parse deep link for referral token: /start ref_abc123 OR marathon invite: /start m_101
     referral_token = None
+    ad_campaign = None
     marathon_invite_id = None
     curator = None
 
@@ -80,6 +82,9 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             referral_token = args[4:]
         elif args.startswith("m_"):
             marathon_invite_id = args[2:]
+        elif args.startswith("ad_"):
+            # рекламная кампания, например /start ad_launch2026
+            ad_campaign = args[3:]
 
     async for session in get_db():
         # Handle Marathon Invite
@@ -131,6 +136,8 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 
+        is_new_user = user is None
+
         if not user:
             # Create new user, optionally linked to curator
             # If coming via referral link, auto-verify (no password needed)
@@ -139,8 +146,17 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 id=message.from_user.id,
                 username=message.from_user.username,
                 curator_id=curator.id if curator else None,
-                is_verified=True if curator else False
+                # CRITICAL: Pioneers (ad_campaign) and Ref-users are verified automatically
+                is_verified=True if (curator or ad_campaign) else False,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name,
+                language_code=message.from_user.language_code
             )
+
+            # Referral: remember who invited this user
+            if referral_token and curator:
+                user.invited_by_id = curator.id
+
             session.add(user)
             await session.commit()
 
@@ -183,6 +199,46 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 except Exception:
                     pass
                 await bot.session.close()
+
+        # Handle ad / referral Pro bonus for brand new users only
+        # Личная реф-ссылка даёт бонус только если есть валидный curator (не просрочен).
+        if is_new_user and (ad_campaign or (referral_token and curator)):
+            try:
+                reward = ReferralReward(
+                    user_id=user.id,
+                    reward_type="pro_days",
+                    days=3,
+                    source="ad_campaign" if ad_campaign else "ref_start",
+                )
+                session.add(reward)
+                await session.commit()
+
+                # Автоактивация бонуса (3 дня Pro)
+                await ReferralService.activate_reward(user_id=user.id, reward_id=reward.id)
+
+                # Логируем signup event для реферала
+                if referral_token and curator:
+                    event = ReferralEvent(
+                        referrer_id=curator.id,
+                        invitee_id=user.id,
+                        event_type="signup",
+                        tier="pro",
+                        created_at=datetime.now(),
+                    )
+                    session.add(event)
+                    await session.commit()
+            except Exception as e:
+                # Не ломаем /start, просто логируем
+                import logging
+
+                logging.getLogger(__name__).error(f"[REFERRAL] Failed to grant start Pro bonus for user {user.id}: {e}", exc_info=True)
+
+        # CRITICAL FIX: Make sure user is verified AFTER finishing onboarding
+        # This ensures they NEVER see the password prompt again
+        user_db = await session.get(User, message.from_user.id)
+        if user_db:
+            user_db.is_verified = True
+            await session.commit()
 
         # Check if user has completed onboarding
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)

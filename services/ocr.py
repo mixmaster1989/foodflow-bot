@@ -33,7 +33,7 @@ class OCRService:
 
     MODELS: list[str] = [
         "qwen/qwen2.5-vl-32b-instruct:free",          # Free 1: Best quality
-        "google/gemini-2.0-flash-exp:free",           # Free 2: Fast & Smart
+        "qwen/qwen3.6-plus:free",                     # Free 2: Fast & Smart
         "mistralai/mistral-small-3.2-24b-instruct:free", # Free 3: Working & Multimodal
         "google/gemini-2.5-flash-lite-preview-09-2025", # Paid 1: Cheapest ($0.00016), 7 items
         "openai/gpt-4.1-mini",                        # Paid 2: Fastest (471ms), 7 items

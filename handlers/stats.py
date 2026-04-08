@@ -7,7 +7,7 @@ Contains:
 import logging
 from datetime import datetime, timedelta
 
-from aiogram import F, Router, types
+from aiogram import Bot, F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import func, select
 
@@ -124,9 +124,17 @@ async def stats_placeholder(callback: types.CallbackQuery) -> None:
     await callback.answer("Скоро будет доступно!", show_alert=True)
 
 
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
+class EditLogStates(StatesGroup):
+    """FSM states for editing consumption log."""
+    waiting_for_field_value = State()
+
+
 @router.callback_query(F.data.startswith("stats_history"))
 async def stats_history_handler(callback: types.CallbackQuery) -> None:
-    """Show consumption logs with delete buttons for specific date."""
+    """Show consumption logs with edit/delete buttons for specific date."""
     parts = callback.data.split(":")
 
     # Check if date is provided
@@ -138,7 +146,7 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
             pass
 
     user_id = callback.from_user.id
-    logger.info(f"📝 User {user_id} requested sexy history for {target_date}")
+    logger.info(f"📝 User {user_id} requested history for {target_date}")
 
     from services.reports import generate_detailed_report
     text = await generate_detailed_report(user_id, target_date)
@@ -156,15 +164,24 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
     builder = InlineKeyboardBuilder()
 
     if logs:
-        text += "\n\n<i>Нажми 🗑️ чтобы удалить запись:</i>"
+        text += "\n\n<i>Нажми ✏️ для правки или 🗑️ для удаления:</i>"
         for log in logs:
             cal = int(log.calories) if log.calories else 0
-            # Pass date to delete handler so it returns to correct date
-            builder.button(text=f"🗑️ {log.product_name[:20]} ({cal})", callback_data=f"delete_log:{log.id}:{target_date}")
+            time_str = log.date.strftime("%H:%M")
+            # Edit button
+            builder.button(
+                text=f"✏️ {time_str} {log.product_name[:15]}", 
+                callback_data=f"edit_log_show_fields:{log.id}:{target_date}"
+            )
+            # Delete button
+            builder.button(
+                text="🗑️", 
+                callback_data=f"delete_log:{log.id}:{target_date}"
+            )
 
-        builder.adjust(1)
+        builder.adjust(2) # Pair edit and delete buttons
 
-    builder.button(text="🔙 Назад", callback_data=f"menu_stats:{target_date}")
+    builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data=f"menu_stats:{target_date}"))
 
     try:
         await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
@@ -207,4 +224,152 @@ async def delete_log_handler(callback: types.CallbackQuery) -> None:
         # Default today
         callback.data = "stats_history"
         await stats_history_handler(callback)
+
+
+@router.callback_query(F.data.startswith("edit_log_show_fields:"))
+async def edit_log_show_fields(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show menu of fields to edit for a consumption log."""
+    parts = callback.data.split(":")
+    log_id = int(parts[1])
+    target_date = parts[2]
+
+    async for session in get_db():
+        log = await session.get(ConsumptionLog, log_id)
+        if not log or log.user_id != callback.from_user.id:
+            await callback.answer("⚠️ Запись не найдена", show_alert=True)
+            return
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="1. Название", callback_data=f"edit_log_field:{log_id}:product_name:{target_date}")
+        builder.button(text="2. 🕒 Время", callback_data=f"edit_log_field:{log_id}:date:{target_date}")
+        builder.button(text="3. 🔥 Калории", callback_data=f"edit_log_field:{log_id}:calories:{target_date}")
+        builder.button(text="4. 🥩 Белки", callback_data=f"edit_log_field:{log_id}:protein:{target_date}")
+        builder.button(text="5. 🥑 Жиры", callback_data=f"edit_log_field:{log_id}:fat:{target_date}")
+        builder.button(text="6. 🍞 Углеводы", callback_data=f"edit_log_field:{log_id}:carbs:{target_date}")
+        builder.button(text="7. 🥬 Клетчатка", callback_data=f"edit_log_field:{log_id}:fiber:{target_date}")
+        
+        builder.adjust(2)
+        builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data=f"stats_history:{target_date}"))
+
+        text = (
+            f"✏️ <b>Редактирование записи</b>\n\n"
+            f"▫️ {log.product_name}\n"
+            f"🕒 {log.date.strftime('%H:%M')}\n"
+            f"🔥 {log.calories} ккал\n"
+            f"📦 Б:{log.protein} Ж:{log.fat} У:{log.carbs} Кл:{log.fiber or 0}"
+        )
+
+        try:
+            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=builder.as_markup())
+        except Exception:
+            try:
+                await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+            except Exception:
+                await callback.message.delete()
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        await callback.answer()
+
+
+@router.callback_query(F.data.startswith("edit_log_field:"))
+async def edit_log_select_field(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start editing a specific field of a consumption log."""
+    parts = callback.data.split(":")
+    log_id = int(parts[1])
+    field = parts[2]
+    target_date = parts[3]
+
+    field_names = {
+        "product_name": "Название",
+        "date": "Время (в формате ЧЧ:ММ)",
+        "calories": "Калории",
+        "protein": "Белки",
+        "fat": "Жиры",
+        "carbs": "Углеводы",
+        "fiber": "Клетчатка"
+    }
+
+    await state.update_data(
+        edit_log_id=log_id, 
+        edit_field=field, 
+        edit_target_date=target_date,
+        edit_msg_id=callback.message.message_id # Store bot message ID to edit it later
+    )
+    await state.set_state(EditLogStates.waiting_for_field_value)
+
+    await callback.message.answer(
+        f"✍️ Введите новое значение для поля <b>{field_names.get(field, field)}</b>:",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.message(EditLogStates.waiting_for_field_value)
+async def process_edit_log_value(message: types.Message, state: FSMContext, bot: Bot) -> None:
+    """Process the new value for the edited field."""
+    data = await state.get_data()
+    log_id = data.get("edit_log_id")
+    field = data.get("edit_field")
+    target_date = data.get("edit_target_date")
+    edit_msg_id = data.get("edit_msg_id")
+    new_value = message.text.strip()
+
+    async for session in get_db():
+        log = await session.get(ConsumptionLog, log_id)
+        if not log or log.user_id != message.from_user.id:
+            await message.answer("❌ Запись не найдена.")
+            await state.clear()
+            return
+
+        try:
+            if field == "product_name":
+                log.product_name = new_value
+            elif field == "date":
+                # Expect HH:MM
+                try:
+                    time_parts = new_value.split(":")
+                    hour = int(time_parts[0])
+                    minute = int(time_parts[1])
+                    log.date = log.date.replace(hour=hour, minute=minute)
+                except (ValueError, IndexError):
+                    await message.answer("❌ Неверный формат времени. Введите ЧЧ:ММ (напр. 14:30)")
+                    return
+            elif field in ["calories", "protein", "fat", "carbs", "fiber"]:
+                try:
+                    log_val = float(new_value.replace(",", "."))
+                    setattr(log, field, log_val)
+                except ValueError:
+                    await message.answer("❌ Введите число.")
+                    return
+            
+            await session.commit()
+            await message.answer(f"✅ Поле <b>{field}</b> обновлено!", parse_mode="HTML")
+            
+        except Exception as e:
+            logger.error(f"Failed to update log {log_id}: {e}")
+            await message.answer(f"❌ Ошибка обновления: {e}")
+
+    await state.clear()
+    
+    # Return to history list using the STORED bot message ID
+    # Re-trigger history handler with the correct message object
+    try:
+        msg_to_edit = await bot.edit_message_reply_markup(
+            chat_id=message.chat.id,
+            message_id=edit_msg_id,
+            reply_markup=None # Temporary clear or keep
+        )
+        
+        # Fake a callback to reuse the handler
+        class FakeCallback:
+            def __init__(self, message, user, data):
+                self.message = message
+                self.from_user = user
+                self.data = data
+            async def answer(self, *args, **kwargs): pass
+
+        fake_cb = FakeCallback(msg_to_edit, message.from_user, f"stats_history:{target_date}")
+        await stats_history_handler(fake_cb)
+    except Exception as e:
+        logger.error(f"Failed to return to history: {e}")
+        await message.answer("✅ Запись обновлена! Используйте /stats чтобы увидеть изменения.")
 

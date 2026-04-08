@@ -23,6 +23,8 @@ from . import (
     support,
     user_settings,
     weight,
+    referrals,
+    feedback,
 )
 
 __all__ = [
@@ -47,6 +49,8 @@ __all__ = [
     "global_input",
     "saved_dishes",
     "herbalife",
-    "curator_menu"
+    "curator_menu",
+    "referrals",
+    "feedback",
 ]
 

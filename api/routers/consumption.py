@@ -1,11 +1,15 @@
-"""Consumption logs router for FoodFlow API."""
 from datetime import date, datetime
 
+import pytz
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
 from api.auth import CurrentUser, DBSession
-from api.schemas import ConsumptionLogCreate, ConsumptionLogRead
+from api.schemas import (
+    ConsumptionLogCreate,
+    ConsumptionLogRead,
+    ConsumptionLogUpdate,
+)
 from database.models import ConsumptionLog
 
 router = APIRouter()
@@ -43,6 +47,15 @@ async def create_consumption_log(
     session: DBSession,
 ):
     """Log food consumption (standard)."""
+    msk_tz = pytz.timezone("Europe/Moscow")
+    
+    log_date = datetime.now(msk_tz).replace(tzinfo=None)
+    if log_data.date:
+        if log_data.date.tzinfo:
+            log_date = log_data.date.astimezone(msk_tz).replace(tzinfo=None)
+        else:
+            log_date = log_data.date
+
     log = ConsumptionLog(
         user_id=user.id,
         product_name=log_data.product_name,
@@ -51,7 +64,7 @@ async def create_consumption_log(
         fat=log_data.fat,
         carbs=log_data.carbs,
         fiber=log_data.fiber,
-        date=datetime.now(),
+        date=log_date,
     )
     session.add(log)
     await session.commit()
@@ -70,6 +83,15 @@ async def create_manual_log(
     if log_data.weight_g:
         final_name = f"{log_data.product_name} ({int(log_data.weight_g)}г)"
 
+    msk_tz = pytz.timezone("Europe/Moscow")
+    
+    log_date = datetime.now(msk_tz).replace(tzinfo=None)
+    if log_data.date:
+        if log_data.date.tzinfo:
+            log_date = log_data.date.astimezone(msk_tz).replace(tzinfo=None)
+        else:
+            log_date = log_data.date
+
     log = ConsumptionLog(
         user_id=user.id,
         product_name=final_name,
@@ -79,7 +101,7 @@ async def create_manual_log(
         fat=log_data.fat,
         carbs=log_data.carbs,
         fiber=log_data.fiber,
-        date=datetime.now(),
+        date=log_date,
     )
     session.add(log)
     await session.commit()
@@ -99,3 +121,39 @@ async def delete_consumption_log(log_id: int, user: CurrentUser, session: DBSess
 
     await session.delete(log)
     await session.commit()
+
+
+@router.patch("/{log_id}", response_model=ConsumptionLogRead)
+async def update_consumption_log(
+    log_id: int,
+    log_data: ConsumptionLogUpdate,
+    user: CurrentUser,
+    session: DBSession,
+):
+    """Update a consumption log entry."""
+    log = await session.get(ConsumptionLog, log_id)
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    if log.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Update fields
+    update_data = log_data.model_dump(exclude_unset=True)
+    
+    # Special handling for date to ensure consistency with timezone
+    if "date" in update_data and update_data["date"]:
+        msk_tz = pytz.timezone("Europe/Moscow")
+        dt = update_data["date"]
+        if dt.tzinfo:
+            update_data["date"] = dt.astimezone(msk_tz).replace(tzinfo=None)
+        else:
+            update_data["date"] = dt
+
+    for key, value in update_data.items():
+        setattr(log, key, value)
+
+    session.add(log)
+    await session.commit()
+    await session.refresh(log)
+    return ConsumptionLogRead.model_validate(log)

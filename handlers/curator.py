@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog, User, UserSettings, WaterLog
+from services.referral_service import ReferralService
 from utils.user import get_user_display_long, get_user_display_name
 
 router = Router()
@@ -131,11 +132,14 @@ async def curator_ward_list(callback: types.CallbackQuery) -> None:
     if not page_wards:
         text = "👥 <b>Подопечные</b>\n\nПока никого нет. Отправьте кому-нибудь вашу реферальную ссылку!"
     else:
+        # Top button: Instant report for ALL wards
+        builder.button(text="📊 Отчёт сейчас", callback_data="curator_instant_report")
+
         text = f"👥 <b>Подопечные ({len(ward_stats)})</b>\n\n"
         for w in page_wards:
             status = "✅" if w["active"] else "😴"
             text += f"{status} @{w['name']} — {w['calories']} ккал / {w['protein']}г б. | {w['fiber']}г кл.\n"
-            builder.button(text=f"👤 {w['name'][:15]}", callback_data=f"curator_ward:{w['id']}")
+            builder.button(text=f"👤 {w['name'][:15]}", callback_data=f"curator_ward_history:{w['id']}")
 
     # Pagination buttons
     nav_row = []
@@ -145,7 +149,7 @@ async def curator_ward_list(callback: types.CallbackQuery) -> None:
     if page < total_pages - 1:
         nav_row.append(types.InlineKeyboardButton(text="➡️", callback_data=f"curator_wards:{page+1}"))
 
-    builder.adjust(2)
+    builder.adjust(1, 2)
     if nav_row:
         builder.row(*nav_row)
     builder.button(text="🔙 Назад", callback_data="curator_dashboard")
@@ -155,6 +159,136 @@ async def curator_ward_list(callback: types.CallbackQuery) -> None:
     except Exception:
         await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
     await callback.answer()
+
+
+@router.callback_query(F.data == "curator_instant_report")
+async def curator_instant_report(callback: types.CallbackQuery) -> None:
+    """Generate and send the morning summary RIGHT NOW (same as scheduled 8am)."""
+    user_id = callback.from_user.id
+    await callback.answer("📊 Генерирую отчёт...", show_alert=False)
+
+    loading_msg = await callback.message.answer(
+        "📊 <b>Генерирую сводку по всем подопечным...</b>",
+        parse_mode="HTML"
+    )
+
+    try:
+        from services.reports import generate_curator_morning_summary
+        summary_text = await generate_curator_morning_summary(user_id)
+
+        await loading_msg.delete()
+
+        if summary_text:
+            await callback.message.answer(summary_text, parse_mode="HTML")
+        else:
+            await callback.message.answer("😔 Нет подопечных или данных за вчера.")
+
+    except Exception as e:
+        logger.error(f"Instant report failed for curator {user_id}: {e}", exc_info=True)
+        await loading_msg.edit_text(f"❌ Ошибка: {e}")
+
+
+@router.callback_query(F.data.startswith("curator_ward_history:"))
+async def curator_ward_history(callback: types.CallbackQuery) -> None:
+    """Show 24h food history for a ward as a beautiful PNG card (no AI)."""
+    ward_id = int(callback.data.split(":")[1])
+    await callback.answer()
+
+    async for session in get_db():
+        ward = await session.get(User, ward_id)
+        if not ward:
+            await callback.message.answer("❌ Подопечный не найден.")
+            return
+
+        ward_name = ward.first_name or ward.username or f"ID:{ward_id}"
+
+        # Get settings (goals)
+        settings_stmt = select(UserSettings).where(UserSettings.user_id == ward_id)
+        ward_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        goals = {
+            "calories": ward_settings.calorie_goal if ward_settings and ward_settings.calorie_goal else 2000,
+            "water": ward_settings.water_goal if ward_settings else 2000
+        }
+
+        # Get logs for last 24 hours
+        now = datetime.now()
+        since = now - timedelta(hours=24)
+
+        log_stmt = select(ConsumptionLog).where(
+            ConsumptionLog.user_id == ward_id,
+            ConsumptionLog.date >= since
+        ).order_by(ConsumptionLog.date)
+        logs = (await session.execute(log_stmt)).scalars().all()
+
+        # Get water
+        water_stmt = select(func.sum(WaterLog.amount_ml)).where(
+            WaterLog.user_id == ward_id,
+            WaterLog.date >= since
+        )
+        water_total = (await session.execute(water_stmt)).scalar() or 0
+
+    if not logs:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 К списку", callback_data="curator_wards:0")
+        await callback.message.answer(
+            f"😴 <b>{ward_name}</b> — нет записей за последние 24ч.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+        return
+
+    # Calculate totals
+    total_metrics = {
+        "calories": sum(log.calories or 0 for log in logs),
+        "protein": sum(log.protein or 0 for log in logs),
+        "fat": sum(log.fat or 0 for log in logs),
+        "carbs": sum(log.carbs or 0 for log in logs),
+        "fiber": sum(log.fiber or 0 for log in logs)
+    }
+
+    # Generate PNG card via Pillow
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from aiogram.types import BufferedInputFile
+
+    from services.image_renderer import draw_daily_card
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        bio = await loop.run_in_executor(
+            pool,
+            draw_daily_card,
+            ward_name,
+            now.date(),
+            logs,
+            total_metrics,
+            goals,
+            water_total
+        )
+
+    photo = BufferedInputFile(bio.getvalue(), filename="ward_history.png")
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📜 Текстовый лог", callback_data=f"curator_ward_logs:{ward_id}:0:{now.date()}")
+    builder.button(text="🧠 AI-отчёт", callback_data=f"curator_ai_report:{ward_id}")
+    builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
+    builder.button(text="🔙 К списку", callback_data="curator_wards:0")
+    builder.adjust(2, 1, 1)
+
+    cal_pct = int((total_metrics["calories"] / goals["calories"]) * 100) if goals["calories"] > 0 else 0
+    caption = (
+        f"👤 <b>{ward_name}</b> — последние 24ч\n"
+        f"🔥 {int(total_metrics['calories'])} ккал ({cal_pct}% от нормы) | "
+        f"📝 {len(logs)} записей"
+    )
+
+    await callback.message.answer_photo(
+        photo=photo,
+        caption=caption,
+        parse_mode="HTML",
+        reply_markup=builder.as_markup()
+    )
 
 
 @router.callback_query(F.data.startswith("curator_ward:"))
@@ -229,6 +363,7 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     if logs:
          builder.button(text="📜 Весь список", callback_data=f"curator_ward_logs:{ward_id}:0:{target_date}")
 
+    builder.button(text="🧠 AI-отчёт", callback_data=f"curator_ai_report:{ward_id}")
     builder.button(text="📩 Написать", callback_data=f"curator_nudge:{ward_id}")
     builder.button(text="🗑 Удалить", callback_data=f"curator_remove_ward:{ward_id}")
     builder.button(text="🔙 К списку", callback_data="curator_wards:0")
@@ -300,6 +435,74 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
 
     await callback.answer()
     await callback.answer()
+
+@router.callback_query(F.data.startswith("curator_ai_report:"))
+async def curator_ai_report(callback: types.CallbackQuery) -> None:
+    """Generate and send AI nutritionist report for a specific ward."""
+    ward_id = int(callback.data.split(":")[1])
+
+    await callback.answer("🧠 Генерирую AI-отчёт...", show_alert=False)
+
+    # Show loading
+    loading_msg = await callback.message.answer(
+        "🧠 <b>Генерирую AI-отчёт...</b>\n<i>Это может занять 10-15 секунд</i>",
+        parse_mode="HTML"
+    )
+
+    try:
+        from services.reports import generate_ward_ai_report
+
+        report_data = await generate_ward_ai_report(ward_id)
+
+        if not report_data:
+            await loading_msg.edit_text("😔 Нет данных за вчера для этого подопечного.")
+            return
+
+        # Generate image card
+        from services.image_renderer import draw_daily_card
+        image_bio = draw_daily_card(
+            user_name=report_data["ward_name"],
+            target_date=report_data["date"],
+            logs=report_data["logs"],
+            total_metrics=report_data["totals"],
+            goals=report_data["goals"]
+        )
+
+        from aiogram.types import BufferedInputFile
+        photo = BufferedInputFile(image_bio.getvalue(), filename="ai_report.png")
+
+        caption = (
+            f"🧠 <b>AI-нутрициолог: {report_data['ward_name']}</b>\n"
+            f"📅 {report_data['date'].strftime('%d.%m.%Y')}\n\n"
+            f"{report_data['ai_text']}"
+        )
+
+        await loading_msg.delete()
+
+        if len(caption) > 1024:
+            short_caption = (
+                f"🧠 <b>AI-нутрициолог: {report_data['ward_name']}</b>\n"
+                f"📅 {report_data['date'].strftime('%d.%m.%Y')}"
+            )
+            await callback.message.answer_photo(
+                photo=photo,
+                caption=short_caption,
+                parse_mode="HTML"
+            )
+            await callback.message.answer(
+                report_data['ai_text'],
+                parse_mode="HTML"
+            )
+        else:
+            await callback.message.answer_photo(
+                photo=photo,
+                caption=caption,
+                parse_mode="HTML"
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to generate AI report for ward {ward_id}: {e}", exc_info=True)
+        await loading_msg.edit_text(f"❌ Ошибка генерации отчёта: {e}")
 
 @router.callback_query(F.data.startswith("curator_remove_ward:"))
 async def curator_remove_ward_confirm(callback: types.CallbackQuery) -> None:
@@ -471,27 +674,18 @@ async def curator_link_custom_days(event, state: FSMContext) -> None:
         user_id = event.from_user.id
         callback = None
 
-    import uuid
-    async for session in get_db():
-        stmt = select(User).where(User.id == user_id)
-        user = (await session.execute(stmt)).scalar_one_or_none()
-
-        if not user:
-            if callback:
-                await callback.answer("Ошибка", show_alert=True)
-            return
-
-        # Always generate a NEW token and invalidate the old one
-        user.referral_token = str(uuid.uuid4())[:12]
-
-        if days == 0:
-            user.referral_token_expires_at = None
+    result = await ReferralService.generate_referral_token(
+        user_id=user_id,
+        days=None if days == 0 else days,
+    )
+    if not result:
+        if callback:
+            await callback.answer("Ошибка при генерации ссылки", show_alert=True)
         else:
-            user.referral_token_expires_at = datetime.now() + timedelta(days=days)
+            await event.answer("Ошибка при генерации ссылки", show_alert=True)
+        return
 
-        await session.commit()
-        token = user.referral_token
-        expires = user.referral_token_expires_at
+    token, expires = result
 
     # Get bot username
     if callback:

@@ -11,6 +11,7 @@ from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog
 from services.normalization import NormalizationService
+from services.ai_guide import AIGuideService
 from utils.parsing import safe_float
 
 router = Router()
@@ -27,6 +28,7 @@ class IAteStates(StatesGroup):
 
 @router.callback_query(F.data == "menu_i_ate")
 async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     """Start the 'I ate' flow - ask for food description."""
     await state.set_state(IAteStates.waiting_for_description)
 
@@ -111,6 +113,23 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
             await message.answer(f"❌ Ошибка распознавания: {e}")
             return
 
+    # Photo support: analyze via Vision if no text/caption
+    if not description and message.photo:
+        status_msg = await message.answer("👀 <b>Смотрю, что на фото...</b>", parse_mode="HTML")
+        try:
+            from services.ai_brain import AIBrainService
+            description = await AIBrainService.analyze_image(message, prompt="Что на фото? Опиши еду кратко.")
+            if not description:
+                await status_msg.edit_text("❌ Не удалось понять, что на фото. Попробуйте написать текстом.")
+                return
+            
+            await status_msg.edit_text(f"👀 <b>Вижу:</b> <blockquote>{description}</blockquote>", parse_mode="HTML")
+            logger.info(f"📸 I_ATE Vision: {description}")
+        except Exception as e:
+            logger.error(f"I_ATE Vision Error: {e}")
+            await status_msg.edit_text(f"❌ Ошибка анализа фото: {e}")
+            return
+
     if not description:
         await message.answer("⚠️ Пожалуйста, напишите название блюда текстом (или отправьте фото/голосовое с описанием).")
         return
@@ -152,6 +171,21 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         weight_grams = result.get("weight_grams")
         weight_missing = result.get("weight_missing", True)
         base_name = result.get("base_name")
+
+        logger.info(
+            "KBJU_FLOW i_ate_process analyzed user_id=%s desc=%r -> name=%r base=%r weight_grams=%r weight_missing=%r kbju={kcal:%s p:%s f:%s c:%s fi:%s}",
+            message.from_user.id,
+            description,
+            name,
+            base_name,
+            weight_grams,
+            weight_missing,
+            calories,
+            protein,
+            fat,
+            carbs,
+            fiber,
+        )
 
         # If weight is missing, ask user to specify
         if weight_missing:
@@ -196,6 +230,14 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
             }
         )
 
+        logger.info(
+            "KBJU_FLOW i_ate_process pending_product_ready user_id=%s name=%r base=%r stored_keys=calories100..fiber100 totals?=%r",
+            message.from_user.id,
+            f"{name} ({weight_grams}г)",
+            base_name,
+            True,
+        )
+
         # Instead of saving immediately, show confirmation
         await show_confirmation_interface(message, state, status_msg)
 
@@ -233,17 +275,39 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
 
         name = product['name']
         base_name = product['base_name']
-        product['calories100'] * factor
-        product['protein100'] * factor
-        product['fat100'] * factor
-        product['carbs100'] * factor
-        product['fiber100'] * factor
+        prev = {
+            "calories100": product.get("calories100"),
+            "protein100": product.get("protein100"),
+            "fat100": product.get("fat100"),
+            "carbs100": product.get("carbs100"),
+            "fiber100": product.get("fiber100"),
+        }
+        expected = {
+            "calories": safe_float(product.get("calories100")) * factor,
+            "protein": safe_float(product.get("protein100")) * factor,
+            "fat": safe_float(product.get("fat100")) * factor,
+            "carbs": safe_float(product.get("carbs100")) * factor,
+            "fiber": safe_float(product.get("fiber100")) * factor,
+        }
+        logger.info(
+            "KBJU_FLOW i_ate_weight_input user_id=%s raw_weight=%r parsed_weight=%s factor=%s prev=%s expected_totals=%s",
+            message.from_user.id,
+            message.text,
+            weight,
+            factor,
+            prev,
+            expected,
+        )
 
         f"{name} ({int(weight)}г)"
 
-        # Update pending product with new weight
-        # IMPORTANT: We DO NOT recalculate macros automatically here, as per user request.
-        # User can edit them manually if needed.
+        # Update pending product with new weight + apply recalculation.
+        # If the AI returned values per 100g (weight_missing=True), this converts them to totals for the chosen weight.
+        product["calories100"] = expected["calories"]
+        product["protein100"] = expected["protein"]
+        product["fat100"] = expected["fat"]
+        product["carbs100"] = expected["carbs"]
+        product["fiber100"] = expected["fiber"]
 
         # FIX: Prevent double weight ("Apple (100g) (200g)")
         # Use base_name if available, otherwise try to strip existing weight
@@ -256,6 +320,20 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
 
         # Updating state
         await state.update_data(pending_product=product)
+
+        logger.info(
+            "KBJU_FLOW i_ate_weight_input updated_pending_product user_id=%s name=%r base=%r stored_after=%s",
+            message.from_user.id,
+            product.get("name"),
+            product.get("base_name"),
+            {
+                "calories100": product.get("calories100"),
+                "protein100": product.get("protein100"),
+                "fat100": product.get("fat100"),
+                "carbs100": product.get("carbs100"),
+                "fiber100": product.get("fiber100"),
+            },
+        )
 
         # Show confirmation
         await show_confirmation_interface(message, state)
@@ -320,6 +398,7 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
 @router.callback_query(F.data == "i_ate_confirm_now", IAteStates.waiting_for_confirmation)
 async def process_confirm_now(callback: types.CallbackQuery, state: FSMContext):
     """Save with current time."""
+    await callback.answer()
     await process_save(callback, state, datetime.now())
 
 @router.callback_query(F.data == "i_ate_ask_time", IAteStates.waiting_for_confirmation)
@@ -328,7 +407,8 @@ async def ask_time(callback: types.CallbackQuery, state: FSMContext):
     from utils.time_picker import get_time_picker_keyboard
     await state.set_state(IAteStates.waiting_for_time)
     await callback.message.edit_text(
-        "🕓 <b>Когда вы это съели?</b>\n\nВыберите из пресетов или используйте смещение:",
+        "🕓 <b>Когда вы это съели?</b>\n\n"
+        "Выберите из пресетов, используйте смещение или <b>введите время текстом</b> (например, <code>12:30</code> или <code>15</code>):",
         parse_mode="HTML",
         reply_markup=get_time_picker_keyboard("i_ate_time")
     )
@@ -336,6 +416,7 @@ async def ask_time(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("i_ate_time:"), IAteStates.waiting_for_time)
 async def process_time_selection(callback: types.CallbackQuery, state: FSMContext):
     """Handle time selection."""
+    await callback.answer()
     if callback.data == "i_ate_time:back":
         await show_confirmation_interface(callback.message, state)
         return
@@ -344,10 +425,111 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
     selected_time = get_time_from_callback(callback.data)
     await process_save(callback, state, selected_time)
 
+@router.message(IAteStates.waiting_for_time, F.text)
+async def process_manual_time_input(message: types.Message, state: FSMContext):
+    """Handle manual text time input."""
+    from utils.time_picker import parse_manual_time
+    
+    selected_time = parse_manual_time(message.text)
+    if not selected_time:
+        await message.reply(
+            "⚠️ <b>Некорректный формат времени</b>\n\n"
+            "Пожалуйста, введите время в формате <code>ЧЧ:ММ</code> (например, <code>12:30</code>) "
+            "или просто час (например, <code>15</code>).",
+            parse_mode="HTML"
+        )
+        return
+
+    # To use process_save, we need a CallbackQuery-like object or refactor process_save
+    # process_save currently expects callback: types.CallbackQuery
+    # Let's create a wrapper or refactor process_save to take (user_id, message_to_edit_or_send, state, timestamp)
+    
+    await process_save_from_message(message, state, selected_time)
+
+async def process_save_from_message(message: types.Message, state: FSMContext, timestamp: datetime):
+    """Refactored save logic that works from a regular message."""
+    data = await state.get_data()
+    product = data.get("pending_product")
+
+    async for session in get_db():
+        log = ConsumptionLog(
+            user_id=message.from_user.id,
+            product_name=product['name'],
+            base_name=product.get('base_name'),
+            calories=product.get('calories100'),
+            protein=product.get('protein100'),
+            fat=product.get('fat100'),
+            carbs=product.get('carbs100'),
+            fiber=product.get('fiber100', 0),
+            date=timestamp
+        )
+        session.add(log)
+        await session.commit()
+
+    await state.clear()
+
+    # Format success message
+    calories = product.get('calories100', 0)
+    protein = product.get('protein100', 0)
+    fat = product.get('fat100', 0)
+    carbs = product.get('carbs100', 0)
+    fiber = product.get('fiber100', 0)
+
+    fiber_line = f"\n🥬 Клетчатка: {fiber:.1f}" if fiber else ""
+    # AI Guide Contextual Advice
+    guide_comment = ""
+    async for session in get_db():
+        if await AIGuideService.is_active(message.from_user.id, session):
+            current_meal = {
+                "name": product['name'],
+                "calories": product.get('calories100', 0),
+                "protein": product.get('protein100', 0),
+                "fat": product.get('fat100', 0),
+                "carbs": product.get('carbs100', 0)
+            }
+            advice = await AIGuideService.get_contextual_advice(message.from_user.id, current_meal, session)
+            if advice:
+                guide_comment = f"\n\n🤖 <b>Гид:</b> <i>{advice}</i>"
+        
+        # Track activity for Guide missions
+        await AIGuideService.track_activity(message.from_user.id, "log_food", session)
+        break
+
+    time_str = timestamp.strftime("%H:%M")
+    success_text = (
+        f"✅ <b>Записано!</b> ({time_str})\n\n"
+        f"🍽️ <b>{product['name']}</b>\n\n"
+        f"🔥 <code>{int(calories)}</code> ккал\n"
+        f"🥩 <code>{protein:.1f}</code> | 🥑 <code>{fat:.1f}</code> | 🍞 <code>{carbs:.1f}</code>"
+        f"{fiber_line}"
+        f"{guide_comment}"
+    )
+
+    await message.answer(success_text, parse_mode="HTML")
+
+    from services.reports import send_daily_visual_report
+    await send_daily_visual_report(message.from_user.id, message.bot)
+
 async def process_save(callback: types.CallbackQuery, state: FSMContext, timestamp: datetime):
+    # await callback.answer() - Handled by entry point
     """Common save logic."""
     data = await state.get_data()
     product = data.get("pending_product")
+    if not product:
+        return
+
+    logger.info(
+        "KBJU_FLOW i_ate_save about_to_persist user_id=%s ts=%s product_name=%r base=%r saved_kbju={kcal:%s p:%s f:%s c:%s fi:%s}",
+        callback.from_user.id,
+        timestamp,
+        product.get("name") if isinstance(product, dict) else None,
+        product.get("base_name") if isinstance(product, dict) else None,
+        (product or {}).get("calories100") if isinstance(product, dict) else None,
+        (product or {}).get("protein100") if isinstance(product, dict) else None,
+        (product or {}).get("fat100") if isinstance(product, dict) else None,
+        (product or {}).get("carbs100") if isinstance(product, dict) else None,
+        (product or {}).get("fiber100") if isinstance(product, dict) else None,
+    )
 
     async for session in get_db():
         log = ConsumptionLog(
@@ -379,7 +561,7 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
         f"✅ <b>Записано!</b> ({time_str})\n\n"
         f"🍽️ <b>{product['name']}</b>\n\n"
         f"🔥 <code>{int(calories)}</code> ккал\n"
-        f"🥩 <code>{protein:.1f}</code> | 🥑 <code>{fat:.1f}</code> | 🍞 <code>{carbs:.1f}</code>"
+        f"🥩 {protein:.1f} | 🥑 {fat:.1f} | 🍞 {carbs:.1f}"
         f"{fiber_line}"
     )
 
@@ -389,8 +571,28 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(callback.from_user.id, callback.bot)
 
-    await callback.answer()
+    # 5. Async AI Guide Advice (Separate message)
+    async for session in get_db():
+        if await AIGuideService.is_active(callback.from_user.id, session):
+            current_meal = {
+                "name": product['name'],
+                "calories": product.get('calories100', 0),
+                "protein": product.get('protein100', 0),
+                "fat": product.get('fat100', 0),
+                "carbs": product.get('carbs100', 0),
+                "time": timestamp.strftime("%H:%M")
+            }
+            # Start gathering advice (can be slow)
+            advice = await AIGuideService.get_contextual_advice(callback.from_user.id, current_meal, session)
+            if advice:
+                # Send as a FOLLOW-UP message to not block the success UI
+                await callback.message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+        
+        # Track activity for Guide missions
+        await AIGuideService.track_activity(callback.from_user.id, "log_food", session)
+        break
 
+    # await callback.answer() - Removed
 @router.callback_query(F.data == "edit_field_weight", IAteStates.waiting_for_confirmation)
 async def start_edit_weight(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(IAteStates.waiting_for_weight) # Reuse existing logic

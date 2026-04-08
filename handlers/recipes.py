@@ -95,6 +95,13 @@ async def show_recipe_categories(callback: types.CallbackQuery) -> None:
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
+    
+    from database.base import get_db
+    from services.ai_guide import AIGuideService
+    async for session in get_db():
+        await AIGuideService.track_activity(callback.from_user.id, "recipes", session)
+        break
+        
     await callback.answer()
 
 # --- Level 3.2: Generate & List ---
@@ -219,8 +226,39 @@ async def generate_recipes_by_category(callback: types.CallbackQuery) -> None:
             return
 
     # If we reach here, we need to call AI (no cache or refresh requested)
+    
+    # 2. Check Daily Refresh Limit (3 per day)
+    from datetime import date
+    today_str = date.today().isoformat()
+    
+    if refresh_requested:
+        async for session in get_db():
+            if not user_settings:
+                from database.models import UserSettings
+                user_settings = UserSettings(user_id=callback.from_user.id)
+                session.add(user_settings)
+            
+            if user_settings.last_recipe_refresh_date == today_str:
+                if user_settings.recipe_refresh_count >= 3:
+                    builder = InlineKeyboardBuilder()
+                    builder.button(text="🔙 Назад", callback_data="menu_recipes")
+                    limit_text = "⚠️ <b>Лимит обновлений исчерпан!</b>\n\nВы можете обновлять рецепты не более 3 раз в день. Попробуйте завтра или используйте текущий список."
+                    try:
+                        await status_msg.edit_media(
+                            media=types.InputMediaPhoto(media=photo_path, caption=limit_text, parse_mode="HTML"),
+                            reply_markup=builder.as_markup()
+                        )
+                    except Exception:
+                        await status_msg.edit_text(limit_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+                    return
+                user_settings.recipe_refresh_count += 1
+            else:
+                user_settings.last_recipe_refresh_date = today_str
+                user_settings.recipe_refresh_count = 1
+            
+            await session.commit()
 
-    # 2. Call AI with category to get appropriate recipes
+    # 3. Call AI with category to get appropriate recipes
     try:
         data = await AIService.generate_recipes(ingredients, category, user_settings)
 

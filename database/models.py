@@ -20,25 +20,35 @@ class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True)  # Telegram ID
     username = Column(String, nullable=True)
-    first_name = Column(String, nullable=True)  # Telegram first name
-    last_name = Column(String, nullable=True)   # Telegram last name
-    language_code = Column(String, nullable=True)  # e.g. "ru", "en"
-    is_premium = Column(Boolean, default=False)  # Telegram Premium
     created_at = Column(DateTime, default=datetime.now)
+    is_verified = Column(Boolean, default=False)
+    role = Column(String, default="user")
+    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+    referral_token = Column(String, unique=True, nullable=True)
+    invited_by_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+    ref_paid_count = Column(Integer, default=0)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    language_code = Column(String, nullable=True)
+    is_premium = Column(Boolean, default=False)
+    is_founding_member = Column(Boolean, default=False)
     last_activity = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    is_verified = Column(Boolean, default=False)  # User auth status
-
-    # Curator system fields
-    role = Column(String, default="user")  # "user" | "curator" | "admin"
-    curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # who curates this user
-    referral_token = Column(String, unique=True, nullable=True)  # for invite links (curators only)
     referral_token_expires_at = Column(DateTime, nullable=True)
+    onboarding_reminded = Column(Boolean, default=False)
+    # Web-only registration fields
+    email = Column(String, unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    is_web_only = Column(Boolean, default=False)
+    
+    # VK Integration
+    vk_id = Column(BigInteger, unique=True, nullable=True, index=True)
 
     # Relationships
     receipts = relationship("Receipt", back_populates="user")
     consumption_logs = relationship("ConsumptionLog", back_populates="user")
     shopping_sessions = relationship("ShoppingSession", back_populates="user")
     wards = relationship("User", backref="curator", remote_side=[id], foreign_keys=[curator_id])
+    invited_users = relationship("User", backref="inviter", remote_side=[id], foreign_keys=[invited_by_id])
     water_logs = relationship("WaterLog", back_populates="user")
     subscription = relationship("Subscription", back_populates="user", uselist=False)
 
@@ -51,6 +61,8 @@ class Subscription(Base):
     starts_at = Column(DateTime, default=datetime.now)
     expires_at = Column(DateTime, nullable=True) # Если None - бесконечно
     is_active = Column(Boolean, default=True)
+    telegram_payment_charge_id = Column(String, nullable=True)  # For refunds & subscription management
+    auto_renew = Column(Boolean, default=True)  # Auto-renewal status
 
     user = relationship("User", back_populates="subscription")
 
@@ -79,6 +91,7 @@ class Product(Base):
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
     fiber = Column(Float, default=0.0) # NEW: Fiber tracking
+    base_name = Column(String, nullable=True) # NEW: Product essence for KBJU matching
     source = Column(String, default="receipt")  # receipt | fridge_init | manual | other
     receipt = relationship("Receipt", back_populates="products")
     user = relationship("User", backref="products")
@@ -93,9 +106,9 @@ class ConsumptionLog(Base):
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
-    fiber = Column(Float, default=0.0) # NEW: Fiber tracking
-    base_name = Column(String, nullable=True) # NEW: Normalized name for history grouping
     date = Column(DateTime, default=datetime.now)
+    fiber = Column(Float, default=0.0)
+    base_name = Column(String, nullable=True)
     user = relationship("User", back_populates="consumption_logs")
 
 class SavedDish(Base):
@@ -164,23 +177,40 @@ class UserSettings(Base):
     protein_goal = Column(Integer, default=150)
     fat_goal = Column(Integer, default=70)
     carb_goal = Column(Integer, default=250)
-    fiber_goal = Column(Integer, default=30) # NEW: Fiber goal
-    water_goal = Column(Integer, default=2000) # NEW: Fiber goal
-    allergies = Column(String, nullable=True)  # Comma-separated list
-    gender = Column(String, nullable=True)  # "male" or "female"
-    age = Column(Integer, nullable=True)  # User's age in years
-    height = Column(Integer, nullable=True)  # height in cm
-    weight = Column(Float, nullable=True)  # weight in kg
-    goal = Column(String, nullable=True)  # "lose_weight", "maintain", "healthy", "gain_mass"
-    is_initialized = Column(Boolean, default=False)  # flag for onboarding completion
-    reminder_time = Column(String, default="09:00")  # HH:MM for weight reminders
-    summary_time = Column(String, default="21:00")
+    allergies = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
+    height = Column(Integer, nullable=True)
+    weight = Column(Float, nullable=True)
+    goal = Column(String, nullable=True)
+    is_initialized = Column(Boolean, default=False)
+    age = Column(Integer, nullable=True)
+    reminder_time = Column(String, default="09:00")
     reminders_enabled = Column(Boolean, default=True)
-
-    # Fridge Summary Cache (24h)
-    fridge_summary_cache = Column(String, nullable=True) # Text
-    fridge_summary_date = Column(DateTime, nullable=True) # Timestamp of last generation
+    fiber_goal = Column(Integer, default=30)
+    summary_time = Column(String, default="21:00")
+    fridge_summary_cache = Column(String, nullable=True)
+    fridge_summary_date = Column(DateTime, nullable=True)
+    water_goal = Column(Integer, default=2000)
+    curator_summary_time = Column(String, default="08:00")  # Время утренней сводки для кураторов
+    # Recipe limits
+    recipe_refresh_count = Column(Integer, default=0)
+    last_recipe_refresh_date = Column(String, nullable=True) # ISO format date
+    
+    # AI Guide settings
+    guide_config = Column(JSON, nullable=True) # Onboarding answers & personality
+    guide_active_until = Column(DateTime, nullable=True)
+    
     user = relationship("User", backref="settings")
+
+class UserActivity(Base):
+    """Tracks feature usage for the AI Guide missions and suggestions."""
+    __tablename__ = "user_activity"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    feature_name = Column(String, nullable=False) # e.g., "fridge", "recipes", "weight", "water"
+    last_used_at = Column(DateTime, default=datetime.now)
+    
+    user = relationship("User", backref="activities")
 
 class ShoppingListItem(Base):
     __tablename__ = "shopping_list_items"
@@ -293,3 +323,76 @@ class SnowflakeLog(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     participant = relationship("MarathonParticipant", back_populates="snowflake_logs")
+
+
+class ReferralEvent(Base):
+    """Audit log of referral-related events."""
+    __tablename__ = "referral_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    referrer_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    invitee_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    event_type = Column(String, nullable=False)  # "signup", "paid", "bonus_activated"
+    tier = Column(String, nullable=True)  # basic / pro / curator, if applicable
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class ReferralReward(Base):
+    """Pending or activated referral rewards (bonus days of tariffs)."""
+    __tablename__ = "referral_rewards"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    reward_type = Column(String, nullable=False)  # "basic_days", "pro_days", "curator_days"
+    days = Column(Integer, nullable=False)
+    source = Column(String, nullable=False)  # "ref_invite_paid", "ref_10_paid", "ad_campaign", "curator_ref_paid", etc.
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    activated_at = Column(DateTime, nullable=True)
+
+class UserFeedback(Base):
+    """Model for saving user answers to polls/surveys."""
+    __tablename__ = "user_feedback"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    feedback_type = Column(String, nullable=False) # e.g. "inactive_poll"
+    answer = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship("User", backref="feedbacks")
+
+class CanonicalProduct(Base):
+    """Cached (canonical) KBJU data for products to avoid redundant AI calls."""
+    __tablename__ = "canonical_products"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    base_name = Column(String, unique=True, nullable=False, index=True)
+    display_name = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    
+    calories = Column(Float, default=0.0)
+    protein = Column(Float, default=0.0)
+    fat = Column(Float, default=0.0)
+    carbs = Column(Float, default=0.0)
+    fiber = Column(Float, default=0.0)
+    
+    source = Column(String, default="ai_gemini_2_5")
+    per_unit = Column(String, default="per_100g")
+    
+    version = Column(Integer, default=1)
+    is_verified = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+class GuideHistory(Base):
+    """Stores conversation history between the user and the AI Guide."""
+    __tablename__ = "guide_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String, nullable=False) # "user", "assistant", "system", "summary"
+    content = Column(String, nullable=False)
+    tokens = Column(Integer, default=0) # Estimated tokens
+    is_summary = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    user = relationship("User", backref="guide_histories")

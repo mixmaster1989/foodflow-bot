@@ -15,8 +15,9 @@ def get_time_picker_keyboard(callback_prefix: str) -> types.InlineKeyboardMarkup
     # Format: label, hour, minute
     presets = [
         ("☕ Завтрак (09:00)", 9, 0),
+        ("🍎 Перекус 1 (11:00)", 11, 0),
         ("🍜 Обед (13:00)", 13, 0),
-        ("🥪 Перекус (16:00)", 16, 0),
+        ("🥪 Перекус 2 (16:00)", 16, 0),
         ("🍗 Ужин (19:00)", 19, 0),
     ]
 
@@ -36,7 +37,7 @@ def get_time_picker_keyboard(callback_prefix: str) -> types.InlineKeyboardMarkup
 
     builder.button(text="🔙 Назад", callback_data=f"{callback_prefix}:back")
 
-    builder.adjust(1, 1, 1, 1, 4, 1)
+    builder.adjust(1, 1, 1, 1, 1, 4, 1)
     return builder.as_markup()
 
 def get_time_from_callback(callback_data: str) -> datetime:
@@ -61,3 +62,33 @@ def get_time_from_callback(callback_data: str) -> datetime:
         return now + timedelta(minutes=mins)
 
     return now
+
+def parse_manual_time(text: str) -> datetime | None:
+    """
+    Parses text like '12:30', '12.30', '13', '1345' and returns today's datetime.
+    Returns None if invalid.
+    """
+    import re
+    s = text.strip().replace(" ", "").replace(".", ":").replace(",", ":")
+    
+    # Pattern 1: HH:MM
+    match = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
+    if match:
+        h, m = int(match.group(1)), int(match.group(2))
+    else:
+        # Pattern 2: HHMM (4 digits)
+        match = re.fullmatch(r"(\d{2})(\d{2})", s)
+        if match:
+            h, m = int(match.group(1)), int(match.group(2))
+        else:
+            # Pattern 3: HH (1 or 2 digits)
+            match = re.fullmatch(r"(\d{1,2})", s)
+            if match:
+                h, m = int(match.group(1)), 0
+            else:
+                return None
+
+    if 0 <= h <= 23 and 0 <= m <= 59:
+        return datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
+    
+    return None

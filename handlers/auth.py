@@ -55,7 +55,17 @@ class AuthMiddleware(BaseMiddleware):
             # Check verification
             is_verified = user.is_verified if user else False
 
-            if is_verified:
+            # Allow /start command and ALL onboarding-related events to pass through
+            # This is crucial for deep links (?start=ad_...) and the entire onboarding flow
+            is_start_command = event.message and event.message.text and event.message.text.startswith("/start")
+            is_onboarding_callback = event.callback_query and event.callback_query.data and event.callback_query.data.startswith("onboarding")
+            
+            # Check FSM state for onboarding (messages like age, weight)
+            state = data.get("state")
+            current_state = await state.get_state() if state else None
+            is_onboarding_state = current_state and current_state.startswith("OnboardingStates")
+
+            if is_verified or is_start_command or is_onboarding_callback or is_onboarding_state:
                 return await handler(event, data)
 
             # --- Auth Logic ---

@@ -1,6 +1,6 @@
-"""Weight tracking router for FoodFlow API."""
 from datetime import datetime
 
+import pytz
 from fastapi import APIRouter
 from sqlalchemy import select
 
@@ -27,10 +27,12 @@ async def list_weight_logs(user: CurrentUser, session: DBSession, limit: int = 3
 @router.post("", response_model=WeightLogRead, status_code=201)
 async def log_weight(data: WeightLogCreate, user: CurrentUser, session: DBSession):
     """Log current weight."""
+    msk_tz = pytz.timezone("Europe/Moscow")
+
     log = WeightLog(
         user_id=user.id,
         weight=data.weight,
-        recorded_at=datetime.now(),
+        recorded_at=datetime.now(msk_tz).replace(tzinfo=None),
     )
     session.add(log)
 

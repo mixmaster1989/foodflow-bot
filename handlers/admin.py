@@ -1,5 +1,6 @@
 import logging
 import subprocess
+from datetime import datetime
 
 from aiogram import Bot, F, Router, types
 from aiogram.filters import Command
@@ -12,6 +13,9 @@ from config import settings
 from database.base import get_db
 from database.models import User
 from handlers.base import BaseCommandHandler
+from monitoring import get_system_health
+from services.reports import generate_admin_daily_digest, generate_admin_stats_csv
+from aiogram.types import BufferedInputFile
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -172,3 +176,120 @@ async def admin_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     await state.clear()
     await callback.message.edit_text("❌ Отменено")
     await callback.answer()
+
+
+@router.callback_query(F.data == "admin_view_stars")
+async def admin_view_stars_handler(callback: types.CallbackQuery, bot: Bot):
+    """Fetch and display total bot Star balance."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа", show_alert=True)
+        return
+
+    try:
+        # Use the NEW Bot API method available in Aiogram 3.22+
+        # get_my_star_balance returns a StarAmount object with 'amount' field
+        balance = await bot.get_my_star_balance()
+        
+        await callback.message.answer(
+            f"💰 <b>Баланс Telegram Stars</b>\n\n"
+            f"На счету бота: <b>{balance.amount} ⭐</b>\n\n"
+            f"<i>Вывести можно через @BotFather -> Payments.</i>",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Failed to get Stars balance: {e}")
+        await callback.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_healthcheck")
+async def admin_healthcheck_handler(callback: types.CallbackQuery):
+    """Show system health status (Admin only)."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа", show_alert=True)
+        return
+
+    await callback.answer()
+
+    try:
+        h = await get_system_health()
+        sys = h["system"]
+        bot = h["bot"]
+
+        procs_text = ""
+        for p in h["python_processes"]:
+            procs_text += f"  PID {p['pid']}: {p['memory_mb']:.0f}MB / {p['cpu_percent']:.1f}% CPU\n"
+
+        text = (
+            f"{h['health_status']} <b>FoodFlow Health</b>\n"
+            f"<code>{h['timestamp'][:19]}</code>\n\n"
+            f"<b>Система:</b>\n"
+            f"  CPU: <b>{sys['cpu_percent']:.1f}%</b>\n"
+            f"  RAM: <b>{sys['memory_used_gb']:.1f}</b>/{sys['memory_total_gb']:.1f}GB "
+            f"({sys['memory_percent']:.0f}%)\n"
+            f"  Диск: <b>{sys['disk_used_gb']:.1f}</b>/{sys['disk_total_gb']:.1f}GB "
+            f"({sys['disk_percent']:.0f}%)\n\n"
+            f"<b>Бот (с момента запуска):</b>\n"
+            f"  Запросов: <b>{bot['total_requests']}</b> "
+            f"({bot['requests_per_minute']:.1f}/мин)\n"
+            f"  AI вызовов: <b>{bot['ai_calls']}</b> "
+            f"(avg {bot['ai_avg_response_ms']}ms)\n"
+            f"  Ошибок: <b>{bot['errors']}</b>\n\n"
+            f"<b>Python процессы:</b>\n{procs_text}"
+        )
+
+        await callback.message.answer(text, parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Healthcheck failed: {e}")
+        await callback.message.answer(f"❌ Ошибка healthcheck: {e}")
+
+
+@router.message(Command("admin_stats"))
+async def admin_stats_command(message: types.Message):
+    """Manually trigger and send admin daily digest with export button."""
+    if not is_admin(message.from_user.id):
+        return
+
+    try:
+        digest_text = await generate_admin_daily_digest()
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📊 Скачать CSV (30 дней)", callback_data="admin_export_csv")
+        
+        await message.answer(digest_text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception as e:
+        logger.error(f"Error in /admin_stats: {e}")
+        await message.answer(f"❌ Ошибка при генерации сводки: {e}")
+
+@router.callback_query(F.data == "admin_export_csv")
+@router.message(Command("admin_export"))
+async def admin_export_handler(event: types.Message | types.CallbackQuery, bot: Bot):
+    """Generate and send CSV statistics file."""
+    user_id = event.from_user.id
+    if not is_admin(user_id):
+        if isinstance(event, types.CallbackQuery):
+            await event.answer("⛔ Нет доступа", show_alert=True)
+        return
+
+    msg = event.message if isinstance(event, types.CallbackQuery) else event
+    status_msg = await msg.answer("⏳ Генерирую файл статистики за 30 дней...")
+
+    try:
+        csv_io = await generate_admin_stats_csv(days=30)
+        document = BufferedInputFile(csv_io.getvalue(), filename=f"stats_export_{datetime.now().strftime('%Y%m%d')}.csv")
+        
+        await bot.send_document(
+            chat_id=user_id,
+            document=document,
+            caption="📊 <b>Экспорт статистики за последние 30 дней</b>\n\nФайл готов для загрузки в Excel или Google Таблицы.",
+            parse_mode="HTML"
+        )
+        await status_msg.delete()
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        await status_msg.edit_text(f"❌ Ошибка при экспорте: {e}")
+
+    if isinstance(event, types.CallbackQuery):
+        await event.answer()

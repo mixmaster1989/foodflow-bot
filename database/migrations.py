@@ -87,6 +87,39 @@ def _create_subscription_table(cursor: sqlite3.Cursor):
         )
 
 
+def _create_referral_tables(cursor: sqlite3.Cursor):
+    """Create referral-related tables if they do not exist."""
+    if not _table_exists(cursor, "referral_events"):
+        cursor.execute(
+            """
+            CREATE TABLE referral_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                referrer_id BIGINT NOT NULL,
+                invitee_id BIGINT NOT NULL,
+                event_type TEXT NOT NULL,
+                tier TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    if not _table_exists(cursor, "referral_rewards"):
+        cursor.execute(
+            """
+            CREATE TABLE referral_rewards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id BIGINT NOT NULL,
+                reward_type TEXT NOT NULL,
+                days INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                activated_at DATETIME
+            )
+            """
+        )
+
+
 def _run_sqlite_migrations():
     db_path = _get_sqlite_path()
     if not db_path:
@@ -97,6 +130,17 @@ def _run_sqlite_migrations():
         cursor = conn.cursor()
 
         _create_subscription_table(cursor)
+
+        # Add Stars payment fields to subscriptions
+        if _table_exists(cursor, "subscriptions"):
+            _ensure_columns(
+                cursor,
+                "subscriptions",
+                [
+                    ("telegram_payment_charge_id", "TEXT"),
+                    ("auto_renew", "BOOLEAN DEFAULT 1"),
+                ]
+            )
 
         if _table_exists(cursor, "products"):
             _ensure_columns(
@@ -130,7 +174,7 @@ def _run_sqlite_migrations():
                 ]
             )
 
-        # Add auth field to users
+        # Add auth/referral fields to users
         if _table_exists(cursor, "users"):
             _ensure_columns(
                 cursor,
@@ -141,6 +185,9 @@ def _run_sqlite_migrations():
                     ("role", "TEXT DEFAULT 'user'"),
                     ("curator_id", "BIGINT"),
                     ("referral_token", "TEXT"),
+                    ("invited_by_id", "BIGINT"),
+                    ("ref_paid_count", "INTEGER DEFAULT 0"),
+                    ("vk_id", "BIGINT"),
                 ]
             )
 
@@ -181,6 +228,8 @@ def _run_sqlite_migrations():
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 )
             """)
+
+        _create_referral_tables(cursor)
 
         conn.commit()
     finally:

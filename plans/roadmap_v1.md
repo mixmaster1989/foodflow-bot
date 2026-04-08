@@ -1,276 +1,190 @@
 # FoodFlow Bot Roadmap v1.0
-**Created**: 2025-11-25  
-**Status**: Active  
-**Target Completion**: Q1 2026
+**Создан**: 2025-11-25  
+**Обновлён**: 2026-04-08 (актуализация по реальному коду)  
+**Статус**: Активен
 
-## Overview
+---
 
-This roadmap addresses critical technical debt and establishes foundation for scalable growth. All items align with the [Constitution](specs/constitution.yml) and [Current Architecture](specs/current_architecture.yml).
+## Обзор
+
+Роадмап фиксирует технический долг и задачи масштабирования. Статусы проверены по реальному коду в апреле 2026.
 
 ---
 
 ## Immediate Goals (Priority: High)
 
-### 1. Add CI/CD Workflow for Linting and Testing
+### 1. CI/CD Workflow
 
-**Status**: ✅ Completed  
-**Priority**: P1 (Critical)  
-**Estimated Effort**: 2-3 days  
-**Completed**: 2025-11-25
+**Статус**: ✅ Завершено  
+**Приоритет**: P1  
+**Завершено**: 2025-11-25
 
-**Tasks**:
-- [x] Set up GitHub Actions workflow (`.github/workflows/ci.yml`)
-- [x] Configure Python linting (ruff or black + flake8)
-- [x] Set up pytest test framework
-- [ ] Add test coverage reporting (coverage.py) - *Deferred to when tests are added*
-- [ ] Configure pre-commit hooks (optional but recommended) - *Future enhancement*
-- [x] Add quality gates (tests must pass, coverage threshold)
+**Задачи**:
+- [x] GitHub Actions workflow (`.github/workflows/ci.yml` + `main.yml`)
+- [x] Python линтинг через ruff (`pyproject.toml`)
+- [x] pytest фреймворк (`tests/` — unit и integration)
+- [ ] Отчёт покрытия (coverage.py) — *отложено до роста тестов*
+- [ ] Pre-commit hooks — *будущее улучшение*
+- [x] Quality gates (тесты должны проходить)
 
-**Success Criteria**:
-- ✅ All PRs automatically run linting and tests
-- ⏳ Test coverage > 70% for new code - *Pending test creation*
-- ✅ CI fails on linting errors or test failures
-
-**Dependencies**: None
-
-**Implementation Notes**:
-- Created `.github/workflows/ci.yml` with GitHub Actions workflow
-- Created `pyproject.toml` with Ruff configuration
-- Workflow runs on push to `main` and PRs
-- Supports Python 3.10, 3.11, 3.12
-- Includes dependency caching for faster runs
-- Gracefully handles missing tests directory
-- See [specs/features/ci_cd_pipeline/](specs/features/ci_cd_pipeline/) for full documentation
+**Факт на апрель 2026**:
+- `tests/unit/` — 7 файлов тестов (handlers, services, onboarding, consultant, ai_guide и др.)
+- `tests/integration/` и отдельные test_*.py в корне `tests/`
+- `tests/workflows/` — workflow-тесты
+- CI настроен и работает
 
 ---
 
 ### 2. Migrate Database to PostgreSQL (asyncpg)
 
-**Status**: Not Started  
-**Priority**: P1 (Critical)  
-**Estimated Effort**: 3-5 days
+**Статус**: Не начато — **решено оставить SQLite**  
+**Приоритет**: P1 → снижен до P4  
+**Обоснование**: SQLite с WAL-режимом (PRAGMA journal_mode=WAL, busy_timeout=5000) обеспечивает достаточную производительность для текущей нагрузки. PostgreSQL — задача для масштаба >10k активных пользователей.
 
-**Tasks**:
-- [ ] Set up PostgreSQL database (local dev + production)
-- [ ] Update `DATABASE_URL` configuration
-- [ ] Create Alembic migrations (replace manual migrations.py)
-- [ ] Migrate existing SQLite data (if any production data exists)
-- [ ] Update `database/base.py` to use asyncpg
-- [ ] Test database connection and queries
-- [ ] Update deployment configuration
-- [ ] Document migration process
-
-**Success Criteria**:
-- PostgreSQL is primary database
-- All migrations are versioned (Alembic)
-- SQLite removed from production (kept for local dev only)
-- Zero data loss during migration
-
-**Dependencies**: None (can be done in parallel with CI/CD)
+**Текущее состояние**: SQLite через aiosqlite, WAL-режим включён в `database/base.py`, ручные миграции в `database/migrations.py`.
 
 ---
 
-### 3. Refactor Shopping Mode Logic to Match Plan
+### 3. Shopping Mode — реализация по плану
 
-**Status**: Partially Complete  
-**Priority**: P2 (High)  
-**Estimated Effort**: 5-7 days
+**Статус**: ✅ Реализовано (основной функционал)  
+**Приоритет**: P2
 
-**Tasks**:
-- [ ] Review `SHOPPING_MODE_PLAN.md` checklist
-- [ ] Complete missing Shopping Mode features:
-  - [ ] Full integration with receipt processing
-  - [ ] UI for unmatched items correction
-  - [ ] Fuzzy matching improvements
-- [ ] Add comprehensive tests for Shopping Mode
-- [ ] Update documentation
+**Что реализовано** (проверено по `handlers/shopping.py`, `services/matching.py`, `services/label_ocr.py`):
+- [x] Таблицы `ShoppingSession` и `LabelScan` в БД
+- [x] FSM States: `scanning_labels`, `waiting_for_receipt`, `waiting_for_label_photo`
+- [x] Кнопка "🛒 Иду в магазин" в меню (запуск через callback `start_shopping_mode`)
+- [x] Сканирование этикеток с OCR (LabelOCRService)
+- [x] Сохранение КБЖУ из этикетки в LabelScan
+- [x] Завершение покупок → ожидание чека
+- [x] Fuzzy matching (rapidfuzz, MIN_SCORE=70) + бонусы за вес и бренд
+- [x] Интерфейс коррекции несовпадений (sm_link, sm_skip, sm_request_label, sm_remove_product)
+- [x] Удаление скана (shopping_delete_scan)
+- [x] AI Consultant рекомендации при сканировании
+- [x] PhotoQueueManager для очередей фото
 
-**Success Criteria**:
-- All items in SHOPPING_MODE_PLAN.md are completed
-- Shopping Mode is fully functional end-to-end
-- Test coverage > 80% for Shopping Mode handlers
-
-**Dependencies**: CI/CD setup (for testing)
+**Что не реализовано**:
+- [ ] Комплексные тесты Shopping Mode
+- [ ] Документация по Shopping Mode обновлена частично
 
 ---
 
-### 4. Implement Comprehensive Logging (Structured Logs)
+### 4. Structured Logging
 
-**Status**: Not Started  
-**Priority**: P2 (High)  
-**Estimated Effort**: 2-3 days
+**Статус**: Частично  
+**Приоритет**: P2 → P3
 
-**Tasks**:
-- [ ] Replace current logging with structured logging (JSON format)
-- [ ] Add log levels configuration (DEBUG, INFO, WARNING, ERROR)
-- [ ] Implement log rotation (logrotate or Python logging.handlers)
-- [ ] Add request ID tracking for correlation
-- [ ] Add performance metrics logging (timing, API call durations)
-- [ ] Configure log aggregation (optional: ELK stack or similar)
+**Текущее состояние**:
+- Базовое логирование в `foodflow.log` через `logging.basicConfig` (main.py)
+- Отдельный модуль `services/logger.py`
+- Нет JSON-форматирования
+- Нет ротации логов (файл растёт неограниченно — см. аудит НИЗ-1)
 
-**Success Criteria**:
-- All logs are structured (JSON format)
-- Log rotation prevents disk space issues
-- Request correlation possible via request IDs
-- Performance metrics logged for critical paths
-
-**Dependencies**: None
+**Задачи (актуальные)**:
+- [ ] Ротация логов (`RotatingFileHandler`, maxBytes=50MB, backupCount=5)
+- [ ] JSON-формат для structured logging
+- [ ] Request ID tracking
 
 ---
 
 ## Short-term Goals (Priority: Medium)
 
-### 5. Add Unit Tests for Core Services
+### 5. Unit Tests для core services
 
-**Status**: ✅ Completed (Partial)  
-**Priority**: P2 (High)  
-**Estimated Effort**: 5-7 days  
-**Completed**: 2025-11-25
+**Статус**: ✅ Реализовано (расширено)  
+**Приоритет**: P2  
+**Завершено**: к апрелю 2026
 
-**Tasks**:
-- [x] Create `tests/` directory structure
-- [x] Write unit tests for OCR service
-- [x] Write unit tests for normalization service
-- [ ] Write unit tests for matching service
-- [ ] Write unit tests for AI service
-- [ ] Add integration tests for receipt processing flow
-- [ ] Add integration tests for Shopping Mode flow
-- [x] Add unit tests for handlers (fridge, recipes, shopping) - *Partial*
-
-**Success Criteria**:
-- ✅ Test coverage > 70% for OCR and Normalization services (94% OCR, 100% Normalization)
-- ✅ All critical paths have tests for services
-- ✅ Tests run in CI/CD pipeline
-- ⏳ Handler tests need fixes for database setup
-
-**Dependencies**: CI/CD setup ✅
-
-**Implementation Notes**:
-- Created `tests/unit/test_services.py` with 10 passing tests
-- Created `tests/unit/test_handlers.py` with 6/10 passing tests (4 need DB fixes)
-- Created `tests/conftest.py` with fixtures for database, mocks, Telegram objects
-- Coverage: OCRService 94%, NormalizationService 100%
-- See [specs/features/unit_testing/](specs/features/unit_testing/) for full documentation
+**Текущее состояние**:
+- `tests/unit/test_services.py` — OCR, нормализация
+- `tests/unit/test_handlers.py` — базовые handlers
+- `tests/unit/test_services_additional.py` — расширенные тесты сервисов
+- `tests/unit/test_handlers_additional.py` — дополнительные handler-тесты
+- `tests/unit/test_consultant.py` — тесты ConsultantService
+- `tests/unit/test_ai_guide.py` — тесты AIGuideService
+- `tests/unit/test_onboarding.py` — тесты онбординга
+- Integration-тесты: marathon, payments, referrals, i_ate, recipes и др.
 
 ---
 
-### 6. Implement Redis Caching Layer
+### 6. Кэш нормализации
 
-**Status**: Not Started  
-**Priority**: P3 (Medium)  
-**Estimated Effort**: 3-4 days
+**Статус**: Частично (кэш рецептов есть, кэш нормализации — нет)  
+**Приоритет**: P3
 
-**Tasks**:
-- [ ] Set up Redis instance (local + production)
-- [ ] Add Redis client (redis-py or aioredis)
-- [ ] Implement caching for:
-  - [ ] OCR results (cache by image hash)
-  - [ ] Recipe generation (cache by ingredients hash)
-  - [ ] Price search results (TTL: 24 hours)
-- [ ] Add cache invalidation logic
-- [ ] Configure cache TTLs appropriately
+**Текущее состояние**:
+- `services/cache.py` — кэш рецептов через `CachedRecipe` в БД (hash по ингредиентам)
+- Кэш нормализации продуктов отсутствует — повторные запросы идут в API
 
-**Success Criteria**:
-- Redis is integrated and working
-- Cache hit rate > 50% for OCR requests
-- Reduced external API calls by 30%+
-
-**Dependencies**: PostgreSQL migration (for production setup)
+**Задачи**:
+- [ ] Кэш нормализации по hash(product_name), TTL 7 дней
 
 ---
 
-### 7. Add API Rate Limiting and Queue System
+### 7. Rate Limiting на AI-эндпоинты
 
-**Status**: Not Started  
-**Priority**: P3 (Medium)  
-**Estimated Effort**: 4-5 days
+**Статус**: Не реализовано  
+**Приоритет**: P1 (финансовый риск — см. аудит СЕРЬЁЗ-5)
 
-**Tasks**:
-- [ ] Implement rate limiting for external API calls
-- [ ] Add request queue for OCR processing (Redis Queue or Celery)
-- [ ] Implement retry logic with exponential backoff
-- [ ] Add monitoring for API usage and limits
-- [ ] Configure rate limits per API (OpenRouter, Perplexity)
-
-**Success Criteria**:
-- No API rate limit errors
-- Queue system handles peak loads gracefully
-- Retry logic prevents transient failures
-
-**Dependencies**: Redis caching
+**Задачи**:
+- [ ] `slowapi` или `fastapi-limiter` для `/api/recognize/*` и `/api/receipts/upload`
+- [ ] Лимиты: 10 req/min на /recognize, 5 req/min на /receipts/upload
 
 ---
 
-## Long-term Goals (Priority: Low)
+## Long-term Goals
 
-### 8. Extract Microservices (When Scale Demands)
+### 8. Микросервисы
 
-**Status**: Not Started  
-**Priority**: P4 (Future)  
-**Estimated Effort**: 2-3 weeks
-
-**Tasks**:
-- [ ] Design service boundaries
-- [ ] Extract OCR Service (standalone API)
-- [ ] Extract Recipe Service (standalone API)
-- [ ] Extract Price Service (standalone API)
-- [ ] Add API Gateway
-- [ ] Implement service-to-service communication
-- [ ] Add service discovery
-
-**Success Criteria**:
-- Services are independently deployable
-- Services can scale independently
-- No breaking changes to Telegram Bot interface
-
-**Dependencies**: Significant user growth (>10k active users)
+**Статус**: Не начато  
+**Приоритет**: P4 (нужен рост >10k активных пользователей)
 
 ---
 
-### 9. Add REST API for Web/Mobile Clients
+### 9. REST API — веб/мобильные клиенты
 
-**Status**: Not Started  
-**Priority**: P4 (Future)  
-**Estimated Effort**: 1-2 weeks
+**Статус**: ✅ FastAPI API уже реализован и работает  
+**Приоритет**: Завершено
 
-**Tasks**:
-- [ ] Design REST API (OpenAPI spec)
-- [ ] Implement FastAPI or Flask REST endpoints
-- [ ] Add authentication (JWT tokens)
-- [ ] Add API documentation (Swagger/OpenAPI)
-- [ ] Version API endpoints
-
-**Success Criteria**:
-- REST API is documented and versioned
-- Authentication is secure
-- API can serve web/mobile clients
-
-**Dependencies**: Microservices extraction (optional, can be done before)
+**Текущее состояние**: FastAPI на порту 8001 с JWT авторизацией, Swagger UI `/docs`. Роутеры: auth, products, consumption, recipes, weight, shopping_list, reports, receipts, recognize, smart, search, herbalife, universal, assets, saved_dishes, water, ai_insight, referrals.
 
 ---
 
-## Progress Tracking
+## Таблица прогресса (апрель 2026)
 
-**Last Updated**: 2025-11-25
-
-| Goal | Status | Progress | Blockers |
-|------|--------|----------|----------|
-| CI/CD Workflow | ✅ Completed | 100% | None |
-| PostgreSQL Migration | Not Started | 0% | None |
-| Shopping Mode Refactor | In Progress | 40% | None |
-| Structured Logging | Not Started | 0% | None |
-| Unit Tests | ✅ Completed (Partial) | 70% | None (core services done) |
-| Redis Caching | Not Started | 0% | PostgreSQL migration |
-| Rate Limiting | Not Started | 0% | Redis caching |
-| Microservices | Not Started | 0% | Scale requirements |
-| REST API | Not Started | 0% | None |
+| Задача | Статус | Прогресс | Примечания |
+|--------|--------|----------|------------|
+| CI/CD Workflow | ✅ Завершено | 100% | GitHub Actions работает |
+| PostgreSQL Migration | ⏸ Заморожено | 0% | SQLite+WAL достаточно |
+| Shopping Mode | ✅ Реализовано | 90% | Нет комплексных тестов |
+| Structured Logging | 🔄 Частично | 30% | Нет ротации, нет JSON |
+| Unit Tests | ✅ Расширено | 80% | 7+ файлов unit + integration |
+| Кэш нормализации | ❌ Нет | 10% | Есть кэш рецептов |
+| Rate Limiting API | ❌ Нет | 0% | Финансовый риск |
+| REST API | ✅ Завершено | 95% | FastAPI полностью работает |
+| Микросервисы | ❌ Нет | 0% | Не нужно при текущей нагрузке |
 
 ---
 
-## Notes
+## Критические задачи (из аудита 2026-03-12)
 
-- All goals follow Spec-Driven Development principles
-- Each goal should have a spec before implementation
-- Technical debt items are prioritized based on impact
-- Roadmap is reviewed and updated monthly
+> Подробнее см. `планы/stability_audit_claude_2026-03-12.md`
 
+| ID | Файл | Проблема | Статус |
+|----|------|----------|--------|
+| КРИТ-1 | ocr.py, normalization.py | Новая aiohttp ClientSession в retry loop | ❌ Не исправлено |
+| КРИТ-2 | photo_queue.py | Unbounded asyncio.Queue (нет maxsize) | ❌ Не исправлено |
+| КРИТ-3 | scheduler.py | Все пользователи в памяти разом | ❌ Не исправлено |
+| СЕРЬЁЗ-1 | paywall.py | SELECT на каждый callback | ❌ Не исправлено |
+| СЕРЬЁЗ-2 | matching.py | Sync fuzzy blocking event loop | ❌ Не исправлено |
+| СЕРЬЁЗ-4 | api/main.py | CORS allow_origins=["*"] | ❌ Не исправлено |
+| СЕРЬЁЗ-5 | api/main.py | Нет rate limit на AI эндпоинты | ❌ Не исправлено |
+| СРЕДН-1 | ecosystem.config.js | PM2 bot memory limit = 200MB | ❌ Не исправлено (api: 300MB) |
+
+---
+
+## Примечания
+
+- Все цели следуют принципу Spec-Driven Development
+- Роадмап обновляется при реальных изменениях кода
+- Критические проблемы стабильности фиксируются в `планы/stability_audit_claude_2026-03-12.md`

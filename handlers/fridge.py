@@ -20,7 +20,9 @@ from sqlalchemy.orm import selectinload
 from database.base import get_db
 from database.models import ConsumptionLog, Product, Receipt
 from services.ai import AIService
+from services.kbju_core import KBJUCoreService
 from services.photo_queue import PhotoQueueManager
+from config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -98,6 +100,12 @@ async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext =
             except Exception:
                 pass
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    
+    from database.base import get_db
+    from services.ai_guide import AIGuideService
+    async for session in get_db():
+        await AIGuideService.track_activity(callback.from_user.id, "fridge", session)
+        break
 
     await callback.answer()
 
@@ -140,8 +148,9 @@ async def show_fridge_list(callback: types.CallbackQuery) -> None:
     builder = InlineKeyboardBuilder()
 
     for product in products:
+        # Use prefix for etalon items if needed (already in name usually, but good to check)
         name = product.name[:25] + "..." if len(product.name) > 25 else product.name
-        builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}:{page}")
+        builder.button(text=f"▫️ {name}", callback_data=f"fridge_item:{product.id}:{page}:0")
 
     builder.adjust(1)
 
@@ -183,6 +192,7 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
         parts = callback.data.split(":")
         product_id = int(parts[1])
         page = int(parts[2]) if len(parts) > 2 else 0
+        source = int(parts[3]) if len(parts) > 3 else 0
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
@@ -210,10 +220,12 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
             f"🥬 Клетчатка: <code>{product.fiber}г</code>"
         )
 
+        back_callback = f"fridge_list:{page}" if source == 0 else "fridge_search_back"
+        
         builder = InlineKeyboardBuilder()
-        builder.button(text="🍽️ Съесть", callback_data=f"fridge_eat:{product.id}:{page}")
-        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}")
-        builder.button(text="🔙 Назад к списку", callback_data=f"fridge_list:{page}")
+        builder.button(text="🍽️ Съесть", callback_data=f"fridge_eat:{product.id}:{page}:{source}")
+        builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}:{source}")
+        builder.button(text="🔙 Назад", callback_data=back_callback)
         builder.adjust(1)
 
         try:
@@ -230,15 +242,16 @@ async def show_eat_options(callback: types.CallbackQuery) -> None:
         parts = callback.data.split(":")
         product_id = int(parts[1])
         page = int(parts[2]) if len(parts) > 2 else 0
+        source = int(parts[3]) if len(parts) > 3 else 0
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="🍽️ Целиком", callback_data=f"fridge_consume:whole:{product_id}:{page}")
-    builder.button(text="⚖️ В граммах", callback_data=f"fridge_consume:grams_input:{product_id}:{page}")
-    builder.button(text="🧩 В штуках", callback_data=f"fridge_consume:pieces_input:{product_id}:{page}")
-    builder.button(text="🔙 Назад", callback_data=f"fridge_item:{product_id}:{page}")
+    builder.button(text="🍽️ Целиком", callback_data=f"fridge_consume:whole:{product_id}:{page}:{source}")
+    builder.button(text="⚖️ В граммах", callback_data=f"fridge_consume:grams_input:{product_id}:{page}:{source}")
+    builder.button(text="🧩 В штуках", callback_data=f"fridge_consume:pieces_input:{product_id}:{page}:{source}")
+    builder.button(text="🔙 Назад", callback_data=f"fridge_item:{product_id}:{page}:{source}")
     builder.adjust(1)
 
     await callback.message.edit_text(
@@ -255,22 +268,23 @@ async def handle_consume_choice(callback: types.CallbackQuery, state: FSMContext
     mode = parts[1]
     product_id = int(parts[2])
     page = int(parts[3]) if len(parts) > 3 else 0
-
+    source = int(parts[4]) if len(parts) > 4 else 0
+    
     if mode == "whole":
-        await consume_product(callback, product_id, page, amount=1, unit="qty")
+        await consume_product(callback, product_id, page, amount=1, unit="qty", source=source)
 
     elif mode == "grams_input":
         await state.set_state(FridgeStates.waiting_for_consume_grams)
-        await state.update_data(product_id=product_id, page=page)
+        await state.update_data(product_id=product_id, page=page, source=source)
         await callback.message.edit_text("⚖️ <b>Введите вес (в граммах):</b>\n\nНапример: 50, 100", parse_mode="HTML")
 
     elif mode == "pieces_input":
         await state.set_state(FridgeStates.waiting_for_consume_pieces)
-        await state.update_data(product_id=product_id, page=page)
+        await state.update_data(product_id=product_id, page=page, source=source)
         await callback.message.edit_text("🧩 <b>Введите количество (шт):</b>\n\nНапример: 0.5, 1, 2", parse_mode="HTML")
 
 
-async def consume_product(callback, product_id, page, amount, unit, log_calories=None):
+async def consume_product(callback, product_id, page, amount, unit, log_calories=None, source=0):
     """Core consumption logic."""
     async for session in get_db():
         product = await session.get(Product, product_id)
@@ -305,9 +319,12 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
                 product.weight_g -= consumed_weight
                 calculated_calories = (consumed_weight / 100) * product.calories if product.calories else 0
             else:
-                # Fallback: Weight unknown. Assume 100g per unit.
-                estimated_weight = 100.0 * amount
-                calculated_calories = (estimated_weight / 100) * product.calories if product.calories else 0
+                # 🚀 IMPROVEMENT: Estimate weight per unit using KBJUCore
+                core_result = await KBJUCoreService.get_product_nutrition(product.base_name or product.name, session)
+                estimated_weight_per_unit = core_result.weight_grams or 100.0 # Fallback to 100g if still unknown
+                
+                consumed_weight = estimated_weight_per_unit * amount
+                calculated_calories = (consumed_weight / 100) * product.calories if product.calories else 0
                 # We can't reduce weight_g since it's None.
 
             if product.quantity > amount:
@@ -319,10 +336,16 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
                 msg = "✅ Продукт закончился."
                 remaining = False
 
+        else:
+             # Fallback case (should not happen with updated UI)
+             msg = "✅ Записано."
+             remaining = True
+
         # Log to DB
         log = ConsumptionLog(
             user_id=callback.from_user.id,
             product_name=product.name,
+            base_name=product.base_name,
             calories=calculated_calories,
             protein=(calculated_calories/product.calories)*product.protein if product.calories and product.calories > 0 else 0,
             fat=(calculated_calories/product.calories)*product.fat if product.calories and product.calories > 0 else 0,
@@ -334,18 +357,22 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
         await session.commit()
 
         if not product.weight_g and unit == "qty":
-             msg += " (Вес неизвестен, считаем 100г/шт)"
+             msg += " (Вес оценен автоматически)"
 
         await callback.answer(msg, show_alert=True)
 
         if remaining:
              from types import SimpleNamespace
-             new_callback = SimpleNamespace(data=f"fridge_item:{product_id}:{page}", from_user=callback.from_user, message=callback.message, answer=callback.answer)
+             new_callback = SimpleNamespace(data=f"fridge_item:{product_id}:{page}:{source}", from_user=callback.from_user, message=callback.message, answer=callback.answer)
              await show_item_detail(new_callback)
         else:
-             from types import SimpleNamespace
-             new_callback = SimpleNamespace(data=f"fridge_list:{page}", from_user=callback.from_user, message=callback.message, answer=callback.answer)
-             await show_fridge_list(new_callback)
+             if source == 1:
+                  from handlers.fridge_search import show_search_results
+                  await show_search_results(callback.message, None, page=page, is_edit=True, use_session_query=True)
+             else:
+                  from types import SimpleNamespace
+                  new_callback = SimpleNamespace(data=f"fridge_list:{page}", from_user=callback.from_user, message=callback.message, answer=callback.answer)
+                  await show_fridge_list(new_callback)
 
 @router.callback_query(F.data.startswith("fridge_del:"))
 async def delete_product(callback: types.CallbackQuery) -> None:
@@ -354,6 +381,7 @@ async def delete_product(callback: types.CallbackQuery) -> None:
         parts = callback.data.split(":")
         product_id = int(parts[1])
         page = int(parts[2]) if len(parts) > 2 else 0
+        source = int(parts[3]) if len(parts) > 3 else 0
     except (IndexError, ValueError):
         await callback.answer("Ошибка", show_alert=True)
         return
@@ -372,13 +400,17 @@ async def delete_product(callback: types.CallbackQuery) -> None:
         else:
             await callback.answer("Товар не найден", show_alert=True)
 
-    from types import SimpleNamespace
-    new_callback = SimpleNamespace()
-    new_callback.data = f"fridge_list:{page}"
-    new_callback.from_user = callback.from_user
-    new_callback.message = callback.message
-    new_callback.answer = callback.answer
-    await show_fridge_list(new_callback)
+    if source == 1:
+         from handlers.fridge_search import show_search_results
+         await show_search_results(callback.message, None, page=page, is_edit=True, use_session_query=True)
+    else:
+         from types import SimpleNamespace
+         new_callback = SimpleNamespace()
+         new_callback.data = f"fridge_list:{page}"
+         new_callback.from_user = callback.from_user
+         new_callback.message = callback.message
+         new_callback.answer = callback.answer
+         await show_fridge_list(new_callback)
 
 
 # --- Add Food Logic ---
@@ -488,20 +520,28 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
             raise ValueError("Не удалось распознать. Попробуй еще раз.")
 
         user_id = message.from_user.id
+        
+        # 🚀 INTEGRATION: Check KBJUCore for verified data
         async for session in get_db():
+            core_result = await KBJUCoreService.get_product_nutrition(product_data["name"], session)
+            
+            # Use KBJUCore values if it's a CACHE HIT, otherwise fallback to AI labels
+            prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
+            
             product = Product(
                 user_id=user_id,
                 source="manual_label",
-                name=product_data.get("name"),
+                name=prefix + core_result.display_name,
+                base_name=core_result.base_name,
                 category="Manual",
-                calories=float(product_data.get("calories", 0)),
-                protein=float(product_data.get("protein", 0)),
-                fat=float(product_data.get("fat", 0)),
-                carbs=float(product_data.get("carbs", 0)),
-                fiber=float(product_data.get("fiber", 0)), # SAVE FIBER
+                calories=core_result.calories,
+                protein=core_result.protein,
+                fat=core_result.fat,
+                carbs=core_result.carbs,
+                fiber=core_result.fiber,
                 price=0.0,
                 quantity=1.0,
-                weight_g=float(product_data.get("weight_g", 0)) if product_data.get("weight_g") else None
+                weight_g=product_data.get("weight_g") or core_result.weight_grams
             )
             session.add(product)
             await session.commit()
@@ -546,20 +586,27 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
             raise ValueError("Не удалось распознать блюдо.")
 
         user_id = message.from_user.id
+        
+        # 🚀 INTEGRATION: Check KBJUCore for verified data
         async for session in get_db():
+            core_result = await KBJUCoreService.get_product_nutrition(product_data["name"], session)
+            
+            prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
+            
             product = Product(
                 user_id=user_id,
                 source="manual_dish",
-                name=product_data.get("name"),
+                name=prefix + core_result.display_name,
+                base_name=core_result.base_name,
                 category="Dish",
-                calories=float(product_data.get("calories", 0)),
-                protein=float(product_data.get("protein", 0)),
-                fat=float(product_data.get("fat", 0)),
-                carbs=float(product_data.get("carbs", 0)),
-                fiber=float(product_data.get("fiber", 0)), # SAVE FIBER
+                calories=core_result.calories,
+                protein=core_result.protein,
+                fat=core_result.fat,
+                carbs=core_result.carbs,
+                fiber=core_result.fiber,
                 price=0.0,
                 quantity=1.0,
-                weight_g=float(product_data.get("weight_g", 0)) if product_data.get("weight_g") else None
+                weight_g=product_data.get("weight_g") or core_result.weight_grams
             )
             session.add(product)
             await session.commit()

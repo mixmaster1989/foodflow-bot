@@ -23,7 +23,11 @@ from api.routers import (
     shopping_list,
     smart,
     universal,
+    saved_dishes,
+    water,
     weight,
+    ai_insight,
+    referrals,
 )
 
 
@@ -71,6 +75,10 @@ app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(herbalife.router, prefix="/api/herbalife", tags=["Herbalife Expert"])
 app.include_router(universal.router, prefix="/api/universal", tags=["Universal Input"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets (Flux)"])
+app.include_router(saved_dishes.router, prefix="/api/saved-dishes", tags=["Saved Dishes"])
+app.include_router(water.router, prefix="/api/water", tags=["Water Tracking"])
+app.include_router(ai_insight.router, prefix="/api/ai", tags=["AI Insight"])
+app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
 
 
 
