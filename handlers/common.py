@@ -17,7 +17,7 @@ from aiogram.types import (
 from sqlalchemy.future import select
 
 from database.base import get_db
-from database.models import User, UserSettings, ReferralEvent, ReferralReward
+from database.models import User, UserSettings, ReferralEvent, ReferralReward, UserFeedback
 from services.referral_service import ReferralService
 from handlers.menu import show_main_menu
 from handlers.onboarding import start_onboarding
@@ -49,7 +49,7 @@ async def btn_main_menu(message: types.Message, state: FSMContext):
 async def cmd_webapp(message: types.Message):
     """Send Inline Button for Web App (More reliable initData)."""
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚀 Open FoodFlow", web_app=types.WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))]
+        [InlineKeyboardButton(text="🚀 Open FoodFlow", web_app=types.WebAppInfo(url="https://xn--d1aojrdbc.xn--p1ai/foodflow/"))]
     ])
     await message.answer("👇 Попробуй открыть через эту кнопку (Inline):", reply_markup=kb)
 
@@ -232,6 +232,19 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
                 import logging
 
                 logging.getLogger(__name__).error(f"[REFERRAL] Failed to grant start Pro bonus for user {user.id}: {e}", exc_info=True)
+
+        # Трекинг рекламной кампании для аналитики Telegram Ads
+        if is_new_user and ad_campaign:
+            try:
+                fb = UserFeedback(
+                    user_id=user.id,
+                    feedback_type="ad_campaign",
+                    answer=ad_campaign,
+                )
+                session.add(fb)
+                await session.commit()
+            except Exception:
+                pass  # Не ломаем /start из-за аналитики
 
         # CRITICAL FIX: Make sure user is verified AFTER finishing onboarding
         # This ensures they NEVER see the password prompt again

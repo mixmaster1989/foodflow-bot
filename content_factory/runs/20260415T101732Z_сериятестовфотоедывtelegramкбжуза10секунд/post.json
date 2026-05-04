@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T101732Z",
+  "mode": "to_me",
+  "topic": "Серия тестов: фото еды в Telegram → КБЖУ за 10 секунд",
+  "scenario": "use_case",
+  "text": "🍽️ <b>Пятница. Стол забит едой, напитками и классическим «запишу позже». 📸🍽️</b>\n\n📸 Обычно на этом учет и заканчивается. Но тут все проще: открыл Telegram, <b>сфоткал стол, отправил в бота</b> — и через пару мгновений получил КБЖУ ⚡\n\n⏱️ <b>Без ручного ввода, без лишних действий</b>, без попыток вспоминать, что именно и сколько было съедено. <b>10 секунд</b> — и уже понятно, что реально попало в рацион. Такие мелочи и решают результат: либо держишь курс, либо снова откладываешь на потом.\n\n⚡ Сфоткал → Отправил → Получил КБЖУ.\n\n<blockquote>Попробуйте — просто сфотографируйте обед.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, food and lifestyle scene in a modern apartment on a Friday evening, a table filled with festive dishes and drinks, a smartphone open to a Telegram chat showing a food analysis result, subtle neon lighting, realistic hands holding the phone, cinematic composition, shallow depth of field, high detail, vivid but natural colors, premium editorial photography",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     BOT_TOKEN: str
+    RECEPTION_BOT_TOKEN: str | None = None
     OPENROUTER_API_KEY: str
+    GROK_PROXY: str | None = None
     DATABASE_URL: str = "sqlite+aiosqlite:////home/user1/foodflow-bot/foodflow.db"
     JWT_SECRET_KEY: str
     GLOBAL_PASSWORD: str
@@ -16,6 +18,19 @@ class Settings(BaseSettings):
     YOOKASSA_SECRET_KEY: str | None = None
     IS_BETA_TESTING: bool = True
     MARKETING_GROUP_ID: int = 0
+
+    # Content Factory publishing (optional)
+    CONTENT_FACTORY_TELEGRAM_TOKEN: str | None = None
+    CONTENT_FACTORY_TARGET_CHAT_ID: int | None = None
+    
+    # VK Mini App
+    VK_APP_ID: int = 54530169
+    VK_APP_SECRET: str = ""  # To be set in .env
+
+    # VK publishing (optional)
+    VK_TOKEN: str | None = None
+    VK_GROUP_ID: int | None = None
+    VK_API_VERSION: str = "5.199"
 
 
     # Paths

@@ -4,9 +4,11 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
+import pytz
+
 from api.auth import CurrentUser, DBSession
 from api.schemas import SavedDishCreate, SavedDishLog, SavedDishRead
-from database.models import SavedDish, Product
+from database.models import ConsumptionLog, SavedDish
 
 router = APIRouter()
 
@@ -78,30 +80,26 @@ async def log_saved_dish(
     if not dish or dish.user_id != user.id:
         raise HTTPException(status_code=404, detail="Saved dish not found")
         
-    target_date = datetime.now()
+    msk_tz = pytz.timezone("Europe/Moscow")
+    target_date = datetime.now(msk_tz).replace(tzinfo=None)
     if log_req.date:
         try:
-            target_date = datetime.fromisoformat(log_req.date.replace('Z', '+00:00'))
+            target_date = datetime.fromisoformat(log_req.date.replace('Z', '+00:00')).replace(tzinfo=None)
         except ValueError:
-            pass # Keep default now
-            
-    # Add products
+            pass
+
     for comp in dish.components:
-        prod = Product(
+        log = ConsumptionLog(
             user_id=user.id,
-            name=comp.get("name"),
+            product_name=comp.get("name"),
             calories=comp.get("calories", 0),
             protein=comp.get("protein", 0),
             fat=comp.get("fat", 0),
             carbs=comp.get("carbs", 0),
             fiber=comp.get("fiber", 0),
-            category="custom",
-            source="saved_dish",
-            price=0,
-            quantity=comp.get("weight_g", 1), # store weight if available
-            created_at=target_date,
+            date=target_date,
         )
-        session.add(prod)
+        session.add(log)
         
     await session.commit()
     return {"message": "Saved dish logged successfully"}

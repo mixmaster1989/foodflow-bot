@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js" async></script>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,7 +12,15 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div
+      style="background: black; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif;">
+      <div style="text-align: center;">
+        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">FoodFlow</div>
+        <div style="color: #666; font-size: 14px;">Загрузка ядра системы...</div>
+      </div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

@@ -7,6 +7,11 @@ from aiogram.fsm.context import FSMContext
 
 logger = logging.getLogger(__name__)
 
+# Per-user queue limit. Защита от OOM при флуде фото:
+# реальный пользователь столько за раз не присылает.
+QUEUE_MAX_SIZE = 10
+
+
 class PhotoQueueManager:
     """Manages per-user queues for sequential photo processing.
 
@@ -24,54 +29,48 @@ class PhotoQueueManager:
         state: FSMContext,
         processing_func: Callable[[types.Message, Bot, FSMContext, str], Awaitable[None]],
         file_id: str
-    ) -> None:
+    ) -> bool:
         """Add a photo to the user's processing queue.
 
-        Args:
-            user_id: Telegram user ID
-            message: Message object (for replying)
-            bot: Bot instance
-            state: FSM context
-            processing_func: Async function to call for processing
-            file_id: ID of the photo file to process
+        Returns:
+            True если фото добавлено в очередь, False если очередь переполнена
+            (юзеру при этом отправляется сообщение).
         """
         if user_id not in cls._queues:
-            cls._queues[user_id] = asyncio.Queue()
+            cls._queues[user_id] = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
 
         queue = cls._queues[user_id]
-        position = queue.qsize()  # Items currently waiting (excluding active one if worker running)
+        position = queue.qsize()
 
-        # If worker is already running, there's 1 active item provided user_id is in _workers
-        # qsize gives waiting items.
-
-        await queue.put({
-            "file_id": file_id,
-            "message": message,
-            "bot": bot,
-            "state": state,
-            "func": processing_func
-        })
-
-        # Log exact position
-        # Note: If queue was empty and worker not running, this is item #1 (starts immediately).
-        # If worker running, this is item #(qsize).
+        try:
+            queue.put_nowait({
+                "file_id": file_id,
+                "message": message,
+                "bot": bot,
+                "state": state,
+                "func": processing_func
+            })
+        except asyncio.QueueFull:
+            logger.warning(
+                f"[PhotoQueue] User {user_id}: queue full ({QUEUE_MAX_SIZE}), rejecting photo {file_id}"
+            )
+            try:
+                await message.answer(
+                    "⏳ Слишком много фото в очереди. "
+                    "Подожди пока я обработаю текущие — затем пришли заново."
+                )
+            except Exception:
+                pass
+            return False
 
         if user_id not in cls._workers or cls._workers[user_id].done():
-            # Start worker if not active
             cls._workers[user_id] = asyncio.create_task(cls._worker(user_id))
             logger.info(f"[PhotoQueue] User {user_id}: Queue started with first item.")
         else:
-            # Already running - notify user about queue position
-            # Position 1 means 1 item WAITING (plus 1 processing).
-            pos_msg = position + 1 # 1-based index for user
+            pos_msg = position + 1
             logger.info(f"[PhotoQueue] User {user_id}: Added to queue. Position: {pos_msg}")
 
-            # Optional: Notify user if queue is getting long (>1)
-            # Use 'create_task' to not block adding to queue
-            # try:
-            #    await message.answer(f"📸 Фото в очереди: {pos_msg}. Обрабатываю предыдущие...")
-            # except Exception:
-            #    pass
+        return True
 
     @classmethod
     async def _worker(cls, user_id: int):

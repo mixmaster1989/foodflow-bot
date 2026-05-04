@@ -29,6 +29,7 @@ from handlers import (
     stats,
     subscription,
     support,
+    survey,
     universal_input,
     user_settings,
     ward_interactions,
@@ -72,20 +73,21 @@ async def main():
         """Drop group messages early — only allow /mstats and mkt_ callbacks through."""
         async def __call__(self, handler, event, data):
             if isinstance(event, Update):
-                # Allow private chats through unconditionally
-                if event.message and event.message.chat.type == "private":
+                if event.message:
+                    if event.message.chat.type == "private":
+                        return await handler(event, data)
+                    if event.message.text and event.message.text.startswith("/mstats"):
+                        return await handler(event, data)
+                    return
+                elif event.callback_query:
+                    if event.callback_query.data and event.callback_query.data.startswith("mkt_"):
+                        return await handler(event, data)
+                    if event.callback_query.message and event.callback_query.message.chat.type == "private":
+                        return await handler(event, data)
+                    return
+                else:
+                    # pre_checkout_query, my_chat_member, etc. — pass through
                     return await handler(event, data)
-                # Allow /mstats command in groups
-                if event.message and event.message.text and event.message.text.startswith("/mstats"):
-                    return await handler(event, data)
-                # Allow marketing callbacks in groups
-                if event.callback_query and event.callback_query.data and event.callback_query.data.startswith("mkt_"):
-                    return await handler(event, data)
-                # Allow callback queries from private chats
-                if event.callback_query and event.callback_query.message and event.callback_query.message.chat.type == "private":
-                    return await handler(event, data)
-                # Drop everything else (group messages, channel posts, etc.)
-                return
             return await handler(event, data)
 
     dp.update.outer_middleware(GroupFilterMiddleware())
@@ -124,6 +126,7 @@ async def main():
     dp.include_router(stats.router)
     dp.include_router(referrals.router)
     dp.include_router(feedback.router)
+    dp.include_router(survey.router)
     dp.include_router(shopping_list.router)
     dp.include_router(weight.router)
     dp.include_router(correction.router)
@@ -153,7 +156,11 @@ async def main():
     logging.info("--- Starting FoodFlow Bot ---")
     logging.info("CI/CD Deployment: Verified successfully.")
     logging.info("🚀 FoodFlow Bot started!")
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        from services.http_client import close_http_session
+        await close_http_session()
 
 if __name__ == "__main__":
     asyncio.run(main())

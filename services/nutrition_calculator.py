@@ -27,9 +27,9 @@ class NutritionCalculator:
             bmr = 10 * weight + 6.25 * height - 5 * age - 161
 
         # 2. TDEE (Activity Level)
-        # Defaulting to Moderate (1.55) as a safe baseline for active people/bots
+        # Defaulting to Light (1.3) as a more conservative baseline for new users
         # TODO: Add activity level selection in future
-        tdee = bmr * 1.55
+        tdee = bmr * 1.3
 
         # 3. Goal Adjustment
         if goal == "lose_weight":

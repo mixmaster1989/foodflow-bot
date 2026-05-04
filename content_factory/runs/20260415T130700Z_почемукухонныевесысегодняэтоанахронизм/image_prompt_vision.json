@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a person holding a sleek futuristic smartphone, taking a photo of a gourmet ceramic plate with a fresh meal (grilled salmon, asparagus, and quinoa) on a warm oak wooden table. Subtle teal and lime green holographic interface elements float above the food, showing abstract data visualizations and glowing scanning lines. High-end cyberpunk aesthetic, soft cinematic lighting, premium interior with blurred indoor plants and warm ambient glow. Photorealistic, 8k resolution, vertical composition 4:5.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, distorted hands, extra fingers, blurry face, messy table, low quality, cartoon, illustration, cluttered background.",
+  "notes": [
+    "Used a POV (first-person) angle to directly relate to the 'taking a photo' hook in the text.",
+    "Integrated the brand's signature teal and green neon as 'scanning' elements to represent the AI analysis.",
+    "Maintained the premium lifestyle look by using warm wood and high-quality food textures as seen in the references.",
+    "Strictly excluded any readable text or numbers to avoid AI-generated gibberish and keep the focus on the visual metaphor."
+  ]
+}

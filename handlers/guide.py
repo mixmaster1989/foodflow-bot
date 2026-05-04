@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database.base import get_db
-from database.models import UserSettings, Subscription
+from database.models import UserSettings, Subscription, ConsumptionLog
 from services.ai_guide import AIGuideService
 
 router = Router()
@@ -206,6 +206,57 @@ async def save_personality_quick(callback: types.CallbackQuery, state: FSMContex
             await session.commit()
     await callback.answer("🎭 Характер изменен!")
     await show_guide_menu(callback, state)
+
+@router.callback_query(F.data.startswith("first_guide_pers:"))
+async def activate_guide_first_log(callback: types.CallbackQuery, state: FSMContext):
+    """Gift-activate Guide after user's first food log."""
+    await callback.answer()
+    personality = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+
+    pers_map = {"soft": "🌸 Поддерживающий", "hard": "🦾 Строгий", "direct": "📊 Аналитик"}
+    pers_name = pers_map.get(personality, "🌸 Поддерживающий")
+
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        settings_obj = (await session.execute(stmt)).scalar_one_or_none()
+        if settings_obj:
+            settings_obj.guide_active_until = datetime.now() + timedelta(days=3)
+            settings_obj.guide_config = {"personality": personality}
+            await session.commit()
+        break
+
+    await callback.message.edit_text(
+        f"🤖 <b>Гид активирован!</b>\n\n"
+        f"Характер: <b>{pers_name}</b>\n\n"
+        f"Следующие 3 дня я буду с тобой — анализировать рацион и помогать двигаться к цели 💪",
+        parse_mode="HTML"
+    )
+
+    # Comment on the just-saved meal
+    async for session in get_db():
+        last_log = (await session.execute(
+            select(ConsumptionLog)
+            .where(ConsumptionLog.user_id == user_id)
+            .order_by(ConsumptionLog.date.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if last_log:
+            current_meal = {
+                "name": last_log.product_name,
+                "calories": last_log.calories or 0,
+                "protein": last_log.protein or 0,
+                "fat": last_log.fat or 0,
+                "carbs": last_log.carbs or 0,
+                "time": last_log.date.strftime("%H:%M")
+            }
+            advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
+            if advice:
+                await callback.message.answer(
+                    f"🤖 <b>Гид:</b> <i>{advice}</i>",
+                    parse_mode="HTML"
+                )
+        break
 
 # Helper to register router - will be called in main.py
 def register_guide_handlers(main_router):

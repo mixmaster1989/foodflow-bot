@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from api.auth import CurrentUser
 from api.dependencies import get_db_session
+from api.main import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 from services.ai_insight import AIInsightService
 from services.ai_guide import AIGuideService
@@ -12,7 +13,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Smart Analytics"])
 
 @router.get("/insight")
+@limiter.limit("20/minute")
 async def get_ai_insight(
+    request: Request,
     user: CurrentUser,
     action: str = "greeting",
     detail: str = "Just opened the app",

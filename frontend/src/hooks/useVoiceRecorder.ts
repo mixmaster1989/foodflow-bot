@@ -24,7 +24,7 @@ export function useVoiceRecorder() {
 
             mediaRecorder.onerror = (event) => {
                 console.error('[VoiceRecorder] MediaRecorder error:', event);
-                alert('Ошибка записи (MediaRecorder Error)');
+                console.error('Ошибка записи (MediaRecorder Error)');
             };
 
             mediaRecorder.start(200); // Send data chunks every 200ms
@@ -32,7 +32,7 @@ export function useVoiceRecorder() {
             setIsRecording(true);
         } catch (err) {
             console.error('[VoiceRecorder] Error accessing microphone:', err);
-            alert('Cannot access microphone. Please check permissions: ' + String(err));
+            console.error('Cannot access microphone:', err);
         }
     };
 

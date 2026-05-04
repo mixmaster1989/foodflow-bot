@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from sqlalchemy import select
 from database.base import init_db, get_db
-from database.models import User, Subscription
+from database.models import PAYMENT_SOURCE_ADMIN, Subscription, User
 
 CORE_TEAM_IDS = [432823154, 295543071, 33587682]
 
@@ -35,6 +35,7 @@ async def grant_lifetime_curator():
                     sub.tier = "curator"
                     sub.expires_at = None # Lifetime
                     sub.is_active = True
+                    sub.payment_source = PAYMENT_SOURCE_ADMIN
                     print(f"✅ Updated existing subscription for {uid} to Lifetime Curator")
                 else:
                     new_sub = Subscription(
@@ -42,7 +43,8 @@ async def grant_lifetime_curator():
                         tier="curator",
                         starts_at=datetime.now(),
                         expires_at=None,
-                        is_active=True
+                        is_active=True,
+                        payment_source=PAYMENT_SOURCE_ADMIN,
                     )
                     session.add(new_sub)
                     print(f"✅ Created new Lifetime Curator subscription for {uid}")

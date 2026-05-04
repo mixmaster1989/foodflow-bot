@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T112544Z",
+  "mode": "to_me",
+  "topic": "Серия тестов v4: крючок <=10 слов",
+  "scenario": "pain",
+  "text": "<b>Вечером над тарелкой гадаешь: сколько здесь калорий?🍽️❓</b>\n\nПотом начинаешь всё записывать, <b>быстро устаёшь от рутины</b> и откладываешь подсчёты.\n\nВ FoodFlow просто сделайте <b>фото или продиктуйте состав</b> — и сводка готова.📸\n\n<blockquote>Выбирайте: гадать дальше или узнать точно?</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, food/lifestyle scene in the evening: a person sitting at a kitchen table with a late dinner plate, slightly frustrated, holding a smartphone as if about to send a food photo to a bot, warm city lights through the window, moody but clean atmosphere, realistic food details, modern urban apartment, cinematic lighting, shallow depth of field",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

@@ -19,6 +19,11 @@ os.environ.setdefault('GLOBAL_PASSWORD', 'test-password')
 from database.base import Base, engine
 from database.models import (
     ConsumptionLog,
+    PAYMENT_SOURCE_FEEDBACK,
+    PAYMENT_SOURCE_REFERRAL,
+    PAYMENT_SOURCE_STARS,
+    PAYMENT_SOURCE_TRIAL,
+    PAYMENT_SOURCE_YOOKASSA,
     ReferralEvent,
     Subscription,
     User,
@@ -208,6 +213,116 @@ class TestHourlyActivity:
 
         result = await get_hourly_activity(days=3)
         assert "Пиковый час: 14:00" in result
+
+
+class TestPaymentSourceFiltering:
+    """Тесты для разделения реальных платежей и триалов в отчётах."""
+
+    @pytest.mark.asyncio
+    async def test_daily_digest_excludes_trials_from_sales(self, db_session):
+        """В digest триалы НЕ учитываются как продажи (только stars/yookassa)."""
+        users = await _seed_users(db_session, count=8, days_ago=0)
+        yesterday = datetime.now() - timedelta(days=1)
+
+        # 5 триалов
+        for u in users[:5]:
+            db_session.add(Subscription(
+                user_id=u.id, tier="pro", starts_at=yesterday,
+                expires_at=yesterday + timedelta(days=3),
+                is_active=True, payment_source=PAYMENT_SOURCE_TRIAL,
+            ))
+        # 1 stars-платёж
+        db_session.add(Subscription(
+            user_id=users[5].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_STARS,
+            telegram_payment_charge_id="ch_x",
+        ))
+        # 1 yookassa-платёж
+        db_session.add(Subscription(
+            user_id=users[6].id, tier="basic", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_YOOKASSA,
+            yookassa_payment_id="yk_x",
+        ))
+        # 1 referral (НЕ должен попасть в продажи)
+        db_session.add(Subscription(
+            user_id=users[7].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_REFERRAL,
+        ))
+        await db_session.commit()
+
+        result = await get_daily_digest()
+        # 1 stars × 200⭐ для pro, 1 yookassa × 199₽ для basic
+        assert "200⭐ (1)" in result, f"должен быть 1 stars-платёж 200⭐, отчёт:\n{result}"
+        assert "199₽ (1)" in result, f"должен быть 1 yookassa-платёж 199₽, отчёт:\n{result}"
+
+    @pytest.mark.asyncio
+    async def test_daily_digest_shows_trials_count(self, db_session):
+        """В digest есть строка «🎁 Триалов: N» с правильным числом."""
+        users = await _seed_users(db_session, count=4, days_ago=0)
+        yesterday = datetime.now() - timedelta(days=1)
+
+        for u in users[:3]:
+            db_session.add(Subscription(
+                user_id=u.id, tier="pro", starts_at=yesterday,
+                is_active=True, payment_source=PAYMENT_SOURCE_TRIAL,
+            ))
+        # feedback_bonus и referral в счётчик триалов НЕ попадают
+        db_session.add(Subscription(
+            user_id=users[3].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_FEEDBACK,
+        ))
+        await db_session.commit()
+
+        result = await get_daily_digest()
+        assert "🎁 Триалов: 3" in result, f"ожидали 3 триала, отчёт:\n{result}"
+
+    @pytest.mark.asyncio
+    async def test_csv_export_separates_stars_and_yookassa_trials_excluded(self, db_session):
+        """CSV: триалы в отдельной колонке, stars/yookassa разделены, freebies исключены."""
+        users = await _seed_users(db_session, count=5, days_ago=0)
+        yesterday = datetime.now() - timedelta(days=1)
+
+        # 2 триала
+        for u in users[:2]:
+            db_session.add(Subscription(
+                user_id=u.id, tier="pro", starts_at=yesterday,
+                is_active=True, payment_source=PAYMENT_SOURCE_TRIAL,
+            ))
+        # 1 stars (pro = 200⭐)
+        db_session.add(Subscription(
+            user_id=users[2].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_STARS,
+            telegram_payment_charge_id="ch_y",
+        ))
+        # 1 yookassa (pro = 299₽)
+        db_session.add(Subscription(
+            user_id=users[3].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_YOOKASSA,
+            yookassa_payment_id="yk_y",
+        ))
+        # 1 feedback (НЕ должен попасть ни в trial-колонку, ни в продажи)
+        db_session.add(Subscription(
+            user_id=users[4].id, tier="pro", starts_at=yesterday,
+            is_active=True, payment_source=PAYMENT_SOURCE_FEEDBACK,
+        ))
+        await db_session.commit()
+
+        csv_io = await export_csv(days=3)
+        content = csv_io.getvalue().decode("utf-8")
+        date = yesterday.strftime("%Y-%m-%d")
+
+        assert "Trials" in content, "колонка Trials должна быть в заголовке"
+
+        # Найти строку за вчера и распарсить
+        target_line = next((line for line in content.splitlines() if line.startswith(date)), None)
+        assert target_line is not None, f"строка за {date} должна быть в CSV:\n{content}"
+        cells = target_line.split(",")
+        # Layout: Date, New Users, Ref Signups, DAU, Food Logs, Feedback, Trials, Sales RUB, Rev RUB, Sales Stars, Rev Stars
+        assert cells[6] == "2", f"Trials = 2, получено: {cells[6]} (полная строка: {target_line})"
+        assert cells[7] == "1", f"Sales RUB = 1 (yookassa), получено: {cells[7]}"
+        assert cells[8] == "299", f"Rev RUB = 299, получено: {cells[8]}"
+        assert cells[9] == "1", f"Sales Stars = 1, получено: {cells[9]}"
+        assert cells[10] == "200", f"Rev Stars = 200 (pro), получено: {cells[10]}"
 
 
 class TestCsvExport:

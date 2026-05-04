@@ -36,18 +36,23 @@ async def contact_dev_start(callback: types.CallbackQuery, state: FSMContext):
 async def process_support_message(message: types.Message, state: FSMContext, bot: Bot):
     """Forward user message to admins."""
     user_info = f"User: {message.from_user.full_name} (@{message.from_user.username}) [ID: {message.from_user.id}]"
-    text = message.text or "[Not text message]"
-
+    
+    # Notify admins about the new message
     for admin_id in settings.ADMIN_IDS:
         try:
             await bot.send_message(
                 admin_id,
-                f"📩 <b>Новое обращение от пользователя:</b>\n{user_info}\n\n"
-                f"📝 Текст:\n{text}",
+                f"📩 <b>Новое обращение от пользователя:</b>\n{user_info}",
                 parse_mode="HTML"
             )
+            # Copy the original message to admin
+            await bot.copy_message(
+                chat_id=admin_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
         except Exception as e:
-            logger.error(f"Failed to send support msg to admin {admin_id}: {e}")
+            logger.error(f"Failed to copy support msg to admin {admin_id}: {e}")
 
     await message.answer("✅ <b>Сообщение отправлено!</b> Разработчик ответит вам лично, если потребуется.", parse_mode="HTML")
     await state.clear()

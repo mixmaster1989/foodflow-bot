@@ -29,6 +29,12 @@
 - `SECURITY_REPORT.md` — актуальные уязвимости и статус.
 - `API_DOCUMENTATION.md` — документация REST API (FastAPI на порту 8001).
 - `SHOPPING_MODE_PLAN.md` — план и статус реализации Shopping Mode.
+- 🌐 API и Веб-интерфейс (WebApp)
+- **Backend (API)**: FastAPI. Работает на порту **8001**.
+- **Frontend**: Vite + React + TypeScript. Билд в `dist/`, раздача через FastAPI (`StaticFiles`) или Nginx.
+- **VK Mini App**: Реализовано через `@vkontakte/vk-bridge`. Авторизация по `vk_user_id` через `vkLogin` API.
+- **Nginx CSP**: Обязательно разрешить `frame-ancestors` для доменов VK (`vk.com`, `vk.ru` и др.).
+- **Auth**: JWT токены, `GLOBAL_PASSWORD` для защиты.
 
 ## Текущий статус проекта (апрель 2026)
 

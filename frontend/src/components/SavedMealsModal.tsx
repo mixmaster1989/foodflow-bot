@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useToast } from '../components/Toast'
 import { X, Loader2, Star, Trash2 } from 'lucide-react';
 import { savedDishesApi, consumptionApi } from '../api/client';
 
@@ -10,6 +11,7 @@ interface SavedMealsModalProps {
 }
 
 export function SavedMealsModal({ isOpen, onClose, onSuccess }: SavedMealsModalProps) {
+    const toast = useToast()
     const [meals, setMeals] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isLogging, setIsLogging] = useState<number | null>(null);
@@ -38,7 +40,7 @@ export function SavedMealsModal({ isOpen, onClose, onSuccess }: SavedMealsModalP
             await savedDishesApi.delete(id);
             fetchMeals();
         } catch (err) {
-            alert('Ошибка при удалении');
+            toast.error('Ошибка при удалении');
         }
     };
 
@@ -60,7 +62,7 @@ export function SavedMealsModal({ isOpen, onClose, onSuccess }: SavedMealsModalP
             onSuccess();
             onClose();
         } catch (err) {
-            alert('Ошибка сохранения блюда');
+            toast.error('Ошибка сохранения блюда');
         } finally {
             setIsLogging(null);
         }

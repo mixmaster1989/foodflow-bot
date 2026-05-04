@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a person holding a sleek futuristic smartphone, taking a photo of a delicious cafe dinner. On the warm wooden table are plates of gourmet pasta, a fresh green salad, a small dessert, and a steaming cup of tea. Floating above the food are subtle, translucent holographic interfaces with teal and neon green glowing charts and abstract data visualizations (no text). The background is a cozy, high-end cafe at night with soft bokeh city lights outside the window. Premium lighting, cinematic composition, photorealistic textures, 8k resolution, cyberpunk aesthetic accents.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, distorted hands, extra fingers, blurry face, messy table, low quality, cartoon, illustration",
+  "notes": [
+    "Selected a POV shot to mimic the 'taking a photo for the chat' action mentioned in the text.",
+    "Included all food items (pasta, salad, dessert, tea) to create a sense of a full, guilt-free meal.",
+    "Used 'abstract data visualizations' for the UI to avoid AI-generated gibberish text while maintaining the cyberpunk 'numbers' theme.",
+    "Balanced warm wood tones with the brand's signature teal/green neon glow for a premium aesthetic."
+  ]
+}

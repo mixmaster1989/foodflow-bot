@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../components/Toast'
 import { Home, Scale, TrendingDown, TrendingUp, Minus, Calendar, Plus, ChevronRight, History } from 'lucide-react';
 import { weightApi } from '../api/client';
 
@@ -8,6 +9,7 @@ interface WeightProps {
 }
 
 export const Weight: React.FC<WeightProps> = ({ user, onNavigate }) => {
+    const toast = useToast()
     const [logs, setLogs] = useState<any[]>([]);
     const [weightInput, setWeightInput] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +32,7 @@ export const Weight: React.FC<WeightProps> = ({ user, onNavigate }) => {
         e.preventDefault();
         const w = parseFloat(weightInput.replace(',', '.'));
         if (isNaN(w) || w <= 0 || w > 300) {
-            alert('Введите корректный вес');
+            toast.error('Введите корректный вес');
             return;
         }
 
@@ -45,7 +47,7 @@ export const Weight: React.FC<WeightProps> = ({ user, onNavigate }) => {
             }));
             fetchLogs();
         } catch (e) {
-            alert('Ошибка при сохранении веса');
+            toast.error('Ошибка при сохранении веса');
         } finally {
             setIsLoading(false);
         }

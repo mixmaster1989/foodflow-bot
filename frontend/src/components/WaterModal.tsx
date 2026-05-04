@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../components/Toast'
 import { X, Droplets, Trash2, Plus } from 'lucide-react';
 import { waterApi } from '../api/client';
 
@@ -9,6 +10,7 @@ interface WaterModalProps {
 }
 
 export const WaterModal: React.FC<WaterModalProps> = ({ isOpen, onClose, onSuccess }) => {
+    const toast = useToast()
     const [logs, setLogs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [customAmount, setCustomAmount] = useState('');
@@ -43,7 +45,7 @@ export const WaterModal: React.FC<WaterModalProps> = ({ isOpen, onClose, onSucce
             }));
             onSuccess();
         } catch (e) {
-            alert('Ошибка добавления воды');
+            toast.error('Ошибка добавления воды');
         } finally {
             setIsLoading(false);
         }

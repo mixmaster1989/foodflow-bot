@@ -2,12 +2,19 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.main")
+
+# Rate limiter (in-memory, per IP)
+limiter = Limiter(key_func=get_remote_address)
 
 from api.routers import (
     assets,
@@ -28,6 +35,7 @@ from api.routers import (
     weight,
     ai_insight,
     referrals,
+    debug,
 )
 
 
@@ -50,13 +58,27 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Attach rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=[
+        "https://web.telegram.org",
+        "https://vk.com",
+        "https://xn--d1aojrdbc.xn--p1ai",
+        "https://www.xn--d1aojrdbc.xn--p1ai",
+        "https://фудфлоу.рф",
+        "https://www.фудфлоу.рф",
+        "https://tretyakov-igor.tech",
+        "https://www.tretyakov-igor.tech",
+        "null",  # Telegram Mini App WebView sends null Origin
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -79,6 +101,7 @@ app.include_router(saved_dishes.router, prefix="/api/saved-dishes", tags=["Saved
 app.include_router(water.router, prefix="/api/water", tags=["Water Tracking"])
 app.include_router(ai_insight.router, prefix="/api/ai", tags=["AI Insight"])
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
+app.include_router(debug.router, prefix="/api/debug", tags=["Debug"])
 
 
 

@@ -101,7 +101,6 @@ async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext =
                 pass
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     
-    from database.base import get_db
     from services.ai_guide import AIGuideService
     async for session in get_db():
         await AIGuideService.track_activity(callback.from_user.id, "fridge", session)

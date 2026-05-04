@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end, photorealistic POV shot from a passenger seat inside a futuristic luxury train. On a sleek, dark wood folding table sits an eclectic mix of food: a modern glass container with home-cooked meal, a rustic paper bag with golden station pastries, and a premium cup of instant noodles. A smartphone is held in a natural, clean hand, pointing its camera at the food. A subtle, elegant teal and blue neon holographic interface glows around the food items on the phone screen, displaying abstract data visualizations and circular progress rings. The lighting is a blend of warm sunset light through the train window and cool cyan ambient accents. Cinematic depth of field, 8k resolution, premium lifestyle photography style.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, brand name, distorted fingers, extra digits, blurry face, messy environment, cheap plastic, low resolution, flat lighting",
+  "notes": [
+    "Combined the 'travel' theme with the app's core 'photo-to-data' mechanic.",
+    "Used 'luxury train' and 'dark wood' to maintain the premium brand aesthetic from the references.",
+    "Specified 'teal and blue neon' to align with the FoodFlow color palette.",
+    "Ensured the food variety (home-cooked, pastry, noodles) matches the post's narrative of mixed travel meals."
+  ]
+}

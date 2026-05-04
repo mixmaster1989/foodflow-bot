@@ -1,0 +1,16 @@
+{
+  "compliance": {
+    "action": "block",
+    "reasons": [
+      "compliance_check_failed"
+    ],
+    "flags": [
+      "system_error"
+    ],
+    "internal_terms_found": [],
+    "banned_time_patterns_found": [],
+    "shaming_tokens_found": []
+  },
+  "chief": {},
+  "judge": {}
+}

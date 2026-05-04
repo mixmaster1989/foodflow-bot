@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot from a first-person perspective (POV) of a person holding a sleek futuristic smartphone, taking a photo of a gourmet dinner plate on a warm wooden table. The plate contains a vibrant salad and sliced meats. Above the plate, a subtle holographic teal and lime green interface glows, displaying abstract data charts and nutritional rings without text. The background is a cozy, premium kitchen at night with soft blue ambient neon lighting and a glimpse of a high-tech refrigerator. Cinematic lighting, 8k resolution, teal and orange color grading, sharp focus on the food and phone screen.",
+  "negative_prompt": "text, words, letters, numbers, watermark, logo, QR code, brand name, distorted hands, extra fingers, blurry face, messy kitchen, low resolution, cartoon, illustration, signature",
+  "notes": [
+    "Used a POV (first-person) angle to directly illustrate the 'photographing the plate' action mentioned in the text.",
+    "Incorporated the teal/green neon glow from the references as holographic UI elements to represent the calorie tracking.",
+    "Balanced the 'late night' theme with warm wood textures to keep the food looking appetizing and premium.",
+    "Requested 'abstract data' to avoid the AI generating garbled, unreadable text which would look unprofessional."
+  ]
+}

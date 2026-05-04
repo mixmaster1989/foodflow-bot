@@ -19,7 +19,10 @@ from database.models import (
     UserSettings,
     UserFeedback,
     Subscription,
-    ReferralEvent
+    ReferralEvent,
+    PAID_SOURCES,
+    PAYMENT_SOURCE_STARS,
+    PAYMENT_SOURCE_YOOKASSA,
 )
 import os
 import csv
@@ -495,29 +498,29 @@ async def generate_admin_daily_digest() -> str:
         )
         ref_signup_count = (await session.execute(ref_stmt)).scalar() or 0
 
-        # 7. Payments / Revenue (Approximated by Subscription.starts_at)
+        # 7. Payments / Revenue (only real paid sources: stars + yookassa)
         sub_stmt = select(Subscription).where(
             and_(
                 func.date(Subscription.starts_at) == yesterday,
-                Subscription.tier != "free"
+                Subscription.payment_source.in_(list(PAID_SOURCES)),
             )
         )
         subs = (await session.execute(sub_stmt)).scalars().all()
-        
+
         pays_rub = 0
         pays_stars = 0
         rev_rub = 0
         rev_stars = 0
-        
+
         # Prices from handlers/payments.py (Basic, Pro, Curator)
         prices_rub = {"basic": 199, "pro": 299, "curator": 499}
         prices_stars = {"basic": 130, "pro": 200, "curator": 350}
-        
+
         for s in subs:
-            if s.telegram_payment_charge_id: # Stars
+            if s.payment_source == PAYMENT_SOURCE_STARS:
                 pays_stars += 1
                 rev_stars += prices_stars.get(s.tier, 0)
-            else: # RUB (YooKassa)
+            elif s.payment_source == PAYMENT_SOURCE_YOOKASSA:
                 pays_rub += 1
                 rev_rub += prices_rub.get(s.tier, 0)
 
@@ -582,18 +585,18 @@ async def generate_admin_stats_csv(days: int = 30) -> io.BytesIO:
             lc = (await session.execute(select(func.count(ConsumptionLog.id)).where(func.date(ConsumptionLog.date) == target_date))).scalar() or 0
             fc = (await session.execute(select(func.count(UserFeedback.id)).where(func.date(UserFeedback.created_at) == target_date))).scalar() or 0
             
-            # Payments
-            subs = (await session.execute(select(Subscription).where(and_(func.date(Subscription.starts_at) == target_date, Subscription.tier != "free")))).scalars().all()
-            
+            # Payments (only real paid sources: stars + yookassa)
+            subs = (await session.execute(select(Subscription).where(and_(func.date(Subscription.starts_at) == target_date, Subscription.payment_source.in_(list(PAID_SOURCES)))))).scalars().all()
+
             p_rub = 0
             p_xtr = 0
             r_rub = 0
             r_xtr = 0
             for s in subs:
-                if s.telegram_payment_charge_id:
+                if s.payment_source == PAYMENT_SOURCE_STARS:
                     p_xtr += 1
                     r_xtr += prices_stars.get(s.tier, 0)
-                else:
+                elif s.payment_source == PAYMENT_SOURCE_YOOKASSA:
                     p_rub += 1
                     r_rub += prices_rub.get(s.tier, 0)
             

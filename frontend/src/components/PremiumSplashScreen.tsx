@@ -163,7 +163,7 @@ export const PremiumSplashScreen: React.FC<SplashProps> = ({ tier }) => {
                         className="relative w-64 h-64 flex items-center justify-center"
                     >
                         <img
-                            src={`/logos/${tier}.png`}
+                            src={`logos/${tier}.png`}
                             alt="Logo"
                             className="w-full h-full object-contain neon-logo"
                         />

@@ -1,6 +1,13 @@
-from fastapi import APIRouter, HTTPException, status
+from datetime import datetime, timedelta
+from typing import Annotated, Optional
+from fastapi import APIRouter, HTTPException, status, Request, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
+import hmac
+import hashlib
+import base64
+import pytz
+from urllib.parse import urlencode
 
 from api.auth import (
     CurrentUser,
@@ -10,9 +17,35 @@ from api.auth import (
 )
 from api.schemas import SubscriptionRead, Token, UserCreate, UserLogin, UserSettingsRead, UserSettingsUpdate, WebUserRegister, WebUserLogin
 from config import settings
-from database.models import Subscription, User, UserSettings
+from database.models import PAYMENT_SOURCE_TRIAL, Subscription, User, UserSettings
 
 router = APIRouter()
+
+
+def verify_vk_signature(query_params: dict, client_secret: str) -> bool:
+    """Verifies the VK Mini App signature using HMAC-SHA256."""
+    sign = query_params.get("sign")
+    if not sign:
+        return False
+
+    # Filter keys starting with 'vk_' and sort alphabetically
+    vk_params = {k: v for k, v in query_params.items() if k.startswith("vk_")}
+    sorted_keys = sorted(vk_params.keys())
+    
+    # Create query string
+    data_string = urlencode({k: vk_params[k] for k in sorted_keys})
+
+    # Calculate HMAC-SHA256
+    hash_code = hmac.new(
+        client_secret.encode('utf-8'),
+        data_string.encode('utf-8'),
+        hashlib.sha256
+    ).digest()
+
+    # Base64 encode the hash (VK specific format)
+    expected_sign = base64.urlsafe_b64encode(hash_code).decode('utf-8').replace('=', '')
+
+    return hmac.compare_digest(expected_sign, sign)
 
 
 @router.post("/register", response_model=Token)
@@ -130,7 +163,7 @@ async def get_current_user_info(user: CurrentUser, session: DBSession):
 
     return UserMeRead(
         id=user.id,
-        first_name=user.username,
+        first_name=user.first_name or user.username,
         role=user.role,
         tier=effective_tier,
         is_founding_member=getattr(user, "is_founding_member", False),
@@ -238,12 +271,14 @@ async def web_register(data: WebUserRegister, session: DBSession):
     session.add(user_settings)
 
     # Gift: 3 days PRO subscription
-    pro_expires = datetime.now() + timedelta(days=3)
+    _msk_tz = pytz.timezone("Europe/Moscow")
+    pro_expires = datetime.now(_msk_tz).replace(tzinfo=None) + timedelta(days=3)
     subscription = Subscription(
         user_id=new_id,
         tier="pro",
         is_active=True,
         expires_at=pro_expires,
+        payment_source=PAYMENT_SOURCE_TRIAL,
     )
     session.add(subscription)
 
@@ -273,4 +308,113 @@ async def web_login(data: WebUserLogin, session: DBSession):
         )
 
     access_token = create_access_token(data={"sub": user.id})
+    return Token(access_token=access_token)
+
+
+class ProfileSyncRequest(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+@router.post("/sync-profile")
+async def sync_profile(
+    request: ProfileSyncRequest,
+    current_user: CurrentUser,
+    session: DBSession
+):
+    if not request.first_name:
+        return {"status": "skipped"}
+    
+    new_full_name = request.first_name
+    if request.last_name:
+        new_full_name = f"{request.first_name} {request.last_name}"
+        
+    if current_user.first_name != new_full_name:
+        current_user.first_name = new_full_name
+        session.add(current_user)
+        await session.commit()
+        return {"status": "updated", "name": new_full_name}
+    
+    return {"status": "synced"}
+
+
+class VKAuthRequest(BaseModel):
+    params: dict
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+@router.post("/vk-login", response_model=Token)
+async def vk_login(request: VKAuthRequest, session: DBSession):
+    """Secure login for VK Mini App users via Launch Parameters verification.
+    Required for VK Store moderation.
+    """
+    if not settings.VK_APP_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="VK login is not configured on this server.",
+        )
+    else:
+        # Verify signature
+        if not verify_vk_signature(request.params, settings.VK_APP_SECRET):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверная подпись VK. Аутентификация отклонена."
+            )
+        vk_id = int(request.params["vk_user_id"])
+
+    if not vk_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="vk_user_id missing in parameters."
+        )
+
+    # Search for user by vk_id
+    stmt = select(User).where(User.vk_id == vk_id)
+    user = (await session.execute(stmt)).scalar_one_or_none()
+
+    if user:
+        # Update name if provided and different
+        if request.first_name:
+            new_full_name = request.first_name
+            if request.last_name:
+                new_full_name = f"{request.first_name} {request.last_name}"
+            
+            if user.first_name != new_full_name:
+                user.first_name = new_full_name
+                session.add(user)
+                await session.commit()
+    else:
+        # Auto-registration for VK users
+        # For ID, we use a large range to avoid Telegram overlaps (TGs are usually up to 10 digits/2bn)
+        # But we also have vk_id column now, so we can use a generated primary ID.
+        import random
+        while True:
+            new_id = random.randint(2_000_000_000, 9_999_999_999) # 10 digit, but larger than common TGs
+            existing_id = await session.get(User, new_id)
+            if not existing_id:
+                break
+
+        # Use provided name or generic default
+        first_name = request.first_name or f"User_{vk_id}"
+        if request.last_name:
+            full_name = f"{first_name} {request.last_name}"
+        else:
+            full_name = first_name
+
+        user = User(
+            id=new_id,
+            vk_id=vk_id,
+            username=f"vk_{vk_id}",
+            first_name=full_name,
+        )
+        session.add(user)
+        
+        # Create default settings
+        user_settings = UserSettings(user_id=new_id, is_initialized=False)
+        session.add(user_settings)
+        await session.commit()
+    
+    access_token = create_access_token(data={"sub": user.id})
+    print(f"🦊 [VK-AUTH] VK User Login: {vk_id} (Internal ID: {user.id})")
     return Token(access_token=access_token)

@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a cozy family dinner table made of warm polished wood. On the table is a generous spread of traditional comfort food: a stack of golden blinis, small savory pies, and a bowl of rustic fried potatoes. A smartphone is held in the foreground, its screen glowing with a subtle teal and lime green interface, framing a plate of food to 'scan' it. Soft, ethereal neon teal and blue light trails hover subtly above the dishes like digital steam. The background is a warm, slightly blurred domestic interior with a premium cyberpunk aesthetic, featuring vertical greenery and soft ambient futuristic lighting. Cinematic lighting, 8k resolution, shot on 35mm lens, depth of field.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, branding, distorted hands, extra fingers, messy faces, blurry food, low resolution, cartoon, illustration, cluttered interface",
+  "notes": [
+    "Combined the 'warm family dinner' theme with the brand's 'cyberpunk tech' identity.",
+    "Used a smartphone as the bridge between the traditional food and the digital tracking mentioned in the text.",
+    "Applied the teal/green neon color palette from the references to the digital elements and ambient highlights.",
+    "Ensured a vertical-friendly composition by focusing on the foreground phone and the table spread."
+  ]
+}

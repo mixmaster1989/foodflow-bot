@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from sqlalchemy import select
 from database.base import init_db, get_db
-from database.models import User, Subscription
+from database.models import PAYMENT_SOURCE_ADMIN, Subscription, User
 
 async def grant_pro_to_all():
     print("🚀 Starting mass PRO granting campaign...")
@@ -39,6 +39,7 @@ async def grant_pro_to_all():
                 sub.starts_at = now
                 sub.expires_at = expires_at
                 sub.is_active = True
+                sub.payment_source = PAYMENT_SOURCE_ADMIN
                 counts["updated"] += 1
             else:
                 new_sub = Subscription(
@@ -46,7 +47,8 @@ async def grant_pro_to_all():
                     tier="pro",
                     starts_at=now,
                     expires_at=expires_at,
-                    is_active=True
+                    is_active=True,
+                    payment_source=PAYMENT_SOURCE_ADMIN,
                 )
                 session.add(new_sub)
                 counts["created"] += 1

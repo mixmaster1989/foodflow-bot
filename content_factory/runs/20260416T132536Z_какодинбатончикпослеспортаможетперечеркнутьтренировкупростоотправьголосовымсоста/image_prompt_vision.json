@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a hand holding a modern protein bar in a sleek, futuristic gym lobby. A high-end smartphone in the other hand is scanning the bar, with a subtle holographic teal and blue neon interface hovering over the screen showing abstract data visualizations and glowing charts. The background features a soft-focus high-tech vending machine and warm wood accents with vertical greenery. Photorealistic, cinematic lighting, premium lifestyle aesthetic, subtle cyberpunk accents, 8k resolution, teal and orange color grading. --ar 4:5",
+  "negative_prompt": "text, letters, numbers, words, logo, watermark, QR code, readable UI, distorted fingers, extra digits, blurry face, messy background, low quality, cartoon, illustration",
+  "notes": [
+    "Used a POV shot to emphasize the 'point and scan' utility mentioned in the post.",
+    "Combined warm wood and greenery from the brand refs with the teal/blue neon 'cyberpunk' data overlays.",
+    "Focused on the 'protein bar' as the central subject to match the post narrative.",
+    "Strictly excluded text/numbers in the negative prompt to ensure the AI generates abstract 'data' shapes rather than gibberish text."
+  ]
+}

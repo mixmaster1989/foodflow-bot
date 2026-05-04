@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodFlow — AI-экосистема для контроля питания | 6 нейросетей считают КБЖУ за тебя</title>
+  <meta name="description"
+    content="Сфоткай еду, скажи голосом или напиши — 6 AI-моделей мгновенно посчитают калории и БЖУ. Дневник питания, рецепты, сканер чеков. 3 дня PRO бесплатно!">
+  <meta property="og:title" content="FoodFlow — AI считает калории за тебя">
+  <meta property="og:description"
+    content="6 нейросетей анализируют еду по фото, голосу и тексту. Умный дневник питания с Dashboard как в Apple Watch. Попробуй бесплатно!">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://xn--d1aojrdbc.xn--p1ai">
+  <meta property="og:image" content="https://xn--d1aojrdbc.xn--p1ai/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=2">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"FoodFlow","applicationCategory":"HealthApplication","operatingSystem":"Web, Telegram, VK","offers":[{"@type":"Offer","price":"0","priceCurrency":"RUB","name":"Free"},{"@type":"Offer","price":"199","priceCurrency":"RUB","name":"Basic"},{"@type":"Offer","price":"299","priceCurrency":"RUB","name":"Pro"}],"description":"AI-экосистема для контроля питания. 6 нейросетей считают КБЖУ по фото, голосу и тексту.","url":"https://xn--d1aojrdbc.xn--p1ai"}
+  </script>
+</head>
+
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="container navbar-inner">
+      <a href="#" class="logo"><span class="logo-icon">🥗</span><span>Food<span
+            class="text-gradient">Flow</span></span></a>
+      <ul class="nav-links">
+        <li><a href="#features">Возможности</a></li>
+        <li><a href="#pricing">Тарифы</a></li>
+        <li><a href="#curators">Кураторам</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="nav-cta">Попробовать</a>
+      <div class="mobile-toggle" aria-label="Меню">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu">
+    <a href="#features">Возможности</a>
+    <a href="#pricing">Тарифы</a>
+    <a href="#curators">Кураторам</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="btn btn-tg"><span
+        class="btn-icon">🤖</span> Открыть в Telegram</a>
+  </div>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero" id="hero">
+    <div class="glow glow-green"></div>
+    <div class="glow glow-amber"></div>
+    <div class="container" style="position:relative;z-index:2;">
+      <div class="hero-badge fade-up">🎁 3 дня PRO бесплатно при регистрации</div>
+      <h1 class="hero-title fade-up fade-up-d1">Забудь калькуляторы.<br><span class="text-gradient">AI считает КБЖУ за
+          тебя</span></h1>
+      <p class="hero-sub fade-up fade-up-d2">Сфоткай еду, скажи голосом или напиши текстом — <strong>6
+          нейросетей</strong> мгновенно определят калории, белки, жиры и углеводы. Ведение дневника питания ещё никогда
+        не было таким простым.</p>
+      <div class="hero-ctas fade-up fade-up-d3">
+        <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="btn btn-tg"><span
+            class="btn-icon">🤖</span> Открыть в Telegram</a>
+        <a href="https://vk.com/app54530169" target="_blank" rel="noopener" class="btn btn-vk"><span
+            class="btn-icon">📱</span> Открыть в ВКонтакте</a>
+        <a href="https://xn--d1aojrdbc.xn--p1ai/foodflow/" target="_blank" rel="noopener" class="btn btn-web"><span
+            class="btn-icon">🌐</span> Попробовать в браузере</a>
+      </div>
+      <div class="hero-stats fade-up fade-up-d4">
+        <div class="hero-stat">
+          <div class="hero-stat-val text-gradient" data-count="6" data-prefix="">6</div>
+          <div class="hero-stat-label">AI-моделей</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-val text-gradient">3 сек</div>
+          <div class="hero-stat-label">Запись голосом</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-val text-gradient">24/7</div>
+          <div class="hero-stat-label">AI-нутрициолог</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PAIN / PROBLEM ===== -->
+  <section class="section pain" id="problem">
+    <div class="container text-center">
+      <span class="label fade-up">Знакомо?</span>
+      <h2 class="section-title fade-up">Считать калории — это <span class="text-gradient-amber">боль</span></h2>
+      <div class="pain-grid">
+        <div class="glass pain-card fade-up">
+          <div class="pain-icon">😩</div>
+          <h3>«Вечно забываю записать»</h3>
+          <p>Поел — забыл. К вечеру ты не помнишь, что ел на завтрак, не говоря уже о КБЖУ</p>
+        </div>
+        <div class="glass pain-card fade-up fade-up-d1">
+          <div class="pain-icon">🧮</div>
+          <h3>«Считать — это скучно»</h3>
+          <p>Взвешивать, гуглить, высчитывать БЖУ на 100г и пересчитывать на свою порцию? Нет, спасибо</p>
+        </div>
+        <div class="glass pain-card fade-up fade-up-d2">
+          <div class="pain-icon">📱</div>
+          <h3>«Сложные приложения»</h3>
+          <p>Куча кнопок, обязательная регистрация, реклама. Ты хочешь просто записать «борщ», а не проходить квест</p>
+        </div>
+      </div>
+      <div class="pain-arrow fade-up">↓</div>
+      <p class="pain-solution fade-up">А что если <span class="text-gradient">AI сделает всё за тебя</span>?<br>Просто
+        скажи, сфоткай или напиши — и готово 🚀</p>
+    </div>
+  </section>
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section class="section" id="how">
+    <div class="container text-center">
+      <span class="label fade-up">Как это работает</span>
+      <h2 class="section-title fade-up">Три шага — <span class="text-gradient">и всё записано</span></h2>
+      <p class="section-subtitle fade-up">Никаких калькуляторов. Никакого ручного поиска. Просто естественный ввод.</p>
+      <div class="steps-grid">
+        <div class="glass step-card fade-up">
+          <div class="step-num">01</div>
+          <div class="step-icon">🎤</div>
+          <h3>Скажи, сфоткай или напиши</h3>
+          <p>«Съел гречку с курицей» голосом, фото тарелки или текстом — как тебе удобно</p>
+        </div>
+        <div class="glass step-card fade-up fade-up-d1">
+          <div class="step-num">02</div>
+          <div class="step-icon">🧠</div>
+          <h3>6 AI-моделей считают КБЖУ</h3>
+          <p>Gemini, Qwen, Perplexity, GPT-4.1, Whisper и Flux работают вместе для точного расчёта</p>
+        </div>
+        <div class="glass step-card fade-up fade-up-d2">
+          <div class="step-num">03</div>
+          <div class="step-icon">📊</div>
+          <h3>Получи инсайты</h3>
+          <p>Красивый Dashboard с прогрессом, AI-рекомендации и персональные отчёты — всё автоматически</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FEATURES ===== -->
+  <section class="section" id="features">
+    <div class="container text-center">
+      <span class="label fade-up">Возможности</span>
+      <h2 class="section-title fade-up">Всё для контроля питания — <span class="text-gradient">в одном месте</span></h2>
+      <p class="section-subtitle fade-up">От простой записи до AI-генерации рецептов. Каждая фича создана, чтобы
+        сэкономить твоё время.</p>
+      <div class="features-grid">
+        <div class="glass feat-card fade-up">
+          <div class="feat-icon">🍽️</div>
+          <h3>Умный дневник питания</h3>
+          <p>Напиши «яблоко 150г» или просто «яблоко» — AI сам найдёт КБЖУ через веб-поиск. Подсказки-чипсы для быстрого
+            ввода, сохранение любимых блюд.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d1">
+          <div class="feat-icon">📸</div>
+          <span class="feat-badge feat-badge-pro">PRO</span>
+          <h3>AI Vision — Анализ по фото</h3>
+          <p>Сфотографируй еду — AI определит продукт и КБЖУ. Сканер чеков и этикеток. 6 моделей с fallback-цепочкой.
+          </p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d2">
+          <div class="feat-icon">🎙️</div>
+          <span class="feat-badge feat-badge-basic">BASIC+</span>
+          <h3>Голосовой ввод</h3>
+          <p>Просто скажи что съел — AI распознает через Whisper и запишет в дневник. Работает на русском языке. 3
+            секунды — и готово.</p>
+        </div>
+        <div class="glass feat-card fade-up">
+          <div class="feat-icon">📊</div>
+          <h3>Визуальный Dashboard</h3>
+          <p>Круговой прогресс калорий, 4 макро-бара: белки, жиры, углеводы, клетчатка. Персональная норма на основе
+            твоего профиля.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d1">
+          <div class="feat-icon">🧊</div>
+          <span class="feat-badge feat-badge-basic">BASIC+</span>
+          <h3>Виртуальный холодильник</h3>
+          <p>Продукты из чеков автоматически в холодильнике. Категоризация, поиск, fuzzy-matching этикеток с товарами.
+          </p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d2">
+          <div class="feat-icon">👨‍🍳</div>
+          <span class="feat-badge feat-badge-pro">PRO</span>
+          <h3>AI-Генератор рецептов</h3>
+          <p>Рецепты на основе того, что реально есть в холодильнике. С точным расчётом КБЖУ и категориями блюд.</p>
+        </div>
+        <div class="glass feat-card fade-up">
+          <div class="feat-icon">💧</div>
+          <h3>Трекер воды</h3>
+          <p>Быстрое логирование воды с персональной нормой: вес × 30мл + бонус для тех, кто активно худеет.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d1">
+          <div class="feat-icon">⚖️</div>
+          <h3>Трекинг веса</h3>
+          <p>История взвешиваний с графиками прогресса. Утренние напоминания, чтобы не забыть встать на весы.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d2">
+          <div class="feat-icon">🤖</div>
+          <span class="feat-badge feat-badge-pro">PRO</span>
+          <h3>AI-Нутрициолог 24/7</h3>
+          <p>Персональные рекомендации, AI-инсайты после каждой записи, предупреждения о дефиците нутриентов.</p>
+        </div>
+        <div class="glass feat-card fade-up">
+          <div class="feat-icon">🌿</div>
+          <h3>Herbalife Expert</h3>
+          <p>Специальная база для точного логирования коктейлей и продуктов Herbalife с учётом дозировки.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d1">
+          <div class="feat-icon">🧾</div>
+          <span class="feat-badge feat-badge-pro">PRO</span>
+          <h3>Сканер чеков</h3>
+          <p>Сфоткай чек из магазина — все товары автоматически попадают в холодильник с рассчитанным КБЖУ.</p>
+        </div>
+        <div class="glass feat-card fade-up fade-up-d2">
+          <div class="feat-icon">🎁</div>
+          <h3>Реферальная программа</h3>
+          <p>Пригласи друга — он получает 3 дня PRO. 10 платящих рефералов = месяц PRO тебе бесплатно.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DASHBOARD DEMO ===== -->
+  <section class="section dashboard-section" id="dashboard">
+    <div class="container text-center">
+      <span class="label fade-up">Интерфейс</span>
+      <h2 class="section-title fade-up">Dashboard как в <span class="text-gradient">Apple Watch</span></h2>
+      <p class="section-subtitle fade-up">Вся картина дня — одним взглядом. Анимированный прогресс, макро-нутриенты и
+        персональная норма.</p>
+      <div class="dashboard-mockup glass fade-up" style="position:relative;">
+        <div class="dash-header">
+          <h4>Сегодня</h4>
+          <div class="dash-date">10 апреля, 2026</div>
+        </div>
+        <div class="cal-ring">
+          <svg viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4ade80" />
+                <stop offset="100%" stop-color="#10b981" />
+              </linearGradient>
+            </defs>
+            <circle class="bg-ring" cx="100" cy="100" r="90" />
+            <circle class="fg-ring" cx="100" cy="100" r="90" />
+          </svg>
+          <div class="cal-center">
+            <div class="cal-val text-gradient">1 480</div>
+            <div class="cal-label">из 2 100 ккал</div>
+          </div>
+        </div>
+        <div class="macro-bars">
+          <div class="macro-bar">
+            <div class="macro-icon">🥩</div>
+            <div class="macro-name">Белки</div>
+            <div class="macro-val">86г</div>
+            <div class="macro-track">
+              <div class="macro-fill macro-fill-p"></div>
+            </div>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-icon">🥑</div>
+            <div class="macro-name">Жиры</div>
+            <div class="macro-val">52г</div>
+            <div class="macro-track">
+              <div class="macro-fill macro-fill-f"></div>
+            </div>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-icon">🥖</div>
+            <div class="macro-name">Углеводы</div>
+            <div class="macro-val">168г</div>
+            <div class="macro-track">
+              <div class="macro-fill macro-fill-c"></div>
+            </div>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-icon">🥬</div>
+            <div class="macro-name">Клетчатка</div>
+            <div class="macro-val">12г</div>
+            <div class="macro-track">
+              <div class="macro-fill macro-fill-fi"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PRICING ===== -->
+  <section class="section" id="pricing">
+    <div class="container text-center">
+      <span class="label fade-up">Тарифы</span>
+      <h2 class="section-title fade-up">Начни бесплатно, <span class="text-gradient">масштабируй с AI</span></h2>
+      <p class="section-subtitle fade-up">Без скрытых платежей. Отменяй в любой момент. При регистрации через веб —
+        <strong class="text-gradient-amber">3 дня PRO бесплатно</strong>!
+      </p>
+      <div class="pricing-grid">
+        <!-- FREE -->
+        <div class="glass price-card fade-up">
+          <div class="price-tier-icon">🌱</div>
+          <div class="price-name">Free</div>
+          <div class="price-amount">0 ₽</div>
+          <ul class="price-features">
+            <li>Ручной ввод текстом</li>
+            <li>Базовые отчёты</li>
+            <li>Трекинг веса</li>
+            <li>Трекер воды</li>
+            <li>Подсказки-чипсы</li>
+          </ul>
+          <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="btn btn-outline price-cta">Начать
+            бесплатно</a>
+        </div>
+        <!-- BASIC -->
+        <div class="glass price-card fade-up fade-up-d1">
+          <div class="price-tier-icon">💡</div>
+          <div class="price-name">Basic</div>
+          <div class="price-amount">199 ₽<span>/мес</span></div>
+          <ul class="price-features">
+            <li>Всё из Free</li>
+            <li>🎙️ Голосовой ввод (Voice AI)</li>
+            <li>🧊 Умный Холодильник</li>
+            <li>📊 Подробная Статистика</li>
+            <li>📦 Пакетный ввод (Batch)</li>
+          </ul>
+          <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="btn btn-tg price-cta"
+            style="background:linear-gradient(135deg,var(--accent-blue),#3b82f6);box-shadow:0 4px 24px rgba(96,165,250,0.25);">Подключить
+            Basic</a>
+        </div>
+        <!-- PRO -->
+        <div class="glass price-card featured fade-up fade-up-d2">
+          <div class="price-tier-icon">🚀</div>
+          <div class="price-name text-gradient-amber">Pro</div>
+          <div class="price-amount text-gradient-amber">299 ₽<span
+              style="-webkit-text-fill-color:var(--text-muted)">/мес</span></div>
+          <ul class="price-features">
+            <li>Всё из Basic</li>
+            <li>📸 Анализ еды по Фото</li>
+            <li>👨‍🍳 AI Генератор рецептов</li>
+            <li>🧾 Сканер чеков (Авто-холод)</li>
+            <li>🤖 Нейро-Нутрициолог 24/7</li>
+          </ul>
+          <a href="https://xn--d1aojrdbc.xn--p1ai/foodflow/" target="_blank" rel="noopener"
+            class="btn btn-web price-cta">Попробовать PRO — 3 дня бесплатно</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CURATORS ===== -->
+  <section class="section curators" id="curators">
+    <div class="container">
+      <div class="curator-grid">
+        <div>
+          <span class="label fade-up">Для кураторов</span>
+          <h2 class="section-title fade-up">Ведите марафоны здоровья с <span class="text-gradient">AI-поддержкой</span>
+          </h2>
+          <p style="color:var(--text-secondary);margin-bottom:32px;font-size:1.05rem;" class="fade-up">Нутрициологам,
+            тренерам и коучам — полноценный модуль управления группами подопечных с аналитикой и мотивацией.</p>
+          <div class="curator-features">
+            <div class="curator-feat fade-up">
+              <span class="curator-feat-icon">👥</span>
+              <div>
+                <h4>Группы подопечных</h4>
+                <p>Создавайте группы, добавляйте участников, следите за прогрессом каждого</p>
+              </div>
+            </div>
+            <div class="curator-feat fade-up fade-up-d1">
+              <span class="curator-feat-icon">❄️</span>
+              <div>
+                <h4>Система «Снежинок»</h4>
+                <p>Начисляйте баллы мотивации за активность, дисциплину и результаты</p>
+              </div>
+            </div>
+            <div class="curator-feat fade-up fade-up-d2">
+              <span class="curator-feat-icon">📋</span>
+              <div>
+                <h4>AI-отчёты по каждому</h4>
+                <p>Автоматические отчёты с КБЖУ, динамикой веса и рекомендациями — без ручной работы</p>
+              </div>
+            </div>
+            <div class="curator-feat fade-up fade-up-d3">
+              <span class="curator-feat-icon">⚖️</span>
+              <div>
+                <h4>Контроль веса</h4>
+                <p>Мониторинг взвешиваний всех участников марафона в одном месте</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="curator-visual glass fade-up">
+          <div class="curator-emoji">👨‍🏫</div>
+          <h3 style="font-size:1.3rem;font-weight:800;margin-bottom:8px;">Кураторский модуль</h3>
+          <p style="color:var(--text-secondary);font-size:0.95rem;">Управляйте марафонами,<br>мотивируйте
+            участников,<br>получайте AI-аналитику</p>
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px;">
+            <div class="glass" style="padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:0.9rem;">
+              <span>👤</span> Анна К. — <span class="text-gradient" style="font-weight:700;">−2.3 кг за неделю</span>
+            </div>
+            <div class="glass" style="padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:0.9rem;">
+              <span>👤</span> Михаил Д. — <span class="text-gradient" style="font-weight:700;">❄️ 48 снежинок</span>
+            </div>
+            <div class="glass" style="padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:0.9rem;">
+              <span>👤</span> Елена В. — <span class="text-gradient" style="font-weight:700;">1 890 ккал / день</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SOCIAL PROOF ===== -->
+  <section class="section" id="proof">
+    <div class="container text-center">
+      <span class="label fade-up">Нам доверяют</span>
+      <h2 class="section-title fade-up"><span class="text-gradient">Реальный продукт</span> с живыми пользователями</h2>
+      <div class="proof-stats">
+        <div class="glass proof-stat fade-up">
+          <div class="proof-stat-val text-gradient" data-count="6">0</div>
+          <div class="proof-stat-label">AI-моделей в работе</div>
+        </div>
+        <div class="glass proof-stat fade-up fade-up-d1">
+          <div class="proof-stat-val text-gradient" data-count="3" data-suffix=" платформы">0</div>
+          <div class="proof-stat-label">Telegram · VK · Web</div>
+        </div>
+        <div class="glass proof-stat fade-up fade-up-d2">
+          <div class="proof-stat-val text-gradient-amber">20.03.2026</div>
+          <div class="proof-stat-label">Дата запуска в Production</div>
+        </div>
+        <div class="glass proof-stat fade-up fade-up-d3">
+          <div class="proof-stat-val text-gradient">24/7</div>
+          <div class="proof-stat-label">Мониторинг и Watchdog</div>
+        </div>
+      </div>
+      <div class="glass fade-up"
+        style="max-width:640px;margin:0 auto;padding:32px;text-align:left;display:flex;flex-direction:column;gap:16px;">
+        <p style="font-size:1.05rem;line-height:1.7;color:var(--text-secondary);">
+          <span style="font-size:1.4rem;">💬</span> «Я просто говорю в телефон "съела творог с бананом" — и всё
+          записано. За неделю привыкла и теперь не представляю, как раньше вела дневник руками.»
+        </p>
+        <p style="font-size:0.9rem;color:var(--text-muted);">— Пользователь FoodFlow, апрель 2026</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="section" id="faq">
+    <div class="container text-center">
+      <span class="label fade-up">FAQ</span>
+      <h2 class="section-title fade-up">Частые <span class="text-gradient">вопросы</span></h2>
+      <div class="faq-list">
+        <div class="glass faq-item fade-up">
+          <button class="faq-q">Это бесплатно? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">Да! Тариф Free полностью бесплатный — ручной ввод, базовые отчёты, трекинг веса и
+              воды. Для продвинутых фич (голос, фото, рецепты) есть тарифы Basic и Pro. При регистрации через веб вы
+              получите 3 дня PRO бесплатно.</div>
+          </div>
+        </div>
+        <div class="glass faq-item fade-up fade-up-d1">
+          <button class="faq-q">Какие AI-модели используются? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">6 моделей работают параллельно: Gemini 2.5 (анализ), Qwen VL-72B (Vision),
+              Perplexity Sonar (поиск КБЖУ), GPT-4.1 (нормализация), Whisper (распознавание речи) и Flux (генерация
+              иконок). При сбое одной модели автоматически подключается резервная.</div>
+          </div>
+        </div>
+        <div class="glass faq-item fade-up fade-up-d2">
+          <button class="faq-q">Как оплатить подписку? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">Два способа: Telegram Stars (внутренняя валюта Telegram) или банковская карта через
+              ЮKassa (для карт РФ). Оплата происходит прямо в боте, без сторонних сайтов.</div>
+          </div>
+        </div>
+        <div class="glass faq-item fade-up fade-up-d3">
+          <button class="faq-q">Работает ли это без Telegram? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">Да! FoodFlow доступен на трёх платформах: Telegram-бот, VK Mini App и полноценная
+              веб-версия. Зарегистрируйтесь на xn--d1aojrdbc.xn--p1ai по email — и пользуйтесь в любом браузере.</div>
+          </div>
+        </div>
+        <div class="glass faq-item fade-up fade-up-d4">
+          <button class="faq-q">Насколько точен AI? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">AI ищет данные КБЖУ через веб-поиск Perplexity Sonar и верифицирует их через
+              несколько моделей. Для фото используется Vision-цепочка из 3 моделей с fallback. Точность сравнима с
+              профессиональными калькуляторами, но ввод занимает секунды, а не минуты.</div>
+          </div>
+        </div>
+        <div class="glass faq-item fade-up">
+          <button class="faq-q">Можно ли использовать для марафонов? <span class="faq-chevron">▼</span></button>
+          <div class="faq-a">
+            <div class="faq-a-inner">Да! Кураторский модуль позволяет создавать группы, отслеживать прогресс каждого
+              участника, начислять баллы мотивации «Снежинки» и получать AI-отчёты. Идеально для нутрициологов, тренеров
+              и коучей.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FINAL CTA ===== -->
+  <section class="final-cta" id="start">
+    <div class="glow glow-green"></div>
+    <div class="container" style="position:relative;z-index:2;">
+      <div class="hero-badge fade-up">🎁 3 дня PRO бесплатно</div>
+      <h2 class="section-title fade-up" style="font-size:clamp(2rem,5vw,3.2rem);">Готов взять питание <span
+          class="text-gradient">под контроль</span>?</h2>
+      <p class="section-subtitle fade-up" style="margin-bottom:32px;">Присоединяйся к FoodFlow — AI-экосистеме, которая
+        считает КБЖУ за тебя. Начни прямо сейчас на любой платформе.</p>
+      <div class="final-ctas fade-up">
+        <a href="https://t.me/FoodFlow2026bot" target="_blank" rel="noopener" class="btn btn-tg"><span
+            class="btn-icon">🤖</span> Открыть в Telegram</a>
+        <a href="https://vk.com/app54530169" target="_blank" rel="noopener" class="btn btn-vk"><span
+            class="btn-icon">📱</span> Открыть в ВКонтакте</a>
+        <a href="https://xn--d1aojrdbc.xn--p1ai/foodflow/" target="_blank" rel="noopener" class="btn btn-web"><span
+            class="btn-icon">🌐</span> Попробовать в браузере</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div style="margin-bottom:16px; display:flex; justify-content:center; align-items:center; gap:10px;">
+        <span class="logo-icon">🥗</span> <strong>Food<span class="text-gradient">Flow</span></strong> — AI-экосистема
+        для контроля питания
+        <span
+          style="display:inline-block; border:1px solid var(--text-muted); padding:2px 6px; border-radius:4px; font-size:10px; color:var(--text-muted);">0+</span>
+      </div>
+      <div
+        style="margin-bottom:16px; display:flex; flex-wrap:wrap; justify-content:center; gap:20px; font-size:12px; color:var(--text-muted);">
+        <a href="privacy.html" class="footer-link">Политика конфиденциальности</a>
+        <a href="terms.html" class="footer-link">Пользовательское соглашение</a>
+        <a href="mailto:support@xn--d1aojrdbc.xn--p1ai" class="footer-link">Поддержка: support@фудфлоу.рф</a>
+      </div>
+      <p>© 2026 FoodFlow · <a href="https://xn--d1aojrdbc.xn--p1ai" target="_blank"
+          rel="noopener">xn--d1aojrdbc.xn--p1ai</a> · <a href="https://t.me/FoodFlow2026bot" target="_blank"
+          rel="noopener">@FoodFlow2026bot</a></p>
+    </div>
+  </footer>
+
+  <script src="script.js?v=2"></script>
+</body>
+
+</html>

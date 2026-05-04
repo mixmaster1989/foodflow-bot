@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a rustic ceramic bowl filled with a steaming, hearty chicken and vegetable stew with grains, placed on a modern dark wood kitchen table. A hand holds a sleek, futuristic smartphone over the bowl, capturing a photo. Subtle cyberpunk aesthetics: a soft teal and lime green neon glow emanates from the table edges and the phone screen, casting faint light on the food. In the background, a blurred high-tech kitchen with vertical greenery and soft blue ambient lighting. Cinematic lighting, 8k resolution, premium food photography style, depth of field.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, interface buttons, distorted fingers, extra digits, blurry face, messy kitchen, low resolution, cartoon, illustration.",
+  "notes": [
+    "I focused on the 'stew from leftovers' theme by using a rustic bowl to contrast with the high-tech environment.",
+    "Integrated the teal/green brand colors through neon table accents and phone glow to match the 'shopping mode' reference.",
+    "The phone framing directly visualizes the 'take a photo to get numbers' hook from the post text.",
+    "Maintained a premium look by using warm wood textures and cinematic steam to make the 'leftover' meal look appetizing."
+  ]
+}

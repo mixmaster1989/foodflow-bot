@@ -39,6 +39,21 @@ export const authApi = {
         const response = await apiClient.post('/auth/web-register', { email, password, name });
         return response.data; // Returns { access_token: "..." }
     },
+    vkLogin: async (params: Record<string, string>, firstName?: string, lastName?: string) => {
+        const response = await apiClient.post('/auth/vk-login', {
+            params,
+            first_name: firstName,
+            last_name: lastName
+        });
+        return response.data; // Returns { access_token: "..." }
+    },
+    syncProfile: async (firstName?: string, lastName?: string) => {
+        const response = await apiClient.post('/auth/sync-profile', {
+            first_name: firstName,
+            last_name: lastName
+        });
+        return response.data;
+    },
     getMe: async () => {
         const response = await apiClient.get('/auth/me');
         return response.data;

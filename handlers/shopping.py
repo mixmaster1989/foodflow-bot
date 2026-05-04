@@ -114,13 +114,10 @@ async def start_shopping(callback: types.CallbackQuery, state: FSMContext) -> No
             parse_mode="HTML"
         )
 
-    from database.base import get_db
     from services.ai_guide import AIGuideService
     async for session in get_db():
         await AIGuideService.track_activity(callback.from_user.id, "shopping_list", session)
         break
-
-    await callback.answer()
 
 
 @router.message(ShoppingMode.scanning_labels, F.photo)

@@ -1,0 +1,31 @@
+{
+  "compliance": {
+    "action": "ok",
+    "reasons": [
+      "The text describes the technical functionality of the bot and its convenience.",
+      "No medical claims, physiological guarantees (weight loss), or shaming detected.",
+      "Internal code terms and specific dates are absent."
+    ],
+    "flags": [],
+    "revise_edits": [],
+    "internal_terms_found": [],
+    "banned_time_patterns_found": [],
+    "shaming_tokens_found": []
+  },
+  "chief": {
+    "decision": "revise",
+    "edits": [
+      "Заменить «перестаешь забивать» на более понятное для широкой аудитории «забиваешь на подсчёт» или «перестаешь мучиться».",
+      "Убрать или объяснить сокращение «КБЖУ» в первом упоминании, написав «калории, белки, жиры и углеводы (КБЖУ)».",
+      "Исправить «Сфоткал» на более нейтральное «Сфотографировал» или «Сделал фото»."
+    ],
+    "notes": [
+      "Текст живой и попадает в пользу, но использует сленг («забивать», «сфоткал»), который может быть не всем понятен или не всем понравится. Также для ЦА важно сразу расшифровать термин «КБЖУ». Стиль и структура хорошие."
+    ]
+  },
+  "judge": {
+    "ok": true,
+    "issues": [],
+    "new_facts_suspected": false
+  }
+}

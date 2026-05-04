@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T095351Z",
+  "mode": "to_me",
+  "topic": "Первый тест (финал): фото еды в Telegram → КБЖУ за 10 секунд, без ручного ввода",
+  "scenario": "anti_old_school",
+  "text": "🍽️ <b>Стоишь с тарелкой и пытаешься высчитать калории вручную?</b> 😩🔢\n\n😏 Поздравляю: это старый способ, где открывают таблицы, тыкают в приложения и страдают, как будто <b>считать КБЖУ руками — это не тупо, а «дисциплина»</b>. Это как писать код в блокноте. <b>Весной особенно смешно тратить на это время</b>, когда можно просто не мучиться.\n\n📸 Схема нормального человека: сфоткал ➡️ отправил ➡️ получил КБЖУ. <b>Без ручного ввода</b>, без цирка, без лишних движений. В Telegram просто отправляешь фото еды или голосом объясняешь, что на тарелке — и FoodFlow возвращает КБЖУ. ⚡\n\n<blockquote>Либо считаешь <tg-spoiler>за 10 секунд</tg-spoiler>, либо продолжаешь забивать.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, food/lifestyle scene: a person standing in a modern kitchen with a plate of food, looking frustrated at a phone with a calorie tracking app and a messy table of notes, contrasted with a sleek Telegram chat interface on another phone showing quick food analysis. Neon lighting, realistic details, cinematic composition, high contrast, futuristic but everyday lifestyle, sharp focus, vertical social media format.",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

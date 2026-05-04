@@ -9,6 +9,7 @@ interface AddProductModalProps {
 }
 
 import { CameraOverlay } from './CameraOverlay'
+import { useToast } from './Toast'
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 
 export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalProps) {
@@ -16,6 +17,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     const [loading, setLoading] = useState(false)
     const [showCamera, setShowCamera] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const toast = useToast()
     const { isRecording, startRecording, stopRecording } = useVoiceRecorder()
 
     // Smart Input State
@@ -65,10 +67,10 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                     }
                     setStep('confirm')
                 } else {
-                    alert(result.message || 'Не удалось распознать голос')
+                    toast.error(result.message || 'Не удалось распознать голос')
                 }
             } catch (err) {
-                alert('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
+                toast.error('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
             } finally {
                 setLoading(false)
             }
@@ -129,7 +131,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 setStep('confirm')
             }
         } catch (err) {
-            alert('Не удалось распознать: ' + err)
+            toast.error('Не удалось распознать')
         } finally {
             setLoading(false)
         }
@@ -156,7 +158,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 setStep('confirm')
             }
         } catch (err) {
-            alert('Ошибка анализа фото')
+            toast.error('Ошибка анализа фото')
         } finally {
             setLoading(false)
         }
@@ -184,7 +186,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 setStep('confirm')
             }
         } catch (err) {
-            alert('Ошибка анализа фото')
+            toast.error('Ошибка анализа фото')
         } finally {
             setLoading(false)
         }
@@ -219,7 +221,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
             onSuccess()
             handleClose()
         } catch (err) {
-            alert('Ошибка добавления: ' + JSON.stringify(err))
+            toast.error('Ошибка добавления')
         } finally {
             setLoading(false)
         }

@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
+import { useToast } from '../components/Toast'
 import { Camera, X, RefreshCcw } from 'lucide-react';
 
 interface CameraOverlayProps {
@@ -7,6 +8,7 @@ interface CameraOverlayProps {
 }
 
 export function CameraOverlay({ onCapture, onClose }: CameraOverlayProps) {
+    const toast = useToast()
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -26,7 +28,7 @@ export function CameraOverlay({ onCapture, onClose }: CameraOverlayProps) {
             }
         } catch (err) {
             console.error('Camera Error:', err);
-            alert('Cannot access camera');
+            toast.error('Нет доступа к камере');
         }
     };
 

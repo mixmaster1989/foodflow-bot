@@ -2,10 +2,22 @@
 
 :root {
     --ff-bg-dark: #0f1115;
+    --ff-bg-panel: #1a1d24;
+    --ff-text: #f3f4f6;
+    --ff-text-muted: #9ca3af;
     --ff-surface: rgba(26, 29, 36, 0.6);
     --ff-surface-border: rgba(255, 255, 255, 0.05);
     --ff-accent: #10b981;
     --ff-accent-glow: rgba(16, 185, 129, 0.4);
+}
+
+body.light-theme {
+    --ff-bg-dark: #f8fafc;
+    --ff-bg-panel: #ffffff;
+    --ff-text: #0f172a;
+    --ff-text-muted: #64748b;
+    --ff-surface: rgba(255, 255, 255, 0.8);
+    --ff-surface-border: rgba(0, 0, 0, 0.1);
 }
 
 body {
@@ -13,8 +25,9 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Inter', sans-serif;
-    color: #f3f4f6;
+    color: var(--ff-text);
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .dynamic-bg {

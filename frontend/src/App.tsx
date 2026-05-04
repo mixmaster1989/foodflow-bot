@@ -21,6 +21,7 @@ import { Fridge } from './components/Fridge'
 import { HerbalifeCatalog } from './components/HerbalifeCatalog'
 import { PremiumSplashScreen } from './components/PremiumSplashScreen'
 import AIWhisper from './components/AIWhisper'
+import { useToast } from './components/Toast'
 import { LoginView } from './components/LoginView'
 import { WebOnboardingModal } from './components/WebOnboardingModal'
 const TierBadge: React.FC<{ tier: string }> = ({ tier }) => {
@@ -69,8 +70,11 @@ function App() {
     isCurator,
     isPro,
     isBasic,
-    isFree
+    isFree,
+    refreshUser
   } = useAuth()
+
+  const toast = useToast()
 
   const [report, setReport] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -112,22 +116,33 @@ function App() {
       const timer = setTimeout(() => {
         setShowSplash(false)
         setWhisperTrigger({ action: 'greeting', detail: 'User just logged in', timestamp: Date.now() })
-      }, 5000)
+      }, 500)
       return () => clearTimeout(timer)
     }
   }, [authLoading])
 
+  // Show diagnostic error if startup failed
   if (authError && !needsLogin) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-8 text-center text-neutral-200">
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl mb-4">
-          <p className="text-red-400 font-medium text-lg">Нет доступа</p>
-          <p className="text-neutral-400 text-xs mt-2 font-mono break-all">{authError}</p>
+        <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6 border border-red-500/30">
+          <Activity className="w-10 h-10 text-red-500 animate-pulse" />
         </div>
-        <p className="text-neutral-500 text-sm mb-6">Телеграм не передал данные для входа.</p>
-        <button onClick={() => window.location.reload()} className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full transition-colors">Обновить</button>
-        <div className="mt-8">
-          <a href="/foodflow/?mock=1" className="text-xs text-neutral-600 underline">Войти в демо-режим</a>
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 to-orange-500 bg-clip-text text-transparent mb-4">
+          Ошибка запуска
+        </h1>
+        <div className="glass-panel p-4 rounded-2xl mb-8 max-w-xs border-red-500/20">
+          <p className="text-red-400 font-mono text-[10px] break-all mb-2">DEBUG_INFO: {authError}</p>
+          <p className="text-neutral-500 text-[10px]">Браузер: {navigator.userAgent.substring(0, 100)}...</p>
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-10 py-4 bg-white text-black font-black rounded-full active:scale-90 transition-transform shadow-2xl"
+        >
+          ПЕРЕЗАГРУЗИТЬ 🔄
+        </button>
+        <div className="mt-12 text-[9px] text-neutral-700 font-mono">
+          Ref: {window.location.hostname} / Path: {window.location.pathname}
         </div>
       </div>
     )
@@ -141,14 +156,11 @@ function App() {
     />
   }
 
-  // Show onboarding modal for new web users who haven't set up their profile
-  const needsOnboarding = user && user.settings && user.settings.is_initialized === false
+  // Guard access to settings to prevent crashes
+  const needsOnboarding = user && user.settings?.is_initialized === false
 
   if (needsOnboarding) {
-    return <WebOnboardingModal onComplete={() => {
-      // Trigger auth reload to get fresh user data
-      window.location.reload()
-    }} />
+    return <WebOnboardingModal onComplete={refreshUser} />
   }
 
   return (
@@ -181,7 +193,7 @@ function App() {
               </div>
               <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden shadow-xl backdrop-blur-md">
                 <img
-                  src={`/logos/${isCurator ? 'curator' : isPro ? 'pro' : isBasic ? 'basic' : 'free'}.png`}
+                  src={`logos/${isCurator ? 'curator' : isPro ? 'pro' : isBasic ? 'basic' : 'free'}.png`}
                   alt="Tier"
                   className="w-10 h-10 object-contain transition-transform group-hover:scale-110 duration-500"
                 />
@@ -237,7 +249,7 @@ function App() {
             <button
               className={`p-2 transition-colors ${activeTab === 'fridge' ? 'text-emerald-500' : 'text-neutral-500'} ${isFree ? 'opacity-30' : ''}`}
               onClick={() => {
-                if (isFree) { alert('🧊 Умный Холодильник доступен в тарифе Basic и выше!'); return; }
+                if (isFree) { toast.info('Умный Холодильник доступен в тарифе Basic и выше'); return; }
                 setActiveTab('fridge');
               }}
             >

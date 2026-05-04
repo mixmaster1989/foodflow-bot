@@ -118,8 +118,8 @@ class TestRecipesHandler:
     @pytest.mark.asyncio
     async def test_show_recipe_categories(self, mock_callback_query):
         """Test showing recipe categories."""
-        # Call handler
-        await recipes.show_recipe_categories(mock_callback_query)
+        with patch('services.ai_guide.AIGuideService.track_activity', new_callable=AsyncMock):
+            await recipes.show_recipe_categories(mock_callback_query)
 
         # Verify callback was answered
         mock_callback_query.answer.assert_called_once()

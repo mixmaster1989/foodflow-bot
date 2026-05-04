@@ -13,6 +13,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+PAYMENT_SOURCE_STARS = "stars"
+PAYMENT_SOURCE_YOOKASSA = "yookassa"
+PAYMENT_SOURCE_TRIAL = "trial"
+PAYMENT_SOURCE_REFERRAL = "referral"
+PAYMENT_SOURCE_FEEDBACK = "feedback_bonus"
+PAYMENT_SOURCE_ADMIN = "admin_grant"
+PAID_SOURCES = (PAYMENT_SOURCE_STARS, PAYMENT_SOURCE_YOOKASSA)
+
 from database.base import Base
 
 
@@ -39,6 +47,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=True)
     password_hash = Column(String, nullable=True)
     is_web_only = Column(Boolean, default=False)
+    is_blocked = Column(Boolean, default=False)
     
     # VK Integration
     vk_id = Column(BigInteger, unique=True, nullable=True, index=True)
@@ -63,6 +72,8 @@ class Subscription(Base):
     is_active = Column(Boolean, default=True)
     telegram_payment_charge_id = Column(String, nullable=True)  # For refunds & subscription management
     auto_renew = Column(Boolean, default=True)  # Auto-renewal status
+    payment_source = Column(String, nullable=True)  # stars|yookassa|trial|referral|feedback_bonus|admin_grant
+    yookassa_payment_id = Column(String, nullable=True)  # YooKassa payment.id for webhook reconciliation
 
     user = relationship("User", back_populates="subscription")
 

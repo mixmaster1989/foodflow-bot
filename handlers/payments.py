@@ -18,7 +18,11 @@ from sqlalchemy import select
 
 from config import settings
 from database.base import get_db
-from database.models import Subscription
+from database.models import (
+    PAYMENT_SOURCE_STARS,
+    PAYMENT_SOURCE_YOOKASSA,
+    Subscription,
+)
 from services.referral_service import ReferralService
 from services.payment_service import YooKassaService
 
@@ -459,6 +463,8 @@ async def handle_check_yookassa_payment(callback: types.CallbackQuery):
                 sub.is_active = True
                 sub.auto_renew = False
                 sub.telegram_payment_charge_id = None
+                sub.payment_source = PAYMENT_SOURCE_YOOKASSA
+                sub.yookassa_payment_id = payment_id
             else:
                 sub = Subscription(
                     user_id=user_id,
@@ -467,6 +473,8 @@ async def handle_check_yookassa_payment(callback: types.CallbackQuery):
                     expires_at=expires,
                     is_active=True,
                     auto_renew=False,
+                    payment_source=PAYMENT_SOURCE_YOOKASSA,
+                    yookassa_payment_id=payment_id,
                 )
                 session.add(sub)
 
@@ -600,6 +608,7 @@ async def successful_payment_handler(message: types.Message):
             sub.is_active = True
             sub.auto_renew = is_subscription
             sub.telegram_payment_charge_id = charge_id if is_subscription else None
+            sub.payment_source = PAYMENT_SOURCE_STARS
         else:
             sub = Subscription(
                 user_id=user_id,
@@ -609,6 +618,7 @@ async def successful_payment_handler(message: types.Message):
                 is_active=True,
                 auto_renew=is_subscription,
                 telegram_payment_charge_id=charge_id if is_subscription else None,
+                payment_source=PAYMENT_SOURCE_STARS,
             )
             session.add(sub)
 

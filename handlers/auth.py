@@ -52,8 +52,9 @@ class AuthMiddleware(BaseMiddleware):
                 # If they send 'Welcome2026', we create them/verify them.
                 pass
 
+            # ALLOW ALL USERS IN THE MVP
             # Check verification
-            is_verified = user.is_verified if user else False
+            is_verified = True # Bypass AuthMiddleware wall!
 
             # Allow /start command and ALL onboarding-related events to pass through
             # This is crucial for deep links (?start=ad_...) and the entire onboarding flow

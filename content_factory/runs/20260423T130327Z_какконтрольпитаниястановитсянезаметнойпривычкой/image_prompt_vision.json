@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a premium healthy meal on a sleek wooden table with integrated neon teal light strips. In the foreground, a person's hand holds an old-fashioned analog wooden abacus or a simple notepad with a pencil, contrasting with a flickering, glitching holographic interface in the background that shows 'ERROR 404' symbols and static. Cyberpunk aesthetic, soft teal and blue ambient lighting, cinematic depth of field, 8k resolution, vertical composition, sophisticated futuristic interior with lush green plants.",
+  "negative_prompt": "text, letters, numbers, words, typography, logo, watermark, QR code, distorted hands, extra fingers, blurry face, messy environment, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used an analog abacus/notepad as a visual metaphor for 'calculating manually' during a system delay.",
+    "Integrated 'glitch' effects into the neon holograms to represent the neural network repairs mentioned in the post.",
+    "Maintained the brand's teal/green and warm wood color palette from the references.",
+    "Ensured a premium, high-tech lifestyle feel to keep it 'FoodFlow' consistent."
+  ]
+}

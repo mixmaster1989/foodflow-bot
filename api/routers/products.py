@@ -1,11 +1,13 @@
+import logging
 from datetime import datetime
 from typing import Annotated
 
 import pytz
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select
 
 from api.auth import CurrentUser, DBSession
+from api.main import limiter
 from api.schemas import (
     ConsumeRequest,
     FridgeSummary,
@@ -18,6 +20,8 @@ from database.models import ConsumptionLog, Product, Receipt
 from services.label_ocr import LabelOCRService
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=ProductList)
@@ -88,7 +92,9 @@ async def get_fridge_summary(user: CurrentUser, session: DBSession):
 
 
 @router.post("/scan-label", response_model=LabelParseResult)
+@limiter.limit("20/minute")
 async def scan_product_label(
+    request: Request,
     user: CurrentUser,
     file: Annotated[UploadFile, File(description="Product label image")],
 ):
@@ -97,12 +103,16 @@ async def scan_product_label(
         raise HTTPException(status_code=400, detail="File must be an image")
 
     image_bytes = await file.read()
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image too large (max 10MB)")
+
     try:
         result = await LabelOCRService.parse_label(image_bytes)
         if not result:
             raise HTTPException(status_code=422, detail="Failed to parse label")
-
         return LabelParseResult(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Label OCR error: {e}")
         raise HTTPException(status_code=500, detail="OCR processing error")
@@ -186,6 +196,14 @@ async def consume_product(
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    owner_id = product.user_id
+    if product.receipt_id:
+        receipt = await session.get(Receipt, product.receipt_id)
+        if receipt:
+            owner_id = receipt.user_id
+    if owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Calculate consumed values
     if consume_data.unit == "grams":

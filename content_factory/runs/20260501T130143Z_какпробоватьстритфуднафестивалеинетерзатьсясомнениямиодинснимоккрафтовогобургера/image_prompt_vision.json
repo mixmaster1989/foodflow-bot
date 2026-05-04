@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "Photorealistic POV shot of a hand holding a modern smartphone over a gourmet street food burger at a vibrant night festival. The phone screen displays a sleek, translucent teal and green holographic interface with abstract data charts and glowing circular progress bars. Subtle cyberpunk atmosphere with soft neon teal and blue bokeh lights in the background. High-end lifestyle photography, warm ambient lighting on the food, sharp focus on the burger textures, 8k resolution, cinematic composition.",
+  "negative_prompt": "readable text, letters, numbers, watermark, QR code, logo, distorted fingers, extra limbs, blurry face, messy background, low resolution, cheap look, red neon.",
+  "notes": [
+    "Used a POV 'scanning' composition to mirror the 'photo of a plate' feature.",
+    "Aligned color palette with brand teal/green and blue neon accents.",
+    "Substituted specific numbers with abstract holographic shapes to avoid AI text distortion.",
+    "Set the scene at a night festival to match the post's narrative context."
+  ]
+}

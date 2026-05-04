@@ -37,16 +37,28 @@ class HerbalifeExpertService:
         # Normalize: common Latin letters used in Herbalife abbreviations
         key_norm = clean_text.replace('f', 'ф').replace('n', 'н')
         
-        # 1. Fast Path: Straight alias match
+        # 1. Fast Path: Straight alias match (Best match - longest alias wins)
+        best_match = None
+        max_alias_len = -1
+
         for p in products:
             aliases = [a.lower() for a in p.get("aliases", [])]
             for alias in aliases:
-                # Check original and normalized
-                if alias == clean_text or alias == key_norm or \
-                   f" {alias}" in clean_text or f" {alias}" in key_norm or \
-                   clean_text.startswith(f"{alias} ") or key_norm.startswith(f"{alias} ") or \
-                   clean_text.endswith(f" {alias}") or key_norm.endswith(f" {alias}"):
-                    return p
+                is_match = False
+                if alias == clean_text or alias == key_norm:
+                    # Perfect match gets huge priority
+                    if len(alias) + 100 > max_alias_len:
+                        max_alias_len = len(alias) + 100
+                        best_match = p
+                elif f" {alias}" in clean_text or f" {alias}" in key_norm or \
+                     clean_text.startswith(f"{alias} ") or key_norm.startswith(f"{alias} ") or \
+                     clean_text.endswith(f" {alias}") or key_norm.endswith(f" {alias}"):
+                    if len(alias) > max_alias_len:
+                        max_alias_len = len(alias)
+                        best_match = p
+        
+        if best_match:
+            return best_match
 
         # 2. AI Fallback: Semantic resolution
         from services.ai_brain import AIBrainService
@@ -106,7 +118,7 @@ class HerbalifeExpertService:
 
         # Fallbacks for specific known types if DB is missing data
         if not unit_weight:
-             if "ложка" in std_serving.get("unit", ""):
+             if "ложк" in std_serving.get("unit", ""):
                  unit_weight = 13.0 # F1 approx
              elif product["id"] == "h24_rebuild":
                  unit_weight = 25.0
@@ -147,13 +159,27 @@ class HerbalifeExpertService:
             total_grams = amount * 0.5
 
         elif unit == "serving":
-            # Default serving - use standard_serving.grams if available
+            # 1. Try nutrition_per_serving directly first (most accurate for '1 serving' inputs)
+            per_serving = product.get("nutrition_per_serving", {})
+            if per_serving and amount == 1.0:
+                return {
+                    "name": product["name"],
+                    "weight": std_serving.get("grams", std_amount * unit_weight),
+                    "calories": per_serving.get("energy_kcal") or 0,
+                    "protein": per_serving.get("protein_g") or 0,
+                    "fat": per_serving.get("fat_g") or 0,
+                    "carbs": per_serving.get("carbs_g") or 0,
+                    "fiber": per_serving.get("fiber_g") or 0,
+                    "warnings": product.get("warnings", [])
+                }
+            
+            # 2. Fallback to gram calculation
             if std_serving.get("grams"):
                 total_grams = amount * std_serving["grams"]
             elif std_serving.get("unit") == "граммы":
                 total_grams = amount * std_serving.get("amount", 26.0)
             elif measurement_unit == "таблетки":
-                # Tablets: use nutrition_per_serving directly
+                # Tablets: handled above or fallback
                 per_serving = product.get("nutrition_per_serving", {})
                 if per_serving:
                     return {
@@ -168,8 +194,9 @@ class HerbalifeExpertService:
                     }
                 total_grams = amount * 0.5  # Fallback
             else:
-                # Default scoop weight
-                total_grams = amount * unit_weight
+                # Default scoop weight * std_amount
+                # IMPORTANT: If 1 serving = 2 scoops, we must multiply by std_amount!
+                total_grams = amount * std_amount * unit_weight
         else:
             # Unknown unit - use scoop weight as fallback
             total_grams = amount * unit_weight

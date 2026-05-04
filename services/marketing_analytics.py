@@ -19,6 +19,10 @@ from sqlalchemy import and_, func, select
 
 from database.base import get_db
 from database.models import (
+    PAID_SOURCES,
+    PAYMENT_SOURCE_STARS,
+    PAYMENT_SOURCE_TRIAL,
+    PAYMENT_SOURCE_YOOKASSA,
     ConsumptionLog,
     ReferralEvent,
     Subscription,
@@ -44,70 +48,96 @@ SOURCE_LABELS = {
 }
 
 
+async def _get_date_metrics(session, d) -> dict:
+    """Helper to get core metrics for a specific date."""
+    nu = (await session.execute(
+        select(func.count(User.id)).where(func.date(User.created_at) == d)
+    )).scalar() or 0
+
+    au = (await session.execute(
+        select(func.count(func.distinct(ConsumptionLog.user_id))).where(
+            func.date(ConsumptionLog.date) == d
+        )
+    )).scalar() or 0
+
+    logs = (await session.execute(
+        select(func.count(ConsumptionLog.id)).where(
+            func.date(ConsumptionLog.date) == d
+        )
+    )).scalar() or 0
+
+    ref = (await session.execute(
+        select(func.count(ReferralEvent.id)).where(and_(
+            func.date(ReferralEvent.created_at) == d,
+            ReferralEvent.event_type == "signup"
+        ))
+    )).scalar() or 0
+
+    fb = (await session.execute(
+        select(func.count(UserFeedback.id)).where(
+            func.date(UserFeedback.created_at) == d
+        )
+    )).scalar() or 0
+
+    # Real payments only — trial/referral/feedback/admin grants are not sales
+    subs = (await session.execute(
+        select(Subscription).where(and_(
+            func.date(Subscription.starts_at) == d,
+            Subscription.payment_source.in_(list(PAID_SOURCES))
+        ))
+    )).scalars().all()
+
+    rev_rub, rev_stars, cnt_rub, cnt_stars = 0, 0, 0, 0
+    for s in subs:
+        if s.payment_source == PAYMENT_SOURCE_STARS:
+            cnt_stars += 1
+            rev_stars += PRICES_STARS.get(s.tier, 0)
+        elif s.payment_source == PAYMENT_SOURCE_YOOKASSA:
+            cnt_rub += 1
+            rev_rub += PRICES_RUB.get(s.tier, 0)
+
+    trials = (await session.execute(
+        select(func.count(Subscription.id)).where(and_(
+            func.date(Subscription.starts_at) == d,
+            Subscription.payment_source == PAYMENT_SOURCE_TRIAL
+        ))
+    )).scalar() or 0
+
+    return {
+        "nu": nu, "au": au, "logs": logs, "ref": ref, "fb": fb,
+        "rev_rub": rev_rub, "rev_stars": rev_stars,
+        "cnt_rub": cnt_rub, "cnt_stars": cnt_stars,
+        "trials": trials,
+    }
+
+
 async def get_daily_digest() -> str:
-    """Compact daily digest for marketing group (plain text, no HTML tags)."""
-    yesterday = (datetime.now() - timedelta(days=1)).date()
-    date_str = yesterday.strftime("%d.%m.%Y")
+    """Compact daily digest showing Today (live) and Yesterday (final)."""
+    now = datetime.now()
+    today = now.date()
+    yesterday = today - timedelta(days=1)
 
     async for session in get_db():
-        nu = (await session.execute(
-            select(func.count(User.id)).where(func.date(User.created_at) == yesterday)
-        )).scalar() or 0
-
+        m_today = await _get_date_metrics(session, today)
+        m_yesterday = await _get_date_metrics(session, yesterday)
         total = (await session.execute(select(func.count(User.id)))).scalar() or 0
-
-        au = (await session.execute(
-            select(func.count(func.distinct(ConsumptionLog.user_id))).where(
-                func.date(ConsumptionLog.date) == yesterday
-            )
-        )).scalar() or 0
-
-        logs = (await session.execute(
-            select(func.count(ConsumptionLog.id)).where(
-                func.date(ConsumptionLog.date) == yesterday
-            )
-        )).scalar() or 0
-
-        ref = (await session.execute(
-            select(func.count(ReferralEvent.id)).where(and_(
-                func.date(ReferralEvent.created_at) == yesterday,
-                ReferralEvent.event_type == "signup"
-            ))
-        )).scalar() or 0
-
-        fb = (await session.execute(
-            select(func.count(UserFeedback.id)).where(
-                func.date(UserFeedback.created_at) == yesterday
-            )
-        )).scalar() or 0
-
-        # Payments
-        subs = (await session.execute(
-            select(Subscription).where(and_(
-                func.date(Subscription.starts_at) == yesterday,
-                Subscription.tier != "free"
-            ))
-        )).scalars().all()
-
-        rev_rub, rev_stars, cnt_rub, cnt_stars = 0, 0, 0, 0
-        for s in subs:
-            if s.telegram_payment_charge_id:
-                cnt_stars += 1
-                rev_stars += PRICES_STARS.get(s.tier, 0)
-            else:
-                cnt_rub += 1
-                rev_rub += PRICES_RUB.get(s.tier, 0)
-
         break
 
-    dau_pct = f"{au / total * 100:.1f}" if total else "0"
+    def format_block(title, m):
+        return (
+            f"{title}\n"
+            f"👥 Новые: +{m['nu']} (реф: {m['ref']})\n"
+            f"📈 DAU: {m['au']} | логов: {m['logs']}\n"
+            f"🎁 Триалов: {m['trials']}\n"
+            f"💬 Фидбек: {m['fb']}\n"
+            f"💰 Продажи: {m['rev_rub']}₽ ({m['cnt_rub']}) + {m['rev_stars']}⭐ ({m['cnt_stars']})"
+        )
 
     return (
-        f"📊 Маркетинг-сводка ({date_str})\n\n"
-        f"👥 Юзеры: +{nu} новых (реф: {ref}) | всего: {total}\n"
-        f"📈 DAU: {au} ({dau_pct}%) | логов еды: {logs}\n"
-        f"💬 Фидбек: {fb}\n"
-        f"💰 Продажи: {rev_rub}₽ ({cnt_rub} шт) + {rev_stars}⭐ ({cnt_stars} шт)"
+        f"📊 Маркетинг-сводка\n\n"
+        f"🏠 Всего юзеров: {total}\n\n"
+        f"{format_block('🕒 СЕГОДНЯ (Live):', m_today)}\n\n"
+        f"{format_block('📅 ВЧЕРА (Итог):', m_yesterday)}"
     )
 
 
@@ -119,7 +149,7 @@ async def get_acquisition_funnel(days: int = 14) -> str:
 
     async for session in get_db():
         for i in range(days):
-            d = (datetime.now() - timedelta(days=i + 1)).date()
+            d = (datetime.now() - timedelta(days=i)).date() # Included Today
 
             nu = (await session.execute(
                 select(func.count(User.id)).where(func.date(User.created_at) == d)
@@ -155,11 +185,10 @@ async def get_retention_metrics() -> str:
     async for session in get_db():
         total = (await session.execute(select(func.count(User.id)))).scalar() or 0
 
-        # DAU — yesterday
-        yesterday = today - timedelta(days=1)
+        # DAU — today (live)
         dau = (await session.execute(
             select(func.count(func.distinct(ConsumptionLog.user_id))).where(
-                func.date(ConsumptionLog.date) == yesterday
+                func.date(ConsumptionLog.date) == today
             )
         )).scalar() or 0
 
@@ -195,7 +224,7 @@ async def get_retention_metrics() -> str:
         f"📈 Удержание (Retention)\n\n"
         f"👥 Всего в базе: {total}\n"
         f"✅ Онбординг пройден: {onboarded} ({pct(onboarded, total)})\n\n"
-        f"📅 DAU (вчера): {dau} ({pct(dau, total)})\n"
+        f"📅 DAU (Live): {dau} ({pct(dau, total)})\n"
         f"📅 WAU (7 дней): {wau} ({pct(wau, total)})\n"
         f"📅 MAU (30 дней): {mau} ({pct(mau, total)})\n\n"
         f"🔄 Sticky factor (DAU/MAU): {pct(dau, mau)}"
@@ -269,7 +298,9 @@ async def get_hourly_activity(days: int = 7) -> str:
 
 
 async def get_acquisition_sources() -> str:
-    """Aggregated acquisition source report from onboarding survey."""
+    """Aggregated acquisition source report with 'Today' breakdown."""
+    today = datetime.now().date()
+    
     async for session in get_db():
         rows = (await session.execute(
             select(UserFeedback.answer, UserFeedback.created_at).where(
@@ -279,31 +310,46 @@ async def get_acquisition_sources() -> str:
         break
 
     if not rows:
-        return "📋 Источники привлечения\n\nДанных пока нет. Опрос появляется у новых пользователей при онбординге."
+        return "📋 Источники привлечения\n\nДанных пока нет."
 
     # Aggregate by source
     counts: dict[str, int] = {}
-    for answer_json, _ in rows:
+    today_counts: dict[str, int] = {}
+    
+    for answer_json, created_at in rows:
         try:
             data = json.loads(answer_json)
             key = data.get("source", "other")
         except (json.JSONDecodeError, TypeError):
             key = "other"
+            
         counts[key] = counts.get(key, 0) + 1
+        
+        if created_at and created_at.date() == today:
+            today_counts[key] = today_counts.get(key, 0) + 1
 
     total = sum(counts.values())
-    lines = [f"📋 Источники привлечения (всего ответов: {total})\n"]
+    total_today = sum(today_counts.values())
+    
+    lines = [f"📋 Источники привлечения (всего: {total})\n"]
 
-    # Sort by count descending
+    # Today breakdown (if any)
+    if total_today > 0:
+        lines.append(f"🚩 ЗА СЕГОДНЯ: +{total_today} ответов")
+        for key, cnt in sorted(today_counts.items(), key=lambda x: -x[1]):
+            label = SOURCE_LABELS.get(key, key)
+            lines.append(f"  • {label}: {cnt}")
+        lines.append("")
+
+    # Overall distribution
+    lines.append("📊 ОБЩЕЕ РАСПРЕДЕЛЕНИЕ:")
     for key, cnt in sorted(counts.items(), key=lambda x: -x[1]):
         label = SOURCE_LABELS.get(key, key)
         pct = f"{cnt / total * 100:.0f}%" if total else "—"
-        bar_len = int((cnt / max(counts.values())) * 10) if counts else 0
-        bar = "█" * bar_len
-        lines.append(f"{label}: {cnt} ({pct}) {bar}")
+        lines.append(f"  {label}: {cnt} ({pct})")
 
     # Last 5 respondents
-    lines.append("\n🕐 Последние 5:")
+    lines.append("\n🕐 Последние 5 юзеров:")
     for answer_json, created_at in rows[:5]:
         try:
             d = json.loads(answer_json)
@@ -326,7 +372,7 @@ async def export_csv(days: int = 30) -> io.BytesIO:
     writer.writerow(["=== DAILY STATS ==="])
     writer.writerow([
         "Date", "New Users", "Ref Signups", "Active Users (DAU)",
-        "Food Logs", "Feedback", "Sales RUB", "Rev RUB",
+        "Food Logs", "Feedback", "Trials", "Sales RUB", "Rev RUB",
         "Sales Stars", "Rev Stars"
     ])
 
@@ -339,18 +385,19 @@ async def export_csv(days: int = 30) -> io.BytesIO:
             au = (await session.execute(select(func.count(func.distinct(ConsumptionLog.user_id))).where(func.date(ConsumptionLog.date) == d))).scalar() or 0
             lc = (await session.execute(select(func.count(ConsumptionLog.id)).where(func.date(ConsumptionLog.date) == d))).scalar() or 0
             fc = (await session.execute(select(func.count(UserFeedback.id)).where(func.date(UserFeedback.created_at) == d))).scalar() or 0
+            tc = (await session.execute(select(func.count(Subscription.id)).where(and_(func.date(Subscription.starts_at) == d, Subscription.payment_source == PAYMENT_SOURCE_TRIAL)))).scalar() or 0
 
-            subs = (await session.execute(select(Subscription).where(and_(func.date(Subscription.starts_at) == d, Subscription.tier != "free")))).scalars().all()
+            subs = (await session.execute(select(Subscription).where(and_(func.date(Subscription.starts_at) == d, Subscription.payment_source.in_(list(PAID_SOURCES)))))).scalars().all()
             p_rub, p_xtr, r_rub, r_xtr = 0, 0, 0, 0
             for s in subs:
-                if s.telegram_payment_charge_id:
+                if s.payment_source == PAYMENT_SOURCE_STARS:
                     p_xtr += 1
                     r_xtr += PRICES_STARS.get(s.tier, 0)
-                else:
+                elif s.payment_source == PAYMENT_SOURCE_YOOKASSA:
                     p_rub += 1
                     r_rub += PRICES_RUB.get(s.tier, 0)
 
-            writer.writerow([d.strftime("%Y-%m-%d"), nu, ref, au, lc, fc, p_rub, r_rub, p_xtr, r_xtr])
+            writer.writerow([d.strftime("%Y-%m-%d"), nu, ref, au, lc, fc, tc, p_rub, r_rub, p_xtr, r_xtr])
 
         # --- Sheet 2: Acquisition sources ---
         writer.writerow([])

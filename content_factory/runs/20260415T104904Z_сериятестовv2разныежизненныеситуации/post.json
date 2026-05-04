@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T104904Z",
+  "mode": "to_me",
+  "topic": "Серия тестов v2: разные жизненные ситуации",
+  "scenario": "use_case",
+  "text": "<b>Пятница, стол забит едой и напитками, а в голове уже привычное «потом внесу»🍽️🎉🔥</b>\n\nПотом, как известно, обычно не случается: <b>тарелки пустеют, чек теряется, а учет так и остается планами</b>.\n\nОткрываешь Telegram, фоткаешь стол и отправляешь в бота. Он считает по фото или голосом и сразу выдает <b>КБЖУ: калории, белки, жиры, углеводы</b>. Получаешь понятную картину без угадайки — <b>сфоткал, отправил, получил КБЖУ</b>. Особенно удобно, когда хочется и посидеть нормально, и не делать вид, что все было «на глаз».\n\n<blockquote>Вот и вся разница между «держу форму» и «с понедельника начну».</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style food and lifestyle scene: a person at a Friday dinner table filled with dishes and drinks, holding a smartphone open to a Telegram chat, warm neon reflections, modern apartment interior, realistic food photography, cinematic lighting, detailed table spread, subtle futuristic cyberpunk accents, high detail, natural human pose",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

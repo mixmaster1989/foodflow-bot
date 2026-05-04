@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot from a first-person perspective inside a modern car at night. A hand holds a sleek smartphone, taking a photo of a delicious, gourmet French-dog and a pastry sitting on a clean wooden dashboard tray. Hovering above the food is a subtle, translucent holographic interface with glowing teal and blue lines, displaying abstract data visualizations and nutrition charts (no text). The background shows a blurred, cinematic gas station at night with soft neon teal and orange ambient lighting. Premium lighting, 8k resolution, cinematic composition, sharp focus on the food and phone screen.",
+  "negative_prompt": "text, letters, numbers, watermark, logo, QR code, readable UI, distorted fingers, extra digits, blurry face, low quality, cartoon, illustration, messy car interior, bright daylight.",
+  "notes": [
+    "Used a first-person POV to mimic the user action described in the post (taking a photo of the snack).",
+    "Balanced the 'road trip' theme with the brand's premium cyberpunk aesthetic using holographic overlays.",
+    "Specified teal and blue glows to match the FoodFlow brand identity seen in the references.",
+    "Ensured the interface is 'abstract' to avoid the AI generating gibberish text or numbers which breaks the 'no readable text' rule."
+  ]
+}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useToast } from '../components/Toast'
 import { Home, Users, BotMessageSquare } from 'lucide-react';
 import WebAppConfig from '@twa-dev/sdk';
 
@@ -8,11 +9,12 @@ interface CuratorProps {
 }
 
 export const CuratorDashboard: React.FC<CuratorProps> = ({ onNavigate }) => {
+    const toast = useToast()
     const handleBotRedirect = () => {
         if (WebAppConfig.initDataUnsafe?.user) {
             WebAppConfig.close();
         } else {
-            alert("Пожалуйста, закройте приложение и используйте меню бота.");
+            toast.info('Используйте меню куратора в Telegram-боте.');
         }
     };
 

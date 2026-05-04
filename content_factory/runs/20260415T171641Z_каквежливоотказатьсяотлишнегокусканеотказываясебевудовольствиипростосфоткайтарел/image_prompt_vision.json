@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a modern office kitchen with a subtle cyberpunk aesthetic. On a clean, warm wooden table sits a delicious, partially sliced homemade berry pie and a birthday cake on a ceramic stand. In the foreground, a first-person perspective (POV) shows a hand holding a sleek, bezel-less smartphone aiming at a slice of pie on a white plate. The phone screen displays a glowing teal and blue holographic interface scanning the food with abstract data visualizations and charts (no text). Subtle neon teal light strips accent the kitchen cabinetry and table edges. The background is softly blurred with warm ambient lighting and hints of a futuristic city through a window. Premium textures, 8k resolution, cinematic lighting, teal and orange color grading.",
+  "negative_prompt": "readable text, letters, numbers, words, watermark, QR code, logo, brand name, distorted hands, extra fingers, blurry food, messy environment, cartoonish, low resolution, ugly faces.",
+  "notes": [
+    "Used a POV (Point of View) composition to directly illustrate the 'Sought the plate, sent to bot' action from the text.",
+    "Integrated the brand's signature teal/blue glow through the phone's 'scanning' UI and architectural accents.",
+    "Balanced the 'office birthday' theme with the 'cyberpunk' requirement by using high-tech kitchen materials and holographic overlays.",
+    "Strictly avoided text on the UI to prevent AI gibberish, focusing instead on abstract data shapes (graphs/nodes) to represent the calculation."
+  ]
+}

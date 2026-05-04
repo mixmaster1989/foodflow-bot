@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) holding a sleek modern smartphone, taking a photo of a rustic wooden dining table laden with a mountain of golden pancakes, mashed potatoes, and meat cutlets. A soft teal and lime green holographic scanner interface glows from the phone screen, casting a subtle neon light onto the food. The background is a cozy, warm-lit kitchen with premium wooden textures. Photorealistic, cinematic lighting, shallow depth of field, high-end food photography style, subtle cyberpunk accents, 8k resolution, vertical composition.",
+  "negative_prompt": "readable text, letters, numbers, watermark, QR code, logo, brand name, distorted hands, extra fingers, blurry face, messy UI, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used a POV (first-person) angle to directly illustrate the 'just take a photo' benefit mentioned in the text.",
+    "Combined traditional comfort food (pancakes, cutlets) with high-tech teal/green neon overlays to bridge the 'grandma's house' and 'cyberpunk' themes.",
+    "Used warm wood tones for the table to keep the 'premium lifestyle' look from the references.",
+    "Ensured the UI is purely visual/holographic with no actual characters to avoid AI text generation issues."
+  ]
+}

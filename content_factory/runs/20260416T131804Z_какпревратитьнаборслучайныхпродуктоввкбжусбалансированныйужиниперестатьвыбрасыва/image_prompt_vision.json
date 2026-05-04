@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a modern kitchen at night. On a sleek dark wooden table sits a premium, appetizing dinner bowl with grains, fresh greens, and protein. Above the plate, a subtle holographic HUD interface glows in teal and soft blue, displaying abstract data visualizations and circular charts (no text). In the background, a blurred high-tech refrigerator with integrated vertical green plants and thin neon light strips. The lighting is warm and cinematic, punctuated by cool cyberpunk accents. 8k resolution, shot on 35mm lens, vertical composition, premium food photography style.",
+  "negative_prompt": "text, letters, words, numbers, watermark, logo, QR code, distorted hands, blurry face, messy kitchen, low quality, cartoon, illustration, signature, brand name",
+  "notes": [
+    "Used the 'late night dinner' theme from the post text to create a premium, guilt-free atmosphere.",
+    "Incorporated the holographic HUD to represent the FoodFlow scanning/data feature without using actual UI text.",
+    "Maintained the brand's teal/blue neon against warm wood textures for style consistency with the references.",
+    "Focused on a 'clean' version of cyberpunk (lifestyle-first) to keep it appealing for a food-tech service."
+  ]
+}

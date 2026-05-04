@@ -11,8 +11,38 @@ from typing import Any
 import aiohttp
 
 from config import settings
+from services.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_first_json_object(content: str) -> str | None:
+    """Extract the first complete JSON object from content, ignoring trailing data."""
+    start = content.find('{')
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(content[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return content[start:i + 1]
+    return None
 
 
 class NormalizationService:
@@ -72,6 +102,8 @@ class NormalizationService:
 
         import asyncio
 
+        session = await get_http_session()
+
         for model in cls.MODELS:
             payload = {
                 "model": model,
@@ -83,66 +115,63 @@ class NormalizationService:
                 ]
             }
 
-            # Retry logic: 3 attempts with 0.5s delay
             for attempt in range(3):
-                async with aiohttp.ClientSession() as session:
-                    try:
-                        async with session.post(
-                            "https://openrouter.ai/api/v1/chat/completions",
-                            headers=headers,
-                            json=payload,
-                            timeout=60
-                        ) as response:
-                            if response.status == 200:
-                                result = await response.json()
-                                content = result['choices'][0]['message']['content']
+                try:
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=60),
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            content = result['choices'][0]['message']['content']
 
-                                # Robust JSON extraction
-                                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
-                                if json_match:
-                                    content = json_match.group(1)
-                                else:
-                                    content = content.replace("```json", "").replace("```", "").strip()
-                                    first_brace = content.find('{')
-                                    last_brace = content.rfind('}')
-                                    if first_brace >= 0 and last_brace >= 0:
-                                        content = content[first_brace:last_brace+1]
-
-                                try:
-                                    parsed = json.loads(content)
-                                    normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
-
-                                    final_items = []
-                                    for item in raw_items:
-                                        raw_name = item.get('name', 'Unknown')
-                                        norm_data = normalized_map.get(raw_name, {})
-
-                                        final_items.append({
-                                            "name": norm_data.get('name', raw_name),
-                                            "price": item.get('price', 0.0),
-                                            "quantity": item.get('quantity', 1.0),
-                                            "category": norm_data.get('category', 'Uncategorized'),
-                                            "calories": norm_data.get('calories', 0),
-                                            "protein": norm_data.get('protein', 0),
-                                            "fat": norm_data.get('fat', 0),
-                                            "carbs": norm_data.get('carbs', 0),
-                                            "fiber": norm_data.get('fiber', 0) # NEW: Fiber
-                                        })
-                                    return final_items
-
-                                except json.JSONDecodeError:
-                                    logger.error(f"Failed to parse Normalization JSON ({model}): {content}")
-                                    break
+                            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                            if json_match:
+                                content = json_match.group(1)
                             else:
-                                logger.warning(f"Normalization API ({model}) attempt {attempt+1}/3 failed: {response.status}")
-                                if attempt < 2:
-                                    await asyncio.sleep(0.5)
-                                    continue
-                    except Exception as e:
-                        logger.error(f"Exception in Normalization Service ({model}) attempt {attempt+1}/3: {e}")
-                        if attempt < 2:
-                            await asyncio.sleep(0.5)
-                            continue
+                                content = content.replace("```json", "").replace("```", "").strip()
+                                first_brace = content.find('{')
+                                last_brace = content.rfind('}')
+                                if first_brace >= 0 and last_brace >= 0:
+                                    content = content[first_brace:last_brace+1]
+
+                            try:
+                                parsed = json.loads(content)
+                                normalized_map = {item['original']: item for item in parsed.get('normalized', [])}
+
+                                final_items = []
+                                for item in raw_items:
+                                    raw_name = item.get('name', 'Unknown')
+                                    norm_data = normalized_map.get(raw_name, {})
+
+                                    final_items.append({
+                                        "name": norm_data.get('name', raw_name),
+                                        "price": item.get('price', 0.0),
+                                        "quantity": item.get('quantity', 1.0),
+                                        "category": norm_data.get('category', 'Uncategorized'),
+                                        "calories": norm_data.get('calories', 0),
+                                        "protein": norm_data.get('protein', 0),
+                                        "fat": norm_data.get('fat', 0),
+                                        "carbs": norm_data.get('carbs', 0),
+                                        "fiber": norm_data.get('fiber', 0)
+                                    })
+                                return final_items
+
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to parse Normalization JSON ({model}): {content}")
+                                break
+                        else:
+                            logger.warning(f"Normalization API ({model}) attempt {attempt+1}/3 failed: {response.status}")
+                            if attempt < 2:
+                                await asyncio.sleep(0.5)
+                                continue
+                except Exception as e:
+                    logger.error(f"Exception in Normalization Service ({model}) attempt {attempt+1}/3: {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(0.5)
+                        continue
 
             logger.warning(f"Model {model} failed, switching to next...")
 
@@ -215,13 +244,13 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
 
         import asyncio
 
-        import aiohttp
+        session = await get_http_session()
 
         # Use gemini first because it strictly follows JSON-only instructions better than sonar/perplexity.
         target_models = [
-            "google/gemini-2.5-flash-lite-preview-09-2025",
+            "perplexity/sonar",
             "openai/gpt-4o-mini",
-            "perplexity/sonar"
+            "google/gemini-2.5-flash-lite-preview-09-2025"
         ]
 
         for model in target_models:
@@ -234,38 +263,34 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
                         "max_tokens": 3000
                     }
 
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(
-                            "https://openrouter.ai/api/v1/chat/completions",
-                            headers=headers,
-                            json=payload,
-                            timeout=aiohttp.ClientTimeout(total=30)
-                        ) as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                content = data["choices"][0]["message"]["content"].strip()
-                                logger.info(f"AI Raw Response ({model}): {content[:100]}")
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            content = data["choices"][0]["message"]["content"].strip()
+                            logger.info(f"AI Raw Response ({model}): {content[:100]}")
 
-                                # Robust JSON extraction
-                                first_brace = content.find('{')
-                                last_brace = content.rfind('}')
-                                if first_brace >= 0 and last_brace >= 0:
-                                    content = content[first_brace:last_brace+1]
-                                else:
-                                    # Basic cleaning
-                                    if content.startswith("```"):
-                                        content = content.split("```")[1]
-                                        if content.startswith("json"):
-                                            content = content[4:]
-                                    content = content.strip()
+                            if content.startswith("```"):
+                                content = content.split("```")[1]
+                                if content.startswith("json"):
+                                    content = content[4:]
+                                content = content.strip()
 
-                                try:
-                                    result = json.loads(content)
-                                    logger.info(f"Food intake analyzed ({model}): {result}")
-                                    return result
-                                except json.JSONDecodeError as je:
-                                    logger.warning(f"JSON Decode Error ({model}): {je} Content: {content[:200]}")
-                                    continue
+                            extracted = _extract_first_json_object(content)
+                            if extracted:
+                                content = extracted
+
+                            try:
+                                result = json.loads(content)
+                                logger.info(f"Food intake analyzed ({model}): {result}")
+                                return result
+                            except json.JSONDecodeError as je:
+                                logger.warning(f"JSON Decode Error ({model}): {je} Content: {content[:200]}")
+                                continue
                 except Exception as e:
                     logger.error(f"analyze_food_intake error ({model}): {e}")
                     if attempt < 1:
@@ -346,7 +371,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
 
         import asyncio
 
-        import aiohttp
+        session = await get_http_session()
 
         for model in cls.MODELS[:3]:
             for attempt in range(2):
@@ -358,32 +383,29 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                         "max_tokens": 3000
                     }
 
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(
-                            "https://openrouter.ai/api/v1/chat/completions",
-                            headers=headers,
-                            json=payload,
-                            timeout=aiohttp.ClientTimeout(total=30)
-                        ) as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                content = data["choices"][0]["message"]["content"].strip()
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            content = data["choices"][0]["message"]["content"].strip()
 
-                                # Clean JSON
-                                if content.startswith("```"):
-                                    content = content.split("```")[1]
-                                    if content.startswith("json"):
-                                        content = content[4:]
-                                content = content.strip()
+                            if content.startswith("```"):
+                                content = content.split("```")[1]
+                                if content.startswith("json"):
+                                    content = content[4:]
+                            content = content.strip()
 
-                                result = json.loads(content)
+                            result = json.loads(content)
 
-                                # Ensure it's a list
-                                if isinstance(result, dict):
-                                    result = [result]
+                            if isinstance(result, dict):
+                                result = [result]
 
-                                logger.info(f"Batch food analyzed: {len(result)} items")
-                                return result
+                            logger.info(f"Batch food analyzed: {len(result)} items")
+                            return result
                 except Exception as e:
                     logger.error(f"analyze_food_intake_batch error ({model}): {e}")
                     if attempt < 1:
@@ -430,26 +452,25 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
             "X-Title": "FoodFlow Bot"
         }
 
-        import aiohttp
+        session = await get_http_session()
         for model in cls.MODELS:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json={
-                            "model": model,
-                            "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.3
-                        },
-                        timeout=10
-                    ) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            result = data["choices"][0]["message"]["content"].strip()
-                            return result.strip('"').strip("'")
+                async with session.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3
+                    },
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        result = data["choices"][0]["message"]["content"].strip()
+                        return result.strip('"').strip("'")
             except Exception as e:
                 logger.error(f"Dish Naming Failed ({model}): {e}")
-                continue # Try next model
+                continue
 
         return "Мое блюдо"

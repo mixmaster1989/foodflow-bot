@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '../components/Toast'
 import { Home, Settings as SettingsIcon, Save, Loader2, AlertCircle } from 'lucide-react';
 import { authApi } from '../api/client';
 
@@ -8,6 +9,7 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ user, onNavigate }) => {
+    const toast = useToast()
     const [settings, setSettings] = useState({
         gender: user?.settings?.gender || '',
         calorie_goal: user?.settings?.calorie_goal || 2000,
@@ -41,7 +43,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onNavigate }) => {
             // but reloading the app on next mount will also work, or just showing success.
         } catch (err) {
             console.error(err);
-            alert('Ошибка при сохранении настроек');
+            toast.error('Ошибка при сохранении настроек');
         } finally {
             setIsLoading(false);
         }

@@ -2,9 +2,10 @@
 import logging
 import os
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from api.auth import CurrentUser
+from api.main import limiter
 from services.ai_brain import AIBrainService
 from services.herbalife_expert import herbalife_expert
 from services.normalization import NormalizationService
@@ -44,7 +45,9 @@ async def resolve_input_intent(text: str):
     }
 
 @router.post("/process")
+@limiter.limit("30/minute")
 async def process_universal(
+    request: Request,
     text: str = Form(None),
     file: UploadFile = File(None),
     user: CurrentUser = None

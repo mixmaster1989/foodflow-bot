@@ -11,6 +11,7 @@ from typing import Any
 import aiohttp
 
 from config import settings
+from services.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -74,38 +75,37 @@ class OCRService:
 
         import asyncio
 
-        # Retry logic: 3 attempts with 0.5s delay
-        for attempt in range(3):
-            async with aiohttp.ClientSession() as session:
-                try:
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=20
-                    ) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            if 'error' in result:
-                                 logger.error(f"Model {model} returned API error: {result['error']}")
-                                 return None
+        session = await get_http_session()
 
-                            content = result['choices'][0]['message']['content']
-                            # Clean markdown if present
-                            content = content.replace("```json", "").replace("```", "").strip()
-                            return json.loads(content)
-                        else:
-                            logger.warning(f"Model {model} attempt {attempt+1}/3 failed with status {response.status}")
-                            if attempt < 2:
-                                await asyncio.sleep(0.5)
-                                continue
-                            return None
-                except Exception as e:
-                    logger.error(f"Exception calling {model} (attempt {attempt+1}/3): {e}")
-                    if attempt < 2:
-                        await asyncio.sleep(0.5)
-                        continue
-                    return None
+        for attempt in range(3):
+            try:
+                async with session.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        if 'error' in result:
+                             logger.error(f"Model {model} returned API error: {result['error']}")
+                             return None
+
+                        content = result['choices'][0]['message']['content']
+                        content = content.replace("```json", "").replace("```", "").strip()
+                        return json.loads(content)
+                    else:
+                        logger.warning(f"Model {model} attempt {attempt+1}/3 failed with status {response.status}")
+                        if attempt < 2:
+                            await asyncio.sleep(0.5)
+                            continue
+                        return None
+            except Exception as e:
+                logger.error(f"Exception calling {model} (attempt {attempt+1}/3): {e}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5)
+                    continue
+                return None
         return None
 
     @classmethod

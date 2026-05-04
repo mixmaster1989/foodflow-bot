@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '../components/Toast'
 import { X, Check, Trash2, Package, Flame, LogOut } from 'lucide-react';
 import { receiptsApi } from '../api/client';
 
@@ -29,6 +30,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     onClose,
     onFinished
 }) => {
+    const toast = useToast()
     const [items, setItems] = useState<ReceiptItem[]>(initialItems);
     const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
     const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
@@ -40,7 +42,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
             setAddedIndices(prev => new Set(prev).add(index));
         } catch (error) {
             console.error('Failed to add item:', error);
-            alert('Ошибка при добавлении товара');
+            toast.error('Ошибка при добавлении товара');
         } finally {
             setLoadingIndex(null);
         }

@@ -7,9 +7,11 @@ interface RecipesProps {
 }
 
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../components/Toast';
 
 export const Recipes: React.FC<RecipesProps> = ({ onNavigate }) => {
     const { isFree, isPro } = useAuth();
+    const toast = useToast();
 
     const [categories, setCategories] = useState<string[]>([]);
     const [activeCategory, setActiveCategory] = useState<string>('');
@@ -36,7 +38,7 @@ export const Recipes: React.FC<RecipesProps> = ({ onNavigate }) => {
 
     const handleGenerate = async (category: string, refresh: boolean) => {
         if (refresh && !isPro) {
-            alert('Обновление рецептов через AI доступно только в тарифе PRO 💎');
+            toast.info('Обновление рецептов через AI доступно только в тарифе PRO');
             return;
         }
         setIsLoading(true);
@@ -46,7 +48,7 @@ export const Recipes: React.FC<RecipesProps> = ({ onNavigate }) => {
             setExpandedRecipe(null);
         } catch (e) {
             console.error(e);
-            alert('Ошибка загрузки рецептов');
+            toast.error('Ошибка загрузки рецептов');
         } finally {
             setIsLoading(false);
         }

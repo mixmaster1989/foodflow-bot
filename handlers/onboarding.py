@@ -18,7 +18,7 @@ from aiogram import Bot, F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 
 from database.base import get_db
 from database.models import Product, UserSettings, User, Subscription, UserFeedback
@@ -58,18 +58,7 @@ class OnboardingStates(StatesGroup):
 
 
 async def start_onboarding(message: types.Message, state: FSMContext) -> None:
-    """Start onboarding process for new users.
-
-    Checks if user has completed onboarding, if not - starts the flow.
-
-    Args:
-        message: Telegram message
-        state: FSM context
-
-    Returns:
-        None
-
-    """
+    """Start onboarding process for new users."""
     user_id: int = message.from_user.id
 
     async for session in get_db():
@@ -81,22 +70,54 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
             await show_main_menu(message, message.from_user.first_name, message.from_user.id)
             return
 
-        # Start onboarding with acquisition source survey
-        await state.set_state(OnboardingStates.waiting_for_source)
-
-        builder = InlineKeyboardBuilder()
-        for key, label in ACQUISITION_SOURCES.items():
-            builder.button(text=label, callback_data=f"onboarding_source:{key}")
-        builder.adjust(2)
-
-        welcome_text = (
-            "👋 <b>Добро пожаловать в FoodFlow!</b>\n\n"
-            "Я помогу тебе следить за питанием и управлять продуктами.\n\n"
-            "Для начала один вопрос:\n\n"
-            "📋 <b>Откуда вы о нас узнали?</b>"
+        # Check if we already have ad_campaign in UserFeedback
+        fb_stmt = select(UserFeedback).where(
+            and_(
+                UserFeedback.user_id == user_id,
+                UserFeedback.feedback_type == "ad_campaign"
+            )
         )
+        fb = (await session.execute(fb_stmt)).scalar_one_or_none()
 
-        await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        if fb:
+            # Skip source survey, go straight to gender
+            logger.info(f"User {user_id} has ad_campaign '{fb.answer}', skipping source survey")
+            await show_gender_selection(message, state)
+        else:
+            # Start onboarding with acquisition source survey
+            await state.set_state(OnboardingStates.waiting_for_source)
+
+            builder = InlineKeyboardBuilder()
+            for key, label in ACQUISITION_SOURCES.items():
+                builder.button(text=label, callback_data=f"onboarding_source:{key}")
+            builder.adjust(2)
+
+            welcome_text = (
+                "👋 <b>Добро пожаловать в FoodFlow!</b>\n\n"
+                "Я помогу тебе следить за питанием и управлять продуктами.\n\n"
+                "Для начала один вопрос:\n\n"
+                "📋 <b>Откуда вы о нас узнали?</b>"
+            )
+
+            await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+
+async def show_gender_selection(message: types.Message, state: FSMContext) -> None:
+    """Show gender selection screen."""
+    await state.set_state(OnboardingStates.waiting_for_gender)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
+    builder.button(text="👩 Женский", callback_data="onboarding_gender:female")
+    builder.adjust(2)
+
+    text = (
+        "👋 <b>Давай настроим твой профиль!</b>\n\n"
+        "Для точного расчета КБЖУ мне нужны твои параметры.\n\n"
+        "1️⃣ Выбери свой пол:"
+    )
+
+    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("onboarding_source:"))
@@ -151,126 +172,114 @@ async def handle_source_selection(callback: types.CallbackQuery, state: FSMConte
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     except Exception:
         await callback.message.delete()
-        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer()
+import asyncio
+
+async def show_ephemeral_warning(message: types.Message, text: str, parse_mode: str = None) -> None:
+    """Show a warning message and auto-delete it after 6 seconds, also deleting the user's invalid input."""
+    try:
+        await message.delete()
+    except Exception:
+        pass
+        
+    msg = await message.answer(text, parse_mode=parse_mode)
+    
+    async def _delete():
+        await asyncio.sleep(6)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+            
+    asyncio.create_task(_delete())
+
+
+@router.message(OnboardingStates.waiting_for_source)
+async def handle_source_fallback(message: types.Message) -> None:
+    """Handle text input during source selection."""
+    await show_ephemeral_warning(message, "Пожалуйста, воспользуйтесь кнопками выше, чтобы выбрать ответ. 👆")
+
 
 @router.callback_query(F.data.startswith("onboarding_gender:"))
+
 async def handle_gender_selection(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Handle gender selection.
-
-    Args:
-        callback: Telegram callback query with gender data
-        state: FSM context
-
-    Returns:
-        None
-
-    """
+    """Handle gender selection."""
     gender = callback.data.split(":")[1]  # "male" or "female"
     await state.update_data(gender=gender)
     await state.set_state(OnboardingStates.waiting_for_age)
 
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="onboarding_back:gender")
-
     text = (
-        "<b>✅ Пол сохранен!</b>\n\n"
-        "2️⃣ Введите свой <b>возраст</b> (напишите числом прямо в чат ⌨️):"
+        "<b>✅ Отлично!</b>\n\n"
+        "2️⃣ Теперь напиши свой <b>возраст</b> (полных лет):\n\n"
+        "<i>Например: 30</i>"
     )
 
     try:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.edit_text(text, parse_mode="HTML")
     except Exception:
         await callback.message.delete()
-        await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
+
+
+@router.message(OnboardingStates.waiting_for_gender)
+async def handle_gender_fallback(message: types.Message) -> None:
+    """Handle text input during gender selection."""
+    await show_ephemeral_warning(message, "Пожалуйста, воспользуйтесь кнопками выше (👨 или 👩). 👆")
 
 
 @router.message(OnboardingStates.waiting_for_age)
 async def handle_age_input(message: types.Message, state: FSMContext) -> None:
-    """Handle age input.
-
-    Args:
-        message: Telegram message with age
-        state: FSM context
-    """
     try:
-        age: int = int(message.text) if message.text else 0
-        if age < 14 or age > 100:
-            await message.answer("Пожалуйста, введите корректный возраст (14-100 лет):")
+        age = int(message.text)
+        if not (14 <= age <= 100):
+            await message.answer("Возраст должен быть от 14 до 100 лет.")
             return
 
         await state.update_data(age=age)
         await state.set_state(OnboardingStates.waiting_for_height)
 
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔙 Назад", callback_data="onboarding_back:age")
-
         text = (
-            "<b>✅ Возраст сохранен!</b>\n\n"
-            "3️⃣ Введите свой <b>рост</b> в сантиметрах (напишите числом прямо в чат ⌨️, например: <code>175</code>):"
+            "<b>✅ Принято!</b>\n\n"
+            "3️⃣ Укажи свой <b>рост</b> (в см):\n\n"
+            "<i>Например: 175</i>"
         )
-
-        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await message.answer(text, parse_mode="HTML")
     except ValueError:
-        await message.answer("Пожалуйста, введите целое число (возраст в годах):")
-
+        await message.answer("Пожалуйста, введите число (например, 30).")
 
 @router.message(OnboardingStates.waiting_for_height)
 async def handle_height_input(message: types.Message, state: FSMContext) -> None:
-    """Handle height input.
-
-    Args:
-        message: Telegram message with height
-        state: FSM context
-
-    Returns:
-        None
-
-    """
     try:
-        height: int = int(message.text) if message.text else 0
-        if height < 50 or height > 250:
-            await message.answer("Пожалуйста, введите корректный рост (50-250 см):")
+        height = int(message.text.replace(",", ".").split(".")[0])
+        if not (50 <= height <= 250):
+            await message.answer("Рост должен быть от 50 до 250 см.")
             return
 
         await state.update_data(height=height)
         await state.set_state(OnboardingStates.waiting_for_weight)
 
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔙 Назад", callback_data="onboarding_back:height")
-
         text = (
-            "<b>✅ Рост сохранен!</b>\n\n"
-            "4️⃣ Введите свой <b>вес</b> в килограммах (напишите прямо в чат ⌨️, например: <code>70.5</code>):"
+            "<b>✅ Записал.</b>\n\n"
+            "4️⃣ И последнее число — твой <b>текущий вес</b> (в кг):\n\n"
+            "<i>Например: 75.5</i>"
         )
-
-        await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await message.answer(text, parse_mode="HTML")
     except ValueError:
-        await message.answer("Пожалуйста, введите целое число (рост в см):")
-
+        await message.answer("Пожалуйста, введите число (например, 175).")
 
 @router.message(OnboardingStates.waiting_for_weight)
 async def handle_weight_input(message: types.Message, state: FSMContext) -> None:
-    """Handle weight input.
-
-    Args:
-        message: Telegram message with weight
-        state: FSM context
-
-    Returns:
-        None
-
-    """
     try:
-        weight: float = float(message.text.replace(",", ".")) if message.text else 0.0
-        if weight < 20 or weight > 300:
-            await message.answer("Пожалуйста, введите корректный вес (20-300 кг):")
+        weight = float(message.text.replace(",", "."))
+        if not (30 <= weight <= 300):
+            await message.answer("Вес должен быть от 30 до 300 кг.")
             return
 
         await state.update_data(weight=weight)
         await state.set_state(OnboardingStates.waiting_for_goal)
-
+        
+        data = await state.get_data()
+        
         builder = InlineKeyboardBuilder()
         builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
         builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
@@ -279,13 +288,19 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
         builder.adjust(2)
 
         text = (
-            "<b>✅ Вес сохранен!</b>\n\n"
-            "5️⃣ Выбери свою <b>цель</b>:"
+            f"<b>✅ Данные приняты: {data.get('age')} лет, {data.get('height')} см, {weight} кг</b>\n\n"
+            "5️⃣ Выбери свою <b>главную цель</b>:"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     except ValueError:
-        await message.answer("Пожалуйста, введите число (вес в кг, можно с десятичной точкой):")
+        await message.answer("Пожалуйста, введите число (например, 75.5).")
+
+
+@router.message(OnboardingStates.waiting_for_goal)
+async def handle_goal_fallback(message: types.Message) -> None:
+    """Handle text input during goal selection."""
+    await show_ephemeral_warning(message, "Пожалуйста, выберите цель, нажав на одну из кнопок выше. 👆")
 
 
 @router.callback_query(F.data.startswith("onboarding_goal:"))
@@ -323,6 +338,7 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
     builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
+    builder.button(text="🔙 Назад", callback_data="onboarding_back:to_goal_selection")
     builder.adjust(1)
 
     goal_names = {
@@ -364,6 +380,29 @@ async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -
     await callback.answer()
 
 
+@router.message(OnboardingStates.waiting_for_calorie_confirmation)
+async def handle_calorie_confirmation_text(message: types.Message, state: FSMContext) -> None:
+    """Handle text input during calorie confirmation (e.g. 'No', 'Too much')."""
+    text = message.text.lower()
+    
+    if any(word in text for word in ["нет", "не", "много", "no", "stop", "угл"]):
+        await show_ephemeral_warning(
+            message,
+            "📍 <b>Я понял, что расчет тебя не устраивает.</b>\n\n"
+            "Ты можешь нажать кнопку <b>«✏️ Ввести свои калории»</b> выше, "
+            "чтобы задать норму самостоятельно, или нажать <b>«🔙 Назад»</b>, "
+            "чтобы изменить свою цель.\n\n"
+            "КБЖУ — это всего лишь прогноз, ты всегда можешь его подправить! ✨",
+            parse_mode="HTML"
+        )
+    else:
+        await show_ephemeral_warning(
+            message,
+            "☝️ <b>Пожалуйста, воспользуйтесь кнопками выше</b>, чтобы подтвердить расчет, "
+            "ввести свои значения или вернуться назад."
+        )
+
+
 @router.callback_query(F.data == "onboarding_goals:manual")
 async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Ask for manual calories."""
@@ -378,6 +417,9 @@ async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMCont
         "Я автоматически пересчитаю БЖУ под твою цель."
     )
 
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Назад", callback_data="onboarding_back:calorie_confirmation")
+    
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
@@ -458,7 +500,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
         # --- NEW: TRIAL LOGIC ---
         from datetime import datetime, timedelta
 
-        from database.models import Subscription
+        from database.models import PAYMENT_SOURCE_TRIAL, Subscription
 
         # Check if they already have one
         stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
@@ -470,9 +512,12 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 user_id=user_id,
                 tier="pro",
                 expires_at=datetime.now() + timedelta(days=3),
-                is_active=True
+                is_active=True,
+                payment_source=PAYMENT_SOURCE_TRIAL,
             )
             session.add(sub)
+            # Also unlock AI Guide for the trial period
+            settings.guide_active_until = datetime.now() + timedelta(days=3)
 
         # CRITICAL FIX: Mark user as verified so they never see password prompt again
         user_db = await session.get(User, user_id)
@@ -495,23 +540,81 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
     except Exception:
         pass
 
+    first_name = message.chat.first_name or "друг"
     finish_text = (
-        "🎉 <b>Отлично! Настройка завершена!</b>\n\n"
-        f"📋 <b>Твой профиль:</b>\n"
-        f"👤 Пол: <b>{'Мужской' if data.get('gender') == 'male' else 'Женский'}</b>\n"
-        f"🎂 Возраст: <code>{data.get('age')}</code> лет\n"
-        f"📏 Рост: <code>{data.get('height')}</code> см\n"
-        f"⚖️ Вес: <code>{data.get('weight')}</code> кг\n"
-        f"🎯 Цель: <b>{goal_text}</b>\n\n"
-        "<blockquote>Теперь я буду давать тебе персональные рекомендации по продуктам!</blockquote>"
+        f"🎉 <b>Готово, {first_name}!</b>\n\n"
+        "PRO активирован на 3 дня — всё открыто.\n\n"
+        "━━━━━━━━━━━━━━━\n"
+        "<b>Давай сразу попробуем.</b>\n"
+        "Напиши, скажи голосом или сфоткай — что ты ел сегодня?\n\n"
+        "<i>Например:</i>\n"
+        "• <code>овсянка 200г на молоке</code>\n"
+        "• <code>2 яйца, кофе с сахаром и бутер с сыром</code>\n"
+        "• <code>борщ 300 грамм</code>\n\n"
+        "Я посчитаю КБЖУ за 3 секунды ⚡\n\n"
+        "<i>Если ещё не ел — просто напиши «ещё не ел».</i>"
     )
 
-    builder = InlineKeyboardBuilder()
-    builder.button(text="📦 Заполнить холодильник", callback_data="onboarding_start_fridge")
-    builder.button(text="⏭️ Пропустить", callback_data="onboarding_skip_fridge")
-    builder.adjust(1)
+    await message.answer(finish_text, parse_mode="HTML")
 
-    await message.answer(finish_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    # Capture user while hot — ask if they've eaten today
+    ate_builder = InlineKeyboardBuilder()
+    ate_builder.button(text="🍳 Да, запишем!", callback_data="onboard_ate_yes")
+    ate_builder.button(text="⏰ Нет, напомни в 8:00", callback_data="onboard_ate_no")
+    ate_builder.adjust(1)
+    await message.answer(
+        "Кстати — ты сегодня уже ел что-нибудь? 🍽️",
+        reply_markup=ate_builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "onboard_ate_yes")
+async def handle_onboard_ate_yes(callback: types.CallbackQuery) -> None:
+    await callback.answer()
+    try:
+        await callback.message.edit_text(
+            "Отлично! 💪 Просто напиши что ел — я всё посчитаю.\n\n"
+            "<i>Например: «овсянка 200г, кофе с молоком»</i>",
+            parse_mode="HTML",
+        )
+    except Exception:
+        await callback.message.answer(
+            "Отлично! 💪 Просто напиши что ел — я всё посчитаю.\n\n"
+            "<i>Например: «овсянка 200г, кофе с молоком»</i>",
+            parse_mode="HTML",
+        )
+
+
+@router.callback_query(F.data == "onboard_ate_no")
+async def handle_onboard_ate_no(callback: types.CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    async for session in get_db():
+        existing = (await session.execute(
+            select(UserFeedback).where(
+                (UserFeedback.user_id == user_id) &
+                (UserFeedback.feedback_type == "morning_reminder_v1")
+            )
+        )).scalar_one_or_none()
+        if not existing:
+            session.add(UserFeedback(
+                user_id=user_id,
+                feedback_type="morning_reminder_v1",
+                answer="pending",
+            ))
+            await session.commit()
+        break
+
+    await callback.answer()
+    try:
+        await callback.message.edit_text(
+            "Окей, напомню в 8:00 утра! ⏰\n\n"
+            "Как проснёшься — запишем первый приём. Это займёт 10 секунд.",
+        )
+    except Exception:
+        await callback.message.answer(
+            "Окей, напомню в 8:00 утра! ⏰\n\n"
+            "Как проснёшься — запишем первый приём. Это займёт 10 секунд.",
+        )
 
 
 @router.callback_query(F.data.startswith("onboarding_back:"))
@@ -529,6 +632,7 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
     step = callback.data.split(":")[1]
 
     if step == "gender":
+        # Back from physical params or gender selection itself
         await state.set_state(OnboardingStates.waiting_for_gender)
         builder = InlineKeyboardBuilder()
         builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
@@ -542,32 +646,25 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
             await callback.message.delete()
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-    elif step == "age":
-        await state.set_state(OnboardingStates.waiting_for_age)
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔙 Назад", callback_data="onboarding_back:gender")
-
-        text = "2️⃣ Введите свой возраст (напишите числом прямо в чат ⌨️):"
-        try:
-            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-        except Exception:
-            await callback.message.delete()
-            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-
-    elif step == "height":
-        await state.set_state(OnboardingStates.waiting_for_height)
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔙 Назад", callback_data="onboarding_back:age")
-
-        text = "3️⃣ Введите свой рост в сантиметрах (напишите числом прямо в чат ⌨️, например: <code>175</code>):"
-        try:
-            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-        except Exception:
-            await callback.message.delete()
-            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-
     elif step == "goals":
-        # Goals selection step (before manual calories)
+        # Back to age from goal selection
+        await state.set_state(OnboardingStates.waiting_for_age)
+        
+        text = (
+            "<b>2️⃣ Напиши свой возраст:</b>\n\n"
+            "Пример: <code>30</code>"
+        )
+        try:
+            await callback.message.edit_text(text, parse_mode="HTML")
+        except Exception:
+            await callback.message.delete()
+            await callback.message.answer(text, parse_mode="HTML")
+
+    elif step == "to_goal_selection":
+        # Back from calorie confirmation to goal selection
+        await state.set_state(OnboardingStates.waiting_for_goal)
+        data = await state.get_data()
+        
         builder = InlineKeyboardBuilder()
         builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
         builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
@@ -575,13 +672,44 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
         builder.button(text="💪 Набрать массу", callback_data="onboarding_goal:gain_mass")
         builder.adjust(2)
 
-        text = "5️⃣ Выбери свою <b>цель</b>:"
-        
+        text = (
+            f"<b>✅ Данные приняты: {data.get('age')} лет, {data.get('height')} см, {data.get('weight')} кг</b>\n\n"
+            "5️⃣ Выбери свою <b>главную цель</b>:"
+        )
         try:
             await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         except Exception:
             await callback.message.delete()
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+    elif step == "calorie_confirmation":
+        # Back to goals from manual input
+        data = await state.get_data()
+        goal = data.get("goal", "healthy")
+        
+        # We need to trigger handle_goal_selection again, but let's just show the goals with buttons
+        await state.set_state(OnboardingStates.waiting_for_calorie_confirmation)
+        
+        # Recalculate if targets are lost, but they should be in state
+        targets = data.get("pending_targets")
+        if not targets:
+            await callback.answer("Ошибка, выберите цель заново")
+            return
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
+        builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
+        builder.adjust(1)
+
+        text = (
+            "🎯 <b>Проверь расчеты еще раз:</b>\n\n"
+            f"🔥 <b>Калории: <code>{targets['calories']} ккал</code></b>\n"
+            f"🥩 Белки: <code>{targets['protein']} г</code>\n"
+            f"🥑 Жиры: <code>{targets['fat']} г</code>\n"
+            f"🍞 Углеводы: <code>{targets['carbs']} г</code>\n\n"
+            "<b>Согласен?</b>"
+        )
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
     await callback.answer()
 

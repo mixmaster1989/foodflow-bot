@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T093622Z",
+  "mode": "to_me",
+  "topic": "Первый тест (повтор): фото еды в Telegram → КБЖУ за 10 секунд, без ручного ввода",
+  "scenario": "use_case",
+  "text": "🍽️ <b>Пятница. Стол ломится от еды и напитков, а в голове — классика жанра: «потом внесу».</b> 🔥😏\n\n🕒 <tg-spoiler>Потом обычно не наступает</tg-spoiler>\n\n📸 Сфоткал стол → отправил в бот в Telegram → получил <b>КБЖУ</b>.\nБез ручного ввода, без скуки, без самообмана. <b>10 секунд</b> — и уже понятно, что реально съел, а не что «примерно было».\n\n⚖️ Вот и вся разница между «держу форму» и «с понедельника начну».\n\n<blockquote>Разница — одно фото.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style food and lifestyle scene, a person at a Friday dinner table in a modern neon-lit apartment, table full of food and drinks, smartphone in hand sending a photo to a Telegram bot, glowing futuristic UI on the phone, realistic details, moody lighting, vibrant reflections, cinematic composition, high detail, urban cyberpunk atmosphere",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a cozy traditional kitchen table with a futuristic twist. On a warm rustic wooden table sits a steaming bowl of hearty soup, a plate of golden traditional hand-pies (pirozhki), and a glass jar of preserves. A subtle teal and lime-green neon holographic interface floats above the food, displaying abstract data visualizations and nutrition charts. In the foreground, a person's hand holds a sleek modern smartphone, framing the plate through the camera lens. The lighting is a mix of warm homey sunset glow and cool cybernetic blue/green accents. Cinematic depth of field, premium textures, 8k resolution, vertical composition.",
+  "negative_prompt": "readable text, letters, numbers, watermark, QR code, logo, brand name, distorted fingers, extra digits, blurry face, messy background, low resolution, cartoon, illustration",
+  "notes": [
+    "Blended 'Grandma's house' warmth with the brand's signature teal/green neon aesthetic.",
+    "Used the 'phone framing' technique from ref_shopping_mode to visualize the app's scanning feature.",
+    "Replaced specific text/numbers with 'abstract data visualizations' to avoid AI-generated gibberish.",
+    "Maintained the premium wood texture from main_menu.png to keep the lifestyle feel grounded."
+  ]
+}

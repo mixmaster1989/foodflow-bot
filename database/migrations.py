@@ -139,7 +139,31 @@ def _run_sqlite_migrations():
                 [
                     ("telegram_payment_charge_id", "TEXT"),
                     ("auto_renew", "BOOLEAN DEFAULT 1"),
+                    ("payment_source", "TEXT"),
+                    ("yookassa_payment_id", "TEXT"),
                 ]
+            )
+
+            # Backfill payment_source for existing rows. Idempotent via WHERE payment_source IS NULL.
+            cursor.execute(
+                "UPDATE subscriptions SET payment_source='stars' "
+                "WHERE payment_source IS NULL AND telegram_payment_charge_id IS NOT NULL"
+            )
+            if _table_exists(cursor, "referral_rewards"):
+                cursor.execute(
+                    "UPDATE subscriptions SET payment_source='referral' "
+                    "WHERE payment_source IS NULL AND tier != 'free' "
+                    "  AND user_id IN (SELECT user_id FROM referral_rewards WHERE is_active=1)"
+                )
+            if _table_exists(cursor, "user_feedback"):
+                cursor.execute(
+                    "UPDATE subscriptions SET payment_source='feedback_bonus' "
+                    "WHERE payment_source IS NULL AND tier != 'free' "
+                    "  AND user_id IN (SELECT user_id FROM user_feedback WHERE feedback_type LIKE '%poll%')"
+                )
+            cursor.execute(
+                "UPDATE subscriptions SET payment_source='trial' "
+                "WHERE payment_source IS NULL AND tier != 'free'"
             )
 
         if _table_exists(cursor, "products"):
@@ -188,6 +212,7 @@ def _run_sqlite_migrations():
                     ("invited_by_id", "BIGINT"),
                     ("ref_paid_count", "INTEGER DEFAULT 0"),
                     ("vk_id", "BIGINT"),
+                    ("is_blocked", "BOOLEAN DEFAULT 0"),
                 ]
             )
 

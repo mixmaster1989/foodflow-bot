@@ -1,0 +1,293 @@
+[TAILING] Tailing last 1000 lines for [foodflow-bot] process (change the value with --lines option)
+/home/user1/.pm2/logs/foodflow-bot-out.log last 1000 lines:
+/home/user1/.pm2/logs/foodflow-bot-error.log last 1000 lines:
+1|foodflow | 2026-04-30T00:15:00: 2026-04-30 00:15:00,005 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 01:15:00 MSK)" (scheduled at 2026-04-30 00:15:00+03:00)
+1|foodflow | 2026-04-30T00:15:00: 2026-04-30 00:15:00,005 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T00:15:00: 2026-04-30 00:15:00,007 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T00:15:00: 2026-04-30 00:15:00,007 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 01:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T00:20:00: 2026-04-30 00:20:00,003 - INFO - apscheduler.executors.default - Running job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 02:20:00 MSK)" (scheduled at 2026-04-30 00:20:00+03:00)
+1|foodflow | 2026-04-30T00:20:00: 2026-04-30 00:20:00,003 - INFO - services.scheduler - Running first_log_nudge check...
+1|foodflow | 2026-04-30T00:20:00: 2026-04-30 00:20:00,048 - INFO - apscheduler.executors.default - Job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 02:20:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T00:30:00: 2026-04-30 00:30:00,000 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 01:30:00 MSK)" (scheduled at 2026-04-30 00:30:00+03:00)
+1|foodflow | 2026-04-30T00:30:00: 2026-04-30 00:30:00,000 - INFO - services.scheduler - Checking for expired subscriptions at 00:30
+1|foodflow | 2026-04-30T00:30:00: 2026-04-30 00:30:00,002 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 01:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T00:45:00: 2026-04-30 00:45:00,001 - INFO - apscheduler.executors.default - Running job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 02:45:00 MSK)" (scheduled at 2026-04-30 00:45:00+03:00)
+1|foodflow | 2026-04-30T00:45:00: 2026-04-30 00:45:00,001 - INFO - services.scheduler - Running trial drip check...
+1|foodflow | 2026-04-30T00:45:00: 2026-04-30 00:45:00,006 - INFO - apscheduler.executors.default - Job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 02:45:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,007 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" (scheduled at 2026-04-30 01:00:00+03:00)
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,007 - INFO - services.scheduler - Running curator summary check for hour 01:00
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,008 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" (scheduled at 2026-04-30 01:00:00+03:00)
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,008 - INFO - services.scheduler - Running daily summary check for hour 01:00
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,008 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" (scheduled at 2026-04-30 01:00:00+03:00)
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,009 - INFO - services.scheduler - Running weight reminder job at 01:00
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,010 - INFO - services.scheduler - Found 0 users for summary at 01:00
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,012 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,012 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,013 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T01:00:00: 2026-04-30 01:00:00,016 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 02:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T01:15:00: 2026-04-30 01:15:00,002 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 02:15:00 MSK)" (scheduled at 2026-04-30 01:15:00+03:00)
+1|foodflow | 2026-04-30T01:15:00: 2026-04-30 01:15:00,005 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T01:15:00: 2026-04-30 01:15:00,007 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T01:15:00: 2026-04-30 01:15:00,007 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 02:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T01:30:00: 2026-04-30 01:30:00,003 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 02:30:00 MSK)" (scheduled at 2026-04-30 01:30:00+03:00)
+1|foodflow | 2026-04-30T01:30:00: 2026-04-30 01:30:00,004 - INFO - services.scheduler - Checking for expired subscriptions at 01:30
+1|foodflow | 2026-04-30T01:30:00: 2026-04-30 01:30:00,005 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 02:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,009 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" (scheduled at 2026-04-30 02:00:00+03:00)
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,009 - INFO - services.scheduler - Running curator summary check for hour 02:00
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,010 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" (scheduled at 2026-04-30 02:00:00+03:00)
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,010 - INFO - services.scheduler - Running daily summary check for hour 02:00
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,010 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" (scheduled at 2026-04-30 02:00:00+03:00)
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,011 - INFO - services.scheduler - Running weight reminder job at 02:00
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,012 - INFO - services.scheduler - Found 0 users for summary at 02:00
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,013 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,014 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,014 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:00:00: 2026-04-30 02:00:00,017 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 03:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:15:00: 2026-04-30 02:15:00,005 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 03:15:00 MSK)" (scheduled at 2026-04-30 02:15:00+03:00)
+1|foodflow | 2026-04-30T02:15:00: 2026-04-30 02:15:00,005 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T02:15:00: 2026-04-30 02:15:00,007 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T02:15:00: 2026-04-30 02:15:00,007 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 03:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:20:00: 2026-04-30 02:20:00,005 - INFO - apscheduler.executors.default - Running job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 04:20:00 MSK)" (scheduled at 2026-04-30 02:20:00+03:00)
+1|foodflow | 2026-04-30T02:20:00: 2026-04-30 02:20:00,005 - INFO - services.scheduler - Running first_log_nudge check...
+1|foodflow | 2026-04-30T02:20:00: 2026-04-30 02:20:00,047 - INFO - apscheduler.executors.default - Job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 04:20:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:30:00: 2026-04-30 02:30:00,005 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 03:30:00 MSK)" (scheduled at 2026-04-30 02:30:00+03:00)
+1|foodflow | 2026-04-30T02:30:00: 2026-04-30 02:30:00,005 - INFO - services.scheduler - Checking for expired subscriptions at 02:30
+1|foodflow | 2026-04-30T02:30:00: 2026-04-30 02:30:00,006 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 03:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T02:45:00: 2026-04-30 02:45:00,001 - INFO - apscheduler.executors.default - Running job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 04:45:00 MSK)" (scheduled at 2026-04-30 02:45:00+03:00)
+1|foodflow | 2026-04-30T02:45:00: 2026-04-30 02:45:00,005 - INFO - services.scheduler - Running trial drip check...
+1|foodflow | 2026-04-30T02:45:00: 2026-04-30 02:45:00,008 - INFO - apscheduler.executors.default - Job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 04:45:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,002 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" (scheduled at 2026-04-30 03:00:00+03:00)
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,002 - INFO - services.scheduler - Running curator summary check for hour 03:00
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,002 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" (scheduled at 2026-04-30 03:00:00+03:00)
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,003 - INFO - services.scheduler - Running daily summary check for hour 03:00
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,003 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" (scheduled at 2026-04-30 03:00:00+03:00)
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,003 - INFO - services.scheduler - Running weight reminder job at 03:00
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,005 - INFO - services.scheduler - Found 0 users for summary at 03:00
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,006 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,006 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,007 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T03:00:00: 2026-04-30 03:00:00,009 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 04:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T03:15:00: 2026-04-30 03:15:00,007 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 04:15:00 MSK)" (scheduled at 2026-04-30 03:15:00+03:00)
+1|foodflow | 2026-04-30T03:15:00: 2026-04-30 03:15:00,008 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T03:15:00: 2026-04-30 03:15:00,009 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T03:15:00: 2026-04-30 03:15:00,010 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 04:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T03:30:00: 2026-04-30 03:30:00,001 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 04:30:00 MSK)" (scheduled at 2026-04-30 03:30:00+03:00)
+1|foodflow | 2026-04-30T03:30:00: 2026-04-30 03:30:00,001 - INFO - services.scheduler - Checking for expired subscriptions at 03:30
+1|foodflow | 2026-04-30T03:30:00: 2026-04-30 03:30:00,002 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 04:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,004 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" (scheduled at 2026-04-30 04:00:00+03:00)
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,004 - INFO - services.scheduler - Running curator summary check for hour 04:00
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,004 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" (scheduled at 2026-04-30 04:00:00+03:00)
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,005 - INFO - services.scheduler - Running daily summary check for hour 04:00
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,005 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" (scheduled at 2026-04-30 04:00:00+03:00)
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,005 - INFO - services.scheduler - Running weight reminder job at 04:00
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,006 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,007 - INFO - services.scheduler - Found 0 users for summary at 04:00
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,008 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,010 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:00:00: 2026-04-30 04:00:00,012 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 05:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:15:00: 2026-04-30 04:15:00,010 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 05:15:00 MSK)" (scheduled at 2026-04-30 04:15:00+03:00)
+1|foodflow | 2026-04-30T04:15:00: 2026-04-30 04:15:00,010 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T04:15:00: 2026-04-30 04:15:00,012 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T04:15:00: 2026-04-30 04:15:00,012 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 05:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:20:00: 2026-04-30 04:20:00,008 - INFO - apscheduler.executors.default - Running job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 06:20:00 MSK)" (scheduled at 2026-04-30 04:20:00+03:00)
+1|foodflow | 2026-04-30T04:20:00: 2026-04-30 04:20:00,008 - INFO - services.scheduler - Running first_log_nudge check...
+1|foodflow | 2026-04-30T04:20:00: 2026-04-30 04:20:00,050 - INFO - apscheduler.executors.default - Job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 06:20:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:30:00: 2026-04-30 04:30:00,005 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 05:30:00 MSK)" (scheduled at 2026-04-30 04:30:00+03:00)
+1|foodflow | 2026-04-30T04:30:00: 2026-04-30 04:30:00,005 - INFO - services.scheduler - Checking for expired subscriptions at 04:30
+1|foodflow | 2026-04-30T04:30:00: 2026-04-30 04:30:00,006 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 05:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T04:45:00: 2026-04-30 04:45:00,001 - INFO - apscheduler.executors.default - Running job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 06:45:00 MSK)" (scheduled at 2026-04-30 04:45:00+03:00)
+1|foodflow | 2026-04-30T04:45:00: 2026-04-30 04:45:00,001 - INFO - services.scheduler - Running trial drip check...
+1|foodflow | 2026-04-30T04:45:00: 2026-04-30 04:45:00,177 - INFO - services.scheduler - Sent drip_day1 to user 694260349
+1|foodflow | 2026-04-30T04:45:00: 2026-04-30 04:45:00,178 - INFO - apscheduler.executors.default - Job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 06:45:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,006 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" (scheduled at 2026-04-30 05:00:00+03:00)
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,006 - INFO - services.scheduler - Running curator summary check for hour 05:00
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,007 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" (scheduled at 2026-04-30 05:00:00+03:00)
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,007 - INFO - services.scheduler - Running daily summary check for hour 05:00
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,007 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" (scheduled at 2026-04-30 05:00:00+03:00)
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,007 - INFO - services.scheduler - Running weight reminder job at 05:00
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,010 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,010 - INFO - services.scheduler - Found 0 users for summary at 05:00
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,011 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,011 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T05:00:00: 2026-04-30 05:00:00,013 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 06:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T05:15:00: 2026-04-30 05:15:00,002 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 06:15:00 MSK)" (scheduled at 2026-04-30 05:15:00+03:00)
+1|foodflow | 2026-04-30T05:15:00: 2026-04-30 05:15:00,002 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T05:15:00: 2026-04-30 05:15:00,004 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T05:15:00: 2026-04-30 05:15:00,004 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 06:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T05:30:00: 2026-04-30 05:30:00,003 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 06:30:00 MSK)" (scheduled at 2026-04-30 05:30:00+03:00)
+1|foodflow | 2026-04-30T05:30:00: 2026-04-30 05:30:00,003 - INFO - services.scheduler - Checking for expired subscriptions at 05:30
+1|foodflow | 2026-04-30T05:30:00: 2026-04-30 05:30:00,005 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 06:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,010 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" (scheduled at 2026-04-30 06:00:00+03:00)
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,010 - INFO - services.scheduler - Running curator summary check for hour 06:00
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,011 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" (scheduled at 2026-04-30 06:00:00+03:00)
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,011 - INFO - services.scheduler - Running daily summary check for hour 06:00
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,012 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" (scheduled at 2026-04-30 06:00:00+03:00)
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,012 - INFO - services.scheduler - Running weight reminder job at 06:00
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,014 - INFO - services.scheduler - Found 0 users for summary at 06:00
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,015 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,015 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,015 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:00:00: 2026-04-30 06:00:00,018 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 07:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:15:00: 2026-04-30 06:15:00,006 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 07:15:00 MSK)" (scheduled at 2026-04-30 06:15:00+03:00)
+1|foodflow | 2026-04-30T06:15:00: 2026-04-30 06:15:00,007 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T06:15:00: 2026-04-30 06:15:00,008 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T06:15:00: 2026-04-30 06:15:00,008 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 07:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:20:00: 2026-04-30 06:20:00,005 - INFO - apscheduler.executors.default - Running job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 08:20:00 MSK)" (scheduled at 2026-04-30 06:20:00+03:00)
+1|foodflow | 2026-04-30T06:20:00: 2026-04-30 06:20:00,006 - INFO - services.scheduler - Running first_log_nudge check...
+1|foodflow | 2026-04-30T06:20:00: 2026-04-30 06:20:00,047 - INFO - apscheduler.executors.default - Job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 08:20:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:22:58: 2026-04-30 06:22:58,348 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Button: main_menu
+1|foodflow | 2026-04-30T06:22:58: 2026-04-30 06:22:58,789 - INFO - aiogram.event - Update id=958104991 is handled. Duration 441 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:30:00: 2026-04-30 06:30:00,008 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 07:30:00 MSK)" (scheduled at 2026-04-30 06:30:00+03:00)
+1|foodflow | 2026-04-30T06:30:00: 2026-04-30 06:30:00,008 - INFO - services.scheduler - Checking for expired subscriptions at 06:30
+1|foodflow | 2026-04-30T06:30:00: 2026-04-30 06:30:00,009 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 07:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:45:00: 2026-04-30 06:45:00,000 - INFO - apscheduler.executors.default - Running job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 08:45:00 MSK)" (scheduled at 2026-04-30 06:45:00+03:00)
+1|foodflow | 2026-04-30T06:45:00: 2026-04-30 06:45:00,001 - INFO - services.scheduler - Running trial drip check...
+1|foodflow | 2026-04-30T06:45:00: 2026-04-30 06:45:00,136 - WARNING - services.scheduler - User 486877669370844 is unreachable, marking as blocked: Telegram server says - Bad Request: chat not found
+1|foodflow | 2026-04-30T06:45:00: 2026-04-30 06:45:00,137 - INFO - apscheduler.executors.default - Job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 08:45:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T06:53:33: 2026-04-30 06:53:33,102 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Button: menu_weight
+1|foodflow | 2026-04-30T06:53:33: 2026-04-30 06:53:33,539 - INFO - aiogram.event - Update id=958104992 is handled. Duration 436 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:53:42: 2026-04-30 06:53:42,553 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Message: 63,6
+1|foodflow | 2026-04-30T06:53:42: 2026-04-30 06:53:42,691 - INFO - aiogram.event - Update id=958104993 is handled. Duration 138 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:53:45: 2026-04-30 06:53:45,967 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Button: main_menu
+1|foodflow | 2026-04-30T06:53:46: 2026-04-30 06:53:46,273 - INFO - aiogram.event - Update id=958104994 is handled. Duration 306 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:53:49: 2026-04-30 06:53:49,616 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Button: menu_i_ate
+1|foodflow | 2026-04-30T06:53:50: 2026-04-30 06:53:50,056 - INFO - aiogram.event - Update id=958104995 is handled. Duration 440 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:54:24: 2026-04-30 06:54:24,907 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Message: Алое Гербалайф 1 порция белок Гербалайф 1 порция Оян Гербалайф 1 порция чай Гербалайф 1 порция коктейль Гербалайф 1 порция
+1|foodflow | 2026-04-30T06:54:25: 2026-04-30 06:54:25,045 - INFO - ai.semaphore - [Semaphore] ▶️ ACQUIRED: 1/5 active, 0 waiting
+1|foodflow | 2026-04-30T06:54:27: 2026-04-30 06:54:27,421 - INFO - ai.semaphore - [Semaphore] ✅ RELEASED: 0/5 active, 0 waiting
+1|foodflow | 2026-04-30T06:54:33: 2026-04-30 06:54:33,482 - INFO - services.normalization - Batch food analyzed: 5 items
+1|foodflow | 2026-04-30T06:54:33: 2026-04-30 06:54:33,554 - INFO - aiogram.event - Update id=958104996 is handled. Duration 8647 ms by bot id=8587231248
+1|foodflow | 2026-04-30T06:54:35: 2026-04-30 06:54:35,525 - INFO - middleware.admin_logger - Admin Alert: User: Татьяна Безручкина (ID: 5153798702) | Action: Button: batch_confirm_now
+1|foodflow | 2026-04-30T06:54:36: 2026-04-30 06:54:36,033 - INFO - aiogram.event - Update id=958104997 is handled. Duration 507 ms by bot id=8587231248
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,004 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" (scheduled at 2026-04-30 07:00:00+03:00)
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,004 - INFO - services.scheduler - Running curator summary check for hour 07:00
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,005 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" (scheduled at 2026-04-30 07:00:00+03:00)
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,005 - INFO - services.scheduler - Running daily summary check for hour 07:00
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,006 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" (scheduled at 2026-04-30 07:00:00+03:00)
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,006 - INFO - services.scheduler - Running weight reminder job at 07:00
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,007 - INFO - services.scheduler - Found 0 users for summary at 07:00
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,009 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,010 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,013 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,082 - INFO - services.scheduler - Sent weight reminder to user 295543071
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,148 - INFO - services.scheduler - Sent weight reminder to user 5422141137
+1|foodflow | 2026-04-30T07:00:00: 2026-04-30 07:00:00,148 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 08:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T07:15:00: 2026-04-30 07:15:00,005 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 08:15:00 MSK)" (scheduled at 2026-04-30 07:15:00+03:00)
+1|foodflow | 2026-04-30T07:15:00: 2026-04-30 07:15:00,005 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T07:15:00: 2026-04-30 07:15:00,006 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T07:15:00: 2026-04-30 07:15:00,007 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 08:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T07:30:00: 2026-04-30 07:30:00,005 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 08:30:00 MSK)" (scheduled at 2026-04-30 07:30:00+03:00)
+1|foodflow | 2026-04-30T07:30:00: 2026-04-30 07:30:00,005 - INFO - services.scheduler - Checking for expired subscriptions at 07:30
+1|foodflow | 2026-04-30T07:30:00: 2026-04-30 07:30:00,006 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 08:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,005 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" (scheduled at 2026-04-30 08:00:00+03:00)
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,005 - INFO - services.scheduler - Running curator summary check for hour 08:00
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,006 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" (scheduled at 2026-04-30 08:00:00+03:00)
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,006 - INFO - services.scheduler - Running daily summary check for hour 08:00
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,007 - INFO - apscheduler.executors.default - Running job "send_morning_reminder (trigger: cron[hour='8', minute='0'], next run at: 2026-05-01 08:00:00 MSK)" (scheduled at 2026-04-30 08:00:00+03:00)
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,007 - INFO - services.scheduler - Running morning_reminder_v1 check...
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,007 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" (scheduled at 2026-04-30 08:00:00+03:00)
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,007 - INFO - services.scheduler - Running weight reminder job at 08:00
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,009 - INFO - services.scheduler - Found 0 users for summary at 08:00
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,009 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,010 - INFO - apscheduler.executors.default - Job "send_morning_reminder (trigger: cron[hour='8', minute='0'], next run at: 2026-05-01 08:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,010 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,011 - INFO - services.scheduler - Sending curator summary to 7587440056
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,013 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,182 - INFO - services.scheduler - Sent text summary to curator 7587440056
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,187 - INFO - services.scheduler - Sending curator summary to 432823154
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,279 - INFO - services.scheduler - Sent text summary to curator 432823154
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,284 - INFO - services.scheduler - Sending curator summary to 295543071
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,362 - INFO - services.scheduler - Sent text summary to curator 295543071
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,371 - INFO - services.scheduler - Sending curator summary to 33587682
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,458 - INFO - services.scheduler - Sent text summary to curator 33587682
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,475 - INFO - services.scheduler - Sending curator summary to 8524393187
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,547 - INFO - services.scheduler - Sent text summary to curator 8524393187
+1|foodflow | 2026-04-30T08:00:00: 2026-04-30 08:00:00,551 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 09:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:15:00: 2026-04-30 08:15:00,001 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 09:15:00 MSK)" (scheduled at 2026-04-30 08:15:00+03:00)
+1|foodflow | 2026-04-30T08:15:00: 2026-04-30 08:15:00,001 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T08:15:00: 2026-04-30 08:15:00,003 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T08:15:00: 2026-04-30 08:15:00,003 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 09:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:20:00: 2026-04-30 08:20:00,005 - INFO - apscheduler.executors.default - Running job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 10:20:00 MSK)" (scheduled at 2026-04-30 08:20:00+03:00)
+1|foodflow | 2026-04-30T08:20:00: 2026-04-30 08:20:00,005 - INFO - services.scheduler - Running first_log_nudge check...
+1|foodflow | 2026-04-30T08:20:00: 2026-04-30 08:20:00,050 - INFO - apscheduler.executors.default - Job "send_first_log_nudge (trigger: cron[hour='*/2', minute='20'], next run at: 2026-04-30 10:20:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:30:00: 2026-04-30 08:30:00,002 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 09:30:00 MSK)" (scheduled at 2026-04-30 08:30:00+03:00)
+1|foodflow | 2026-04-30T08:30:00: 2026-04-30 08:30:00,002 - INFO - services.scheduler - Checking for expired subscriptions at 08:30
+1|foodflow | 2026-04-30T08:30:00: 2026-04-30 08:30:00,004 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 09:30:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T08:45:00: 2026-04-30 08:45:00,002 - INFO - apscheduler.executors.default - Running job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 10:45:00 MSK)" (scheduled at 2026-04-30 08:45:00+03:00)
+1|foodflow | 2026-04-30T08:45:00: 2026-04-30 08:45:00,002 - INFO - services.scheduler - Running trial drip check...
+1|foodflow | 2026-04-30T08:45:00: 2026-04-30 08:45:00,147 - WARNING - services.scheduler - User 486877669370844 is unreachable, marking as blocked: Telegram server says - Bad Request: chat not found
+1|foodflow | 2026-04-30T08:45:00: 2026-04-30 08:45:00,247 - INFO - services.scheduler - Sent drip_day1 to user 979417065
+1|foodflow | 2026-04-30T08:45:00: 2026-04-30 08:45:00,249 - INFO - apscheduler.executors.default - Job "send_trial_drip (trigger: cron[hour='*/2', minute='45'], next run at: 2026-04-30 10:45:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,001 - INFO - apscheduler.executors.default - Running job "send_admin_digest (trigger: cron[hour='9', minute='0'], next run at: 2026-05-01 09:00:00 MSK)" (scheduled at 2026-04-30 09:00:00+03:00)
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,001 - INFO - services.scheduler - Running admin daily digest job
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,002 - INFO - apscheduler.executors.default - Running job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" (scheduled at 2026-04-30 09:00:00+03:00)
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,002 - INFO - services.scheduler - Running curator summary check for hour 09:00
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,003 - INFO - apscheduler.executors.default - Running job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" (scheduled at 2026-04-30 09:00:00+03:00)
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,003 - INFO - services.scheduler - Running daily summary check for hour 09:00
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,003 - INFO - apscheduler.executors.default - Running job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" (scheduled at 2026-04-30 09:00:00+03:00)
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,003 - INFO - services.scheduler - Running weight reminder job at 09:00
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,007 - INFO - services.scheduler - Found 0 users for summary at 09:00
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,008 - INFO - services.scheduler - Found 5 curators to check
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,009 - INFO - apscheduler.executors.default - Job "send_daily_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,013 - INFO - apscheduler.executors.default - Job "send_curator_summaries (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,089 - INFO - services.scheduler - Sent weight reminder to user 5263406733
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,198 - INFO - services.scheduler - Sent weight reminder to user 33587682
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,199 - INFO - services.scheduler - Sent admin digest to 432823154
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,199 - INFO - apscheduler.executors.default - Job "send_admin_digest (trigger: cron[hour='9', minute='0'], next run at: 2026-05-01 09:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,354 - INFO - services.scheduler - Sent weight reminder to user 495294354
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,441 - INFO - services.scheduler - Sent weight reminder to user 911990304
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,520 - INFO - services.scheduler - Sent weight reminder to user 1348491591
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,602 - INFO - services.scheduler - Sent weight reminder to user 7587440056
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,680 - INFO - services.scheduler - Sent weight reminder to user 7846721167
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,766 - INFO - services.scheduler - Sent weight reminder to user 8061682158
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,840 - INFO - services.scheduler - Sent weight reminder to user 432823154
+1|foodflow | 2026-04-30T09:00:00: 2026-04-30 09:00:00,928 - INFO - services.scheduler - Sent weight reminder to user 109153550
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,007 - INFO - services.scheduler - Sent weight reminder to user 1020860110
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,079 - INFO - services.scheduler - Sent weight reminder to user 7899005241
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,165 - INFO - services.scheduler - Sent weight reminder to user 1044916834
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,257 - INFO - services.scheduler - Sent weight reminder to user 7206006611
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,341 - INFO - services.scheduler - Sent weight reminder to user 1015270932
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,415 - INFO - services.scheduler - Sent weight reminder to user 5153798702
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,517 - INFO - services.scheduler - Sent weight reminder to user 5204589721
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,608 - INFO - services.scheduler - Sent weight reminder to user 383734576
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,697 - INFO - services.scheduler - Sent weight reminder to user 1958422723
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,790 - INFO - services.scheduler - Sent weight reminder to user 1899304364
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,870 - INFO - services.scheduler - Sent weight reminder to user 584511734
+1|foodflow | 2026-04-30T09:00:01: 2026-04-30 09:00:01,949 - INFO - services.scheduler - Sent weight reminder to user 1281838652
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,041 - INFO - services.scheduler - Sent weight reminder to user 582252581
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,115 - INFO - services.scheduler - Sent weight reminder to user 299517032
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,196 - INFO - services.scheduler - Sent weight reminder to user 6323214991
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,271 - INFO - services.scheduler - Sent weight reminder to user 6891198267
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,356 - INFO - services.scheduler - Sent weight reminder to user 97928522
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,429 - INFO - services.scheduler - Sent weight reminder to user 5318525610
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,505 - INFO - services.scheduler - Sent weight reminder to user 275333977
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,583 - INFO - services.scheduler - Sent weight reminder to user 1284319568
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,655 - INFO - services.scheduler - Sent weight reminder to user 6631298521
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,730 - INFO - services.scheduler - Sent weight reminder to user 5549454481
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,839 - INFO - services.scheduler - Sent weight reminder to user 557306704
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,922 - INFO - services.scheduler - Sent weight reminder to user 5140327128
+1|foodflow | 2026-04-30T09:00:02: 2026-04-30 09:00:02,991 - INFO - services.scheduler - Sent weight reminder to user 1047664072
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,069 - INFO - services.scheduler - Sent weight reminder to user 5151696775
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,146 - INFO - services.scheduler - Sent weight reminder to user 680675766
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,217 - INFO - services.scheduler - Sent weight reminder to user 8524393187
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,291 - INFO - services.scheduler - Sent weight reminder to user 1192291795
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,373 - INFO - services.scheduler - Sent weight reminder to user 5276124843
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,455 - INFO - services.scheduler - Sent weight reminder to user 5261872311
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,532 - INFO - services.scheduler - Sent weight reminder to user 694260349
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,613 - INFO - services.scheduler - Sent weight reminder to user 979417065
+1|foodflow | 2026-04-30T09:00:03: 2026-04-30 09:00:03,613 - INFO - apscheduler.executors.default - Job "send_weight_reminders (trigger: cron[minute='0'], next run at: 2026-04-30 10:00:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:05:00: 2026-04-30 09:05:00,008 - INFO - apscheduler.executors.default - Running job "send_marketing_digest (trigger: cron[hour='9', minute='5'], next run at: 2026-05-01 09:05:00 MSK)" (scheduled at 2026-04-30 09:05:00+03:00)
+1|foodflow | 2026-04-30T09:05:00: 2026-04-30 09:05:00,008 - INFO - services.scheduler - Running marketing daily digest job
+1|foodflow | 2026-04-30T09:05:00: 2026-04-30 09:05:00,194 - INFO - services.scheduler - Sent marketing digest to group -1003772936659
+1|foodflow | 2026-04-30T09:05:00: 2026-04-30 09:05:00,195 - INFO - apscheduler.executors.default - Job "send_marketing_digest (trigger: cron[hour='9', minute='5'], next run at: 2026-05-01 09:05:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:15:00: 2026-04-30 09:15:00,003 - INFO - apscheduler.executors.default - Running job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 10:15:00 MSK)" (scheduled at 2026-04-30 09:15:00+03:00)
+1|foodflow | 2026-04-30T09:15:00: 2026-04-30 09:15:00,003 - INFO - services.scheduler - Running onboarding reminder check...
+1|foodflow | 2026-04-30T09:15:00: 2026-04-30 09:15:00,007 - INFO - services.scheduler - Sent 0 onboarding reminders.
+1|foodflow | 2026-04-30T09:15:00: 2026-04-30 09:15:00,007 - INFO - apscheduler.executors.default - Job "send_onboarding_reminders (trigger: cron[minute='15'], next run at: 2026-04-30 10:15:00 MSK)" executed successfully
+1|foodflow | 2026-04-30T09:19:52: 2026-04-30 09:19:52,478 - INFO - middleware.admin_logger - Admin Alert: User: Coda_net (ID: 7451243960) | Action: Message: /start ad_pioneer
+1|foodflow | 2026-04-30T09:19:52: 2026-04-30 09:19:52,572 - INFO - handlers.onboarding - User 7451243960 has ad_campaign 'pioneer', skipping source survey
+1|foodflow | 2026-04-30T09:19:52: 2026-04-30 09:19:52,646 - INFO - aiogram.event - Update id=958104998 is handled. Duration 168 ms by bot id=8587231248
+1|foodflow | 2026-04-30T09:30:00: 2026-04-30 09:30:00,006 - INFO - apscheduler.executors.default - Running job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 10:30:00 MSK)" (scheduled at 2026-04-30 09:30:00+03:00)
+1|foodflow | 2026-04-30T09:30:00: 2026-04-30 09:30:00,006 - INFO - services.scheduler - Checking for expired subscriptions at 09:30
+1|foodflow | 2026-04-30T09:30:00: 2026-04-30 09:30:00,008 - INFO - apscheduler.executors.default - Job "expire_subscriptions (trigger: cron[minute='30'], next run at: 2026-04-30 10:30:00 MSK)" executed successfully
+

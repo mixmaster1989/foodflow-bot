@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A first-person perspective (POV) of a person sitting at a warm wooden dinner table in a high-end futuristic apartment. On the table is a ceramic plate with a traditional creamy spring salad (olivier style). A subtle, thin holographic teal and lime green interface frame hovers over the plate, scanning the food. The background features a soft-focus interior with clean lines, indoor greenery, and a window showing a blurred evening city with blue neon lights. Photorealistic, cinematic lighting, 8k resolution, premium lifestyle aesthetic, soft teal and orange color palette.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, branding, distorted hands, blurry face, messy kitchen, dark gritty cyberpunk, low resolution, signature, interface icons, buttons",
+  "notes": [
+    "Used a POV shot to make the viewer feel like they are 'at the guest table' as per the post text.",
+    "Balanced the 'traditional salad' with 'subtle cyberpunk' by using a sleek holographic scanning frame instead of heavy tech.",
+    "Maintained the teal/green and warm wood color scheme from the references for brand consistency.",
+    "Requested a high-end apartment setting to keep the 'premium' look requested."
+  ]
+}

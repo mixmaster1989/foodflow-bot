@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective in a premium dimly lit cinema, holding a modern smartphone with a glowing teal interface framing a large bucket of buttery popcorn and a cold soda cup with condensation. Subtle cyberpunk aesthetic with soft neon teal and blue light streaks reflecting off the cinema seats. High-end lifestyle photography, cinematic lighting, shallow depth of field. A holographic, translucent data overlay with abstract charts and glowing green nodes floats near the popcorn, representing nutritional scanning. 8k resolution, photorealistic, vertical composition.",
+  "negative_prompt": "text, letters, numbers, words, logo, watermark, QR code, distorted hands, extra fingers, blurry face, messy background, low quality, illustration, cartoon, signature",
+  "notes": [
+    "Used a first-person POV to mimic the user's experience described in the post (scanning food with a phone).",
+    "Incorporated the 'teal/green + blue' brand palette through the phone's glow and holographic UI elements.",
+    "Maintained the 'premium cyberpunk' style by using holographic data overlays instead of flat UI, ensuring no readable text is present.",
+    "Set the scene in a cinema to directly align with the post's narrative of tracking calories during a movie."
+  ]
+}

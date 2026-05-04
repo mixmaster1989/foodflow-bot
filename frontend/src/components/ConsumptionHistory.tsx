@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useToast } from '../components/Toast'
 import { History, X, Loader2, Edit2, Trash2, Check } from 'lucide-react'
 import { consumptionApi } from '../api/client'
 
@@ -9,6 +10,7 @@ interface ConsumptionHistoryProps {
 }
 
 export function ConsumptionHistory({ isOpen, onClose, targetDate }: ConsumptionHistoryProps) {
+    const toast = useToast()
     const [logs, setLogs] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
@@ -70,7 +72,7 @@ export function ConsumptionHistory({ isOpen, onClose, targetDate }: ConsumptionH
             fetchLogs()
         } catch (err) {
             console.error('Update log error:', err)
-            alert('Ошибка при сохранении')
+            toast.error('Ошибка при сохранении')
         } finally {
             setIsSaving(false)
         }

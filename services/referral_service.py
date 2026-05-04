@@ -5,7 +5,14 @@ from typing import Optional
 from sqlalchemy import select
 
 from database.base import get_db
-from database.models import User, Subscription, ReferralEvent, ReferralReward
+from database.models import (
+    PAID_SOURCES,
+    PAYMENT_SOURCE_REFERRAL,
+    ReferralEvent,
+    ReferralReward,
+    Subscription,
+    User,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -213,6 +220,7 @@ class ReferralService:
                     expires_at=expires,
                     is_active=True,
                     auto_renew=False,
+                    payment_source=PAYMENT_SOURCE_REFERRAL,
                 )
                 session.add(sub)
             else:
@@ -238,6 +246,10 @@ class ReferralService:
                 else:
                     # Lower or equal priority bonus: approximate by extending expiry
                     sub.expires_at = base_start + timedelta(days=reward.days)
+
+                # Don't overwrite a real paid source — referral is a freebie
+                if sub.payment_source not in PAID_SOURCES:
+                    sub.payment_source = PAYMENT_SOURCE_REFERRAL
 
             # Mark reward as activated
             reward.is_active = True

@@ -96,12 +96,11 @@ async def show_recipe_categories(callback: types.CallbackQuery) -> None:
             parse_mode="HTML"
         )
     
-    from database.base import get_db
     from services.ai_guide import AIGuideService
     async for session in get_db():
         await AIGuideService.track_activity(callback.from_user.id, "recipes", session)
         break
-        
+
     await callback.answer()
 
 # --- Level 3.2: Generate & List ---

@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person point of view (POV) holding a sleek futuristic smartphone in a premium grocery store. The phone screen shows a glowing teal and lime green interface scanning a glass jar of yogurt on a wooden shelf. Subtle holographic nutritional data charts (KBJU) float around the product in neon teal. Photorealistic style, cinematic lighting, soft bokeh background of a high-end supermarket. Cyberpunk accents with thin glowing light strips on the shelves. Color palette: warm wood, vibrant food colors, accented by FoodFlow signature teal and electric green glow. 8k resolution, highly detailed, vertical composition.",
+  "negative_prompt": "readable text, letters, numbers, words, watermark, logo, QR code, brand name, distorted hands, extra fingers, blurry face, messy interface, low resolution, cartoon, illustration, red colors",
+  "notes": [
+    "Used a POV (First-person) angle to make the 'scanning' action feel personal and immediate as per the post text.",
+    "Integrated the brand-specific teal/green glow as holographic data to represent the bot's output (KBJU).",
+    "Balanced the 'cyberpunk' requirement with 'premium lifestyle' by using warm wood textures and soft bokeh to avoid a dark/gritty sci-fi look.",
+    "Strictly excluded text and numbers to prevent AI-generated gibberish, focusing on 'data shapes' and 'charts' instead."
+  ]
+}

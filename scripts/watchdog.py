@@ -23,6 +23,10 @@ DISK_THRESHOLD_GB = 1.0  # Алерт если < 1 ГБ
 RAM_THRESHOLD_PERCENT = 90.0
 PM2_RESTART_THRESHOLD = 5 # Алерт если > 5 перезапусков с момента последнего чека
 
+# Процессы, которые полностью игнорируются мониторингом
+# ssh-tunnel — R&D лаборатория, отключена в целях экономии
+IGNORED_PROCESSES = {"ssh-tunnel", "pm2-logrotate"}
+
 # Состояние для отслеживания изменений
 state = {
     "last_pm2_restarts": {},
@@ -59,11 +63,16 @@ async def check_resources(bot: Bot, admin_id: int):
     processes = await get_pm2_status()
     for proc in processes:
         name = proc['name']
+
+        # Полностью пропускаем игнорируемые процессы
+        if name in IGNORED_PROCESSES:
+            continue
+
         status = proc['pm2_env']['status']
         restarts = proc['pm2_env']['restart_time']
         
         # Check if status is not online
-        if status not in ['online', 'one-launch-status'] and name != 'ssh-tunnel':
+        if status not in ['online', 'one-launch-status']:
             msg = f"🔴 **ПРОЦЕСС УПАЛ!**\nИмя: `{name}`\nСтатус: `{status}`"
             await bot.send_message(admin_id, msg, parse_mode="Markdown")
             logger.error(f"Process {name} is {status}")

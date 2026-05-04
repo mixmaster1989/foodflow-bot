@@ -1,9 +1,10 @@
 """Food recognition router for FoodFlow API — AI-powered food analysis."""
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from api.auth import CurrentUser
+from api.main import limiter
 from api.schemas import FoodRecognitionResult
 from services.ai import AIService
 
@@ -11,7 +12,9 @@ router = APIRouter()
 
 
 @router.post("/food", response_model=FoodRecognitionResult)
+@limiter.limit("20/minute")
 async def recognize_food(
+    request: Request,
     user: CurrentUser,
     file: Annotated[UploadFile, File(description="Food photo (JPEG/PNG)")],
 ):

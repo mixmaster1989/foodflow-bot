@@ -7,6 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from sqlalchemy import select, func
+
 from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog
@@ -29,27 +31,25 @@ class IAteStates(StatesGroup):
 @router.callback_query(F.data == "menu_i_ate")
 async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
-    """Start the 'I ate' flow - ask for food description."""
     await state.set_state(IAteStates.waiting_for_description)
+
+    photo_path = types.FSInputFile("assets/i_ate.png")
 
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
-    # builder.button(text="🍽️ Приёмы пищи", callback_data="menu_saved_meals")
     builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
-    # builder.button(text="🍳 Собрать приём", callback_data="menu_build_meal")
     builder.button(text="❌ Отмена", callback_data="main_menu")
     builder.adjust(2, 1)
 
     caption = (
-        "🍽️ <b>Что съели?</b>\n\n"
-        "Опишите что вы съели <b>с указанием веса</b>.\n\n"
-        "<i>Например:\n"
-        "• Борщ 300г\n"
-        "• Куриная грудка 200г\n"
-        "• 2 яйца</i>"
+        "🍽️ <b>Что съел(а)?</b>\n\n"
+        "Напиши, скажи голосом или сфоткай.\n\n"
+        "<i>Примеры:</i>\n"
+        "• <code>овсянка 200г на молоке</code>\n"
+        "• <code>2 яйца и кофе с сахаром</code>\n"
+        "• <code>борщ 300 грамм</code>\n\n"
+        "Если продукт часто повторяется — сохрани его в «⭐ Мои блюда»."
     )
-
-    photo_path = types.FSInputFile("assets/i_ate.png")
 
     try:
         await callback.message.edit_media(
@@ -67,7 +67,6 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
-    await callback.answer()
 
 
 @router.message(IAteStates.waiting_for_description)
@@ -381,11 +380,11 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Прямо сейчас", callback_data="i_ate_confirm_now")
     builder.button(text="🕓 Другое время", callback_data="i_ate_ask_time")
+    builder.button(text="🍱 Это несколько блюд", callback_data="u_split_to_batch")
     builder.button(text="✏️ Ред. Вес", callback_data="edit_field_weight")
     builder.button(text="✏️ Ред. КБЖУ", callback_data="i_ate_edit_macros")
-    builder.button(text="❌ Это несколько продуктов", callback_data="u_split_to_batch")
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    builder.adjust(2, 2, 1, 1)
+    builder.adjust(2, 1, 2, 1)
 
     await state.set_state(IAteStates.waiting_for_confirmation)
 
@@ -510,6 +509,28 @@ async def process_save_from_message(message: types.Message, state: FSMContext, t
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(message.from_user.id, message.bot)
 
+    # Guide: first-log gift activation
+    async for session in get_db():
+        logs_count = (await session.execute(
+            select(func.count()).select_from(ConsumptionLog).where(ConsumptionLog.user_id == message.from_user.id)
+        )).scalar() or 0
+        if logs_count == 1 and not await AIGuideService.is_active(message.from_user.id, session):
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🌸 Поддерживающий", callback_data="first_guide_pers:soft")
+            builder.button(text="🦾 Строгий", callback_data="first_guide_pers:hard")
+            builder.button(text="📊 Аналитик", callback_data="first_guide_pers:direct")
+            builder.adjust(1)
+            await message.answer(
+                "🤖 <b>Знакомься — твой Личный ИИ-Гид!</b>\n\n"
+                "Ты сделал первую запись — и это повод для подарка 🎁\n\n"
+                "<b>ИИ-Гид активируется на 3 дня бесплатно.</b>\n\n"
+                "После каждого приёма пищи я буду анализировать рацион и давать персональные советы.\n\n"
+                "Выбери мой характер:",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        break
+
 async def process_save(callback: types.CallbackQuery, state: FSMContext, timestamp: datetime):
     # await callback.answer() - Handled by entry point
     """Common save logic."""
@@ -571,9 +592,29 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(callback.from_user.id, callback.bot)
 
-    # 5. Async AI Guide Advice (Separate message)
+    # 5. Guide: first-log gift activation OR regular advice
     async for session in get_db():
-        if await AIGuideService.is_active(callback.from_user.id, session):
+        logs_count = (await session.execute(
+            select(func.count()).select_from(ConsumptionLog).where(ConsumptionLog.user_id == callback.from_user.id)
+        )).scalar() or 0
+        guide_active = await AIGuideService.is_active(callback.from_user.id, session)
+
+        if logs_count == 1 and not guide_active:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🌸 Поддерживающий", callback_data="first_guide_pers:soft")
+            builder.button(text="🦾 Строгий", callback_data="first_guide_pers:hard")
+            builder.button(text="📊 Аналитик", callback_data="first_guide_pers:direct")
+            builder.adjust(1)
+            await callback.message.answer(
+                "🤖 <b>Знакомься — твой Личный ИИ-Гид!</b>\n\n"
+                "Ты сделал первую запись — и это повод для подарка 🎁\n\n"
+                "<b>ИИ-Гид активируется на 3 дня бесплатно.</b>\n\n"
+                "После каждого приёма пищи я буду анализировать рацион и давать персональные советы.\n\n"
+                "Выбери мой характер:",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        elif guide_active:
             current_meal = {
                 "name": product['name'],
                 "calories": product.get('calories100', 0),
@@ -582,13 +623,10 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
                 "carbs": product.get('carbs100', 0),
                 "time": timestamp.strftime("%H:%M")
             }
-            # Start gathering advice (can be slow)
             advice = await AIGuideService.get_contextual_advice(callback.from_user.id, current_meal, session)
             if advice:
-                # Send as a FOLLOW-UP message to not block the success UI
                 await callback.message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
-        
-        # Track activity for Guide missions
+
         await AIGuideService.track_activity(callback.from_user.id, "log_food", session)
         break
 
@@ -643,3 +681,176 @@ async def save_macro_value(message: types.Message, state: FSMContext):
 @router.callback_query(F.data == "back_to_confirm")
 async def back_to_confirm_handler(callback: types.CallbackQuery, state: FSMContext):
     await show_confirmation_interface(callback.message, state)
+
+
+# Маппинг коротких кодов → описания для AI (callback_data не более 64 байт)
+_QUICK_FOOD_ITEMS = {
+    "1": "яичница",
+    "2": "бутерброд с докторской колбасой",
+    "3": "овсяная каша на молоке",
+    "4": "творог",
+}
+
+# Умный выбор порции — никаких граммов вручную
+_PORTION_HINTS = [
+    ("яичниц",    "Из скольких яиц?",    [("1 яйцо", 55),   ("2 яйца", 110),  ("3 яйца", 165)]),
+    ("омлет",     "Из скольких яиц?",    [("1 яйцо", 65),   ("2 яйца", 130),  ("3 яйца", 195)]),
+    ("бутерброд", "Сколько бутербродов?",[("1 шт",    80),   ("2 шт",   160),  ("3 шт",   240)]),
+    ("блин",      "Сколько блинов?",     [("1 блин",  60),   ("2 блина", 120), ("3 блина", 180)]),
+    ("каш",       "Размер порции?",      [("Маленькая ~150г", 150), ("Стандарт ~200г", 200), ("Большая ~300г", 300)]),
+    ("творог",    "Сколько творога?",    [("100г", 100), ("150г", 150), ("200г", 200)]),
+    ("сырник",    "Сколько сырников?",   [("1 шт", 60),  ("2 шт", 120),  ("3 шт", 180)]),
+]
+_DEFAULT_PORTIONS = ("Размер порции?", [("Небольшая ~100г", 100), ("Средняя ~200г", 200), ("Большая ~300г", 300)])
+
+
+def _get_portion_options(food_name: str):
+    name_lower = food_name.lower()
+    for keyword, question, options in _PORTION_HINTS:
+        if keyword in name_lower:
+            return question, options
+    return _DEFAULT_PORTIONS
+
+
+@router.callback_query(F.data.startswith("quick_food:"))
+async def quick_food_select(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle quick food selection from first-timer screen."""
+    code = callback.data.split(":", 1)[1]
+    food_description = _QUICK_FOOD_ITEMS.get(code, code)
+    await callback.answer()
+
+    status_msg = await callback.message.answer("🔄 <b>Анализирую...</b>", parse_mode="HTML")
+
+    try:
+        from services.ai_brain import AIBrainService
+        brain_result = await AIBrainService.analyze_text(food_description)
+
+        if brain_result and isinstance(brain_result, dict) and brain_result.get("multi") and brain_result.get("items"):
+            items = brain_result["items"]
+            if len(items) > 1:
+                from handlers.universal_input import process_batch_food_logging
+                await process_batch_food_logging(callback.message, state, items, status_msg)
+                return
+
+        result = await NormalizationService.analyze_food_intake(food_description)
+
+        name = result.get("name", food_description)
+        calories = safe_float(result.get("calories"))
+        protein = safe_float(result.get("protein"))
+        fat = safe_float(result.get("fat"))
+        carbs = safe_float(result.get("carbs"))
+        fiber = safe_float(result.get("fiber"))
+        weight_grams = result.get("weight_grams")
+        weight_missing = result.get("weight_missing", True)
+        base_name = result.get("base_name")
+
+        if weight_missing:
+            await state.update_data(
+                pending_product={
+                    "name": name,
+                    "base_name": base_name,
+                    "calories100": calories,
+                    "protein100": protein,
+                    "fat100": fat,
+                    "carbs100": carbs,
+                    "fiber100": fiber,
+                    "original_text": food_description,
+                }
+            )
+
+            question, portions = _get_portion_options(name)
+            builder = InlineKeyboardBuilder()
+            for label, weight in portions:
+                builder.button(text=label, callback_data=f"quick_portion:{weight}")
+            builder.button(text="❌ Отмена", callback_data="main_menu")
+            builder.adjust(len(portions), 1)
+
+            await status_msg.edit_text(
+                f"🍽️ <b>{name}</b>\n\n{question}",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            return
+
+        await state.update_data(
+            pending_product={
+                "name": f"{name} ({weight_grams}г)",
+                "base_name": base_name,
+                "calories100": calories,
+                "protein100": protein,
+                "fat100": fat,
+                "carbs100": carbs,
+                "fiber100": fiber,
+                "original_text": food_description,
+            }
+        )
+        await show_confirmation_interface(callback.message, state, status_msg)
+
+    except Exception as e:
+        logger.error(f"Error in quick_food_select: {e}", exc_info=True)
+        await state.clear()
+        await status_msg.edit_text(f"❌ Ошибка: {e}\n\nПопробуйте ещё раз.")
+
+
+@router.callback_query(F.data.startswith("quick_portion:"))
+async def quick_portion_select(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Apply chosen portion weight to pending product and show confirmation."""
+    weight = float(callback.data.split(":", 1)[1])
+    await callback.answer()
+
+    data = await state.get_data()
+    product = data.get("pending_product")
+    if not product:
+        await callback.answer("Попробуйте снова", show_alert=True)
+        return
+
+    factor = weight / 100.0
+    display_name = product.get("base_name") or product.get("name", "")
+    product["name"] = f"{display_name} ({int(weight)}г)"
+    product["calories100"] = safe_float(product.get("calories100")) * factor
+    product["protein100"] = safe_float(product.get("protein100")) * factor
+    product["fat100"] = safe_float(product.get("fat100")) * factor
+    product["carbs100"] = safe_float(product.get("carbs100")) * factor
+    product["fiber100"] = safe_float(product.get("fiber100", 0)) * factor
+
+    await state.update_data(pending_product=product)
+    await show_confirmation_interface(callback.message, state)
+
+
+@router.callback_query(F.data == "i_ate_manual")
+async def i_ate_manual(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Switch from first-timer quick buttons to standard text input."""
+    await callback.answer()
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
+    builder.button(text="❌ Отмена", callback_data="main_menu")
+    builder.adjust(1)
+
+    caption = (
+        "🍽️ <b>Что съели?</b>\n\n"
+        "Напишите что вы съели — можно с весом или без:\n\n"
+        "<i>Например:\n"
+        "• Борщ 300г\n"
+        "• Куриная грудка\n"
+        "• 2 яйца</i>"
+    )
+
+    photo_path = types.FSInputFile("assets/i_ate.png")
+    try:
+        await callback.message.edit_media(
+            media=types.InputMediaPhoto(media=photo_path, caption=caption, parse_mode="HTML"),
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(caption, parse_mode="HTML", reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data == "first_log_later")
+async def first_log_later(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Dismiss first-log nudge from scheduler."""
+    await callback.answer("Хорошо! Заходи когда будешь готов 😊", show_alert=False)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass

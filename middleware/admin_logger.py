@@ -31,7 +31,24 @@ class AdminLoggerMiddleware(BaseMiddleware):
                 user = event.message.from_user
                 user_id = user.id
                 user_info = f"{user.full_name} (ID: {user.id})"
-                event_info = f"Message: {event.message.text}"
+                
+                # Identify content type
+                if event.message.text:
+                    event_info = f"Message: {event.message.text}"
+                elif event.message.photo:
+                    event_info = "Content: [PHOTO]"
+                elif event.message.voice:
+                    event_info = "Content: [VOICE]"
+                elif event.message.video:
+                    event_info = "Content: [VIDEO]"
+                elif event.message.video_note:
+                    event_info = "Content: [VIDEO_NOTE]"
+                elif event.message.sticker:
+                    event_info = f"Content: [STICKER] ({event.message.sticker.emoji if event.message.sticker else ''})"
+                elif event.message.document:
+                    event_info = f"Content: [DOCUMENT] ({event.message.document.file_name})"
+                else:
+                    event_info = "Content: [OTHER_NON_TEXT]"
             elif event.callback_query:
                 user = event.callback_query.from_user
                 user_id = user.id

@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a person sitting at a premium modern wooden restaurant table. In front of them is a business lunch featuring a gourmet salad, a bowl of soup, and a main course with sauce. The person is holding a sleek, bezel-less smartphone, framing the plate through the camera lens. Subtle teal and lime-green neon holographic data interfaces (graphs and abstract digital particles) float around the plate, suggesting scanning and analysis. High-end cinematic lighting with warm wood tones contrasted by cool blue and green ambient glows. Photorealistic, 8k resolution, depth of field, blurred restaurant background with futuristic vertical greenery.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, signature, distorted hands, extra fingers, blurry face, messy food, low quality, cartoon, illustration, readable UI text, phone screen displaying actual words",
+  "notes": [
+    "Used a POV (first-person) angle to make the user feel like they are the one 'scanning' the meal, as per the post text.",
+    "Incorporated the 'business lunch' elements (soup, salad, main) specifically mentioned in the brief.",
+    "Maintained the brand color palette of teal/green neon against warm wood textures from the reference images.",
+    "Replaced readable text with 'abstract digital particles' and 'holographic interfaces' to avoid AI-generated gibberish and comply with constraints."
+  ]
+}

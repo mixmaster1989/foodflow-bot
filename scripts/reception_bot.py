@@ -11,8 +11,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.types import FSInputFile
 
+# Load .env from project root so the token is available regardless of how PM2 launches the script
+_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 # --- CONFIGURATION ---
-TOKEN = "8486697960:AAFxWmY9vR0SjCgSDV-_HJoQujStkqq-l-E"
+TOKEN = os.environ.get("RECEPTION_BOT_TOKEN") or os.environ.get("BOT_TOKEN") or ""
 CHANNEL_ID = -1003856929949 
 ADMIN_IDS = [432823154]
 DB_PATH = "reception.db"

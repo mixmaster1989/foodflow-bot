@@ -15,6 +15,8 @@ async def main():
             sub.is_active = True
             sub.expires_at = None
             sub.telegram_payment_charge_id = None
+            sub.payment_source = None
+            sub.yookassa_payment_id = None
             print(f"Downgraded subscription for user {user_id} to FREE.")
         else:
             sub = Subscription(user_id=user_id, tier="free", is_active=True)

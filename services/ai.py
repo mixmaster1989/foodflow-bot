@@ -29,10 +29,10 @@ class AIService:
     ]
 
     GUIDE_MODELS: list[str] = [
-        "nvidia/nemotron-3-super-120b-a12b:free",         # Primary (Powerful 120B)
-        "google/gemma-4-31b-it:free",                      # Fallback (User insisted)
-        "qwen/qwen-2.5-72b-instruct:free",                # Backup 2
-        "google/gemini-2.0-flash-lite-preview-09-2025"    # Paid fallback
+        "google/gemini-3-flash-preview",              # Primary (paid, for paying users)
+        "google/gemma-4-31b-it:free",                 # Fallback 1
+        "qwen/qwen3-next-80b-a3b-instruct:free",      # Fallback 2
+        "openai/gpt-oss-120b:free",                   # Fallback 3
     ]
 
     @classmethod
@@ -273,7 +273,7 @@ class AIService:
                         else:
                             logger.warning(f"AI Completion ({target_model}) failed: {response.status}")
                 except Exception as e:
-                    logger.error(f"Exception in AI Completion ({target_model}): {e}")
+                    logger.error(f"Exception in AI Completion ({target_model}): {e!r}")
         return None
 
     @classmethod

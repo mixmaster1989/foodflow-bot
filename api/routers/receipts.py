@@ -1,9 +1,10 @@
 """Receipts router for FoodFlow API — OCR and normalization."""
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from api.auth import CurrentUser, DBSession
+from api.main import limiter
 from api.schemas import ReceiptParseResult
 from database.models import Product, Receipt
 from services.normalization import NormalizationService
@@ -13,7 +14,9 @@ router = APIRouter()
 
 
 @router.post("/upload", response_model=ReceiptParseResult)
+@limiter.limit("5/minute")
 async def upload_receipt(
+    request: Request,
     user: CurrentUser,
     session: DBSession,
     file: Annotated[UploadFile, File(description="Receipt image (JPEG/PNG)")],

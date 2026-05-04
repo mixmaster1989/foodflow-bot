@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T111900Z",
+  "mode": "to_me",
+  "topic": "Серия тестов v3: сильные концовки",
+  "scenario": "pain",
+  "text": "<b>Весной стоишь с пакетом из магазина или с чеком из кафе: смотришь на еду и пытаешься понять — это 300 ккал или 800.</b> 🛒🍔❓\n\nВводишь сам, злишься, и всё это быстро надоедает.\n\n<b>Проблема не в дисциплине.</b> Просто считать так — уже <b>устарело</b>.\n\nВ FoodFlow ты просто сфоткал чек, отправил в бот или скинул голосом — и сразу получил КБЖУ и понятные цифры по еде. <b>Сфоткал. Отправил. Получил сводку.</b>\n\n<blockquote>Или у тебя будут чёткие цифры, или снова догадки.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, food lifestyle scene in spring: a person holding a supermarket receipt and a takeaway coffee cup in a modern city street, checking food calories on a phone, subtle neon reflections, realistic hands, casual clothing, evening urban atmosphere, shallow depth of field, cinematic lighting, highly detailed, natural expressions",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

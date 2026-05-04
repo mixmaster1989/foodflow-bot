@@ -18,6 +18,7 @@ os.environ['GLOBAL_PASSWORD'] = "test-password"
 # Import all models to ensure they are registered with Base.metadata
 # Import engine from database.base once it's configured
 from database.base import Base, engine
+import database.models  # noqa: F401 — регистрирует все модели в Base.metadata
 from database.models import (
     Product,
     Receipt,
@@ -103,6 +104,7 @@ def mock_telegram_user():
     user.username = "test_user"
     user.first_name = "Test"
     user.last_name = "User"
+    user.language_code = None
     return user
 
 

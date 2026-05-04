@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useToast } from '../components/Toast'
 import { ShoppingBasket, CheckCircle2, Circle, Trash2, Plus, Loader2 } from 'lucide-react'
 import { shoppingApi } from '../api/client'
 
@@ -7,6 +8,7 @@ interface ShoppingListProps {
 }
 
 export function ShoppingList({ onBought }: ShoppingListProps) {
+    const toast = useToast()
     const [items, setItems] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [newItemName, setNewItemName] = useState('')
@@ -35,7 +37,7 @@ export function ShoppingList({ onBought }: ShoppingListProps) {
             setNewItemName('')
             fetchList()
         } catch (err) {
-            alert('Ошибка добавления')
+            toast.error('Ошибка добавления')
         }
     }
 
@@ -45,7 +47,7 @@ export function ShoppingList({ onBought }: ShoppingListProps) {
             fetchList()
             onBought() // Refresh fridge
         } catch (err) {
-            alert('Ошибка обновления')
+            toast.error('Ошибка обновления')
         }
     }
 
@@ -54,7 +56,7 @@ export function ShoppingList({ onBought }: ShoppingListProps) {
             await shoppingApi.deleteItem(id)
             fetchList()
         } catch (err) {
-            alert('Ошибка удаления')
+            toast.error('Ошибка удаления')
         }
     }
 

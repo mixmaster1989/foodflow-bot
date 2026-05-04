@@ -1,33 +1,53 @@
 module.exports = {
-    apps: [
-        {
-            name: 'foodflow-bot',
-            script: 'main.py',
-            interpreter: '/home/user1/foodflow-bot_new/venv/bin/python',
-            cwd: '/home/user1/foodflow-bot_new',
-            instances: 1,
-            autorestart: true,
-            watch: false,
-            max_memory_restart: '200M',
-            env: {
-                NODE_ENV: 'production'
-            },
-            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-            merge_logs: true,
-            time: true
-        },
-        {
-            name: 'foodflow-api',
-            script: 'venv/bin/python',
-            args: '-m uvicorn api.main:app --host 127.0.0.1 --port 8001',
-            cwd: '/home/user1/foodflow-bot_new',
-            instances: 1,
-            autorestart: true,
-            watch: false,
-            max_memory_restart: '300M',
-            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-            merge_logs: true,
-            time: true
-        }
-    ]
+  apps: [
+    {
+      name: "foodflow-bot",
+      script: "main.py",
+      interpreter: "/home/user1/foodflow-bot_new/venv/bin/python",
+      cwd: "/home/user1/foodflow-bot_new",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "200M",
+      env: {
+        NODE_ENV: "production",
+        NO_PROXY: "*.azureedge.net,api.yookassa.ru"
+      },
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      time: true,
+    },
+    {
+      name: "foodflow-api",
+      script: "venv/bin/python",
+      args: "-m uvicorn api.main:app --host 127.0.0.1 --port 8001",
+      cwd: "/home/user1/foodflow-bot_new",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "300M",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      time: true,
+    },
+    {
+      name: "foodflow-content-factory",
+      script: "venv/bin/python",
+      args: "-m content_factory.daemon",
+      cwd: "/home/user1/foodflow-bot_new",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "300M",
+      env: {
+        NODE_ENV: "production",
+        PYTHONUNBUFFERED: "1",
+      },
+      out_file: "/home/user1/.pm2/logs/foodflow-content-factory-out.log",
+      error_file: "/home/user1/.pm2/logs/foodflow-content-factory-err.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      time: true,
+    },
+  ],
 };

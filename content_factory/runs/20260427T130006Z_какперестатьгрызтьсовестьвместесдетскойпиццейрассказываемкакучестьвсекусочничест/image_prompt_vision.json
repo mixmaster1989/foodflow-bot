@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end lifestyle photograph of a festive dining table with delicious pizza slices and colorful appetizers, shot from a first-person perspective. A hand holds a sleek smartphone over the food, the screen displaying a clean holographic interface with teal and blue neon glowing data charts and blurred calorie metrics. The background is a warm, premium interior with soft sunlight and subtle cyberpunk accents like glowing green plant walls and thin neon light strips embedded in the wooden table. Photorealistic, cinematic lighting, 8k resolution, shallow depth of field, vibrant food textures, teal and orange color palette.",
+  "negative_prompt": "text, letters, numbers, watermark, logo, QR code, interface buttons, distorted fingers, extra limbs, blurry face, messy room, low quality, cartoon, illustration, readable words",
+  "notes": [
+    "Used a first-person perspective (POV) to mirror the 'one hand tracking, one hand eating' narrative from the text.",
+    "Integrated the 'teal/green + blue' brand colors via the holographic UI and ambient neon lighting.",
+    "Combined high-end food photography (pizza/party snacks) with subtle sci-fi elements to maintain the 'premium cyberpunk' aesthetic.",
+    "Ensured the UI is purely visual/geometric to avoid AI-generated gibberish text."
+  ]
+}

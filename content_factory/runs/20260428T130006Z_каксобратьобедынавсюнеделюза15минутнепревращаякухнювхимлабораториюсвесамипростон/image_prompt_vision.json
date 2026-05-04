@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a person holding a sleek modern smartphone, taking a photo of several meal prep glass containers filled with chicken breast, buckwheat, and greens on a clean wooden kitchen counter. Subtle cyberpunk aesthetic with soft teal and lime green neon glow emanating from the phone screen and under-cabinet lighting. High-end photorealistic lifestyle photography, cinematic lighting, shallow depth of field. Floating over the containers are translucent, holographic data interfaces showing abstract charts and nutrition bars in neon green and blue, mimicking an AI scan. Warm kitchen atmosphere blended with futuristic technology, premium 8k resolution.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, brand name, distorted hands, extra fingers, blurry face, messy kitchen, low resolution, dark gloomy lighting, red colors, yellow neon.",
+  "notes": [
+    "Used a POV shot to directly illustrate the 'Snap -> Send -> Get numbers' workflow mentioned in the text.",
+    "Combined organic food (buckwheat/chicken) with high-tech holograms to visualize the AI bot's calculation process.",
+    "Maintained the brand's teal/green color palette through neon accents and holographic UI elements.",
+    "Ensured a premium lifestyle feel by using materials like wood and glass, avoiding a 'cheap' sci-fi look."
+  ]
+}

@@ -23,9 +23,9 @@ cursor.execute('UPDATE users SET is_premium=1 WHERE id=?', (user_id,))
 cursor.execute('SELECT id FROM subscriptions WHERE user_id=?', (user_id,))
 row = cursor.fetchone()
 if row:
-    cursor.execute('UPDATE subscriptions SET tier="pro", starts_at=?, expires_at=?, is_active=1 WHERE id=?', (now, expires, row[0]))
+    cursor.execute('UPDATE subscriptions SET tier="pro", starts_at=?, expires_at=?, is_active=1, payment_source="admin_grant" WHERE id=?', (now, expires, row[0]))
 else:
-    cursor.execute('INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, is_active) VALUES (?, "pro", ?, ?, 1)', (user_id, now, expires))
+    cursor.execute('INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, is_active, payment_source) VALUES (?, "pro", ?, ?, 1, "admin_grant")', (user_id, now, expires))
 conn.commit()
 conn.close()
 print('DB updated for user', user_id)

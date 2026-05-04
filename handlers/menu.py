@@ -182,7 +182,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     vk_app_link = f"https://vk.com/app54530169#token={token}"
     
     builder.button(text="🚀 FoodFlow в VK", url=vk_app_link)
-    builder.button(text="📱 App (TG)", web_app=WebAppInfo(url="https://tretyakov-igor.tech/foodflow/"))
+    builder.button(text="📱 App (TG)", web_app=WebAppInfo(url="https://xn--d1aojrdbc.xn--p1ai/foodflow/"))
     builder.button(text="🔑 Вход в App", callback_data="menu_web_login")
 
 
@@ -347,7 +347,7 @@ async def menu_web_login_handler(callback: types.CallbackQuery) -> None:
     password = generate_user_password(user_id)
     
     # We use a special URL that might pre-fill the data or just the login page
-    web_app_url = "https://tretyakov-igor.tech/foodflow/"
+    web_app_url = "https://xn--d1aojrdbc.xn--p1ai/foodflow/"
 
     text = (
         "🔐 <b>Данные для входа в App</b>\n\n"
@@ -382,7 +382,7 @@ async def web_link_command(message: types.Message) -> None:
     token = create_access_token(data={"sub": user_id})
     password = generate_user_password(user_id)
 
-    link = f"https://tretyakov-igor.tech/?token={token}"
+    link = f"https://xn--d1aojrdbc.xn--p1ai/?token={token}"
 
     text = (
         "🌐 <b>Вход в Web-версию</b>\n\n"

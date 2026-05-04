@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person POV holding a smartphone, photographing a delicious hot-dog in a paper wrap inside a modern car interior at night. Through the windshield, a blurred gas station with futuristic teal and green neon lights. On the phone screen, a sleek holographic UI displays abstract nutrition charts and glowing data points in blue and lime green. Photorealistic, cinematic lighting, premium textures, subtle cyberpunk aesthetic, 4:5 aspect ratio.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, distorted hands, extra fingers, blurry face, messy car, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used a first-person perspective to emphasize the 'snap and track' action.",
+    "Combined warm food textures with cool teal/green brand neon for visual contrast.",
+    "Replaced readable UI with abstract 'data points' to avoid AI text distortion.",
+    "Set the scene at night/dusk to make the cyberpunk accents pop."
+  ]
+}

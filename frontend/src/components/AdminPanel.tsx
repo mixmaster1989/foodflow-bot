@@ -1,4 +1,5 @@
 import React from 'react';
+import { useToast } from '../components/Toast'
 import { Home, Shield, AlertTriangle, Terminal } from 'lucide-react';
 import WebAppConfig from '@twa-dev/sdk';
 
@@ -8,11 +9,12 @@ interface AdminProps {
 }
 
 export const AdminPanel: React.FC<AdminProps> = ({ onNavigate }) => {
+    const toast = useToast()
     const handleBotRedirect = () => {
         if (WebAppConfig.initDataUnsafe?.user) {
             WebAppConfig.close();
         } else {
-            alert("Пожалуйста, закройте приложение и используйте меню администратора в боте.");
+            toast.info('Используйте меню администратора в Telegram-боте.');
         }
     };
 

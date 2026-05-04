@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260415T102000Z",
+  "mode": "to_me",
+  "topic": "Серия тестов: фото еды в Telegram → КБЖУ за 10 секунд",
+  "scenario": "lazy_pro",
+  "text": "<b>Хочешь худеть без игры в «грудка с огурцом»? 📸🔥💪</b>\n\n✅ Не надо ломать рацион — <b>надо просто начать его считать</b>.\n\n🍽️ FoodFlow делает это незаметно: <b>сфоткал обычную еду</b>, отправил в сервис, <b>получил КБЖУ</b>.\n\n🧠 <b>Микро-сценарий простой:</b> сфоткал тарелку → отправил фото в Telegram → получил КБЖУ и уже решаешь, что подкрутить — <tg-spoiler>порцию, а не жизнь</tg-spoiler>.\n\n<blockquote>Удобно не усложнять себе еду: контроль должен быть быстрым, а не героическим 🧠</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, modern lifestyle scene in a Telegram-like chat interface on a smartphone, a person casually photographing an everyday meal and sending it, visible clean nutrition result cards with calories, protein, fat, carbs, neon accents, realistic food on the table, soft spring daylight mixed with subtle cyberpunk glow, high detail, cinematic composition, urban apartment kitchen, premium realistic look",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

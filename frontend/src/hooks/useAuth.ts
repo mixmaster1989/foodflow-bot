@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import vkBridge from '@vkontakte/vk-bridge';
 import WebApp from '@twa-dev/sdk';
 import { authApi } from '../api/client';
 
@@ -9,172 +10,205 @@ export function useAuth() {
     const [error, setError] = useState<string | null>(null);
     const [needsLogin, setNeedsLogin] = useState(false);
 
-    // Manual login function (for LoginView)
-    const loginWithPassword = useCallback(async (telegramId: number, password: string) => {
-        const authData = await authApi.loginWithPassword(telegramId, password);
-        if (authData.access_token) {
-            localStorage.setItem('ff_token', authData.access_token);
-            setToken(authData.access_token);
-
+    const loginWithPassword = async (telegramId: number, password: string) => {
+        setIsLoading(true);
+        try {
+            const data = await authApi.loginWithPassword(telegramId, password);
+            localStorage.setItem('ff_token', data.access_token);
+            setToken(data.access_token);
             const fullUser = await authApi.getMe();
             setUser(fullUser);
             setNeedsLogin(false);
             setError(null);
+        } catch (err: any) {
+            setError(err.response?.data?.detail || 'Неверный ID или пароль');
+            throw err;
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    };
 
-    const loginWithEmail = useCallback(async (email: string, password: string) => {
-        const authData = await authApi.loginWithEmail(email, password);
-        if (authData.access_token) {
-            localStorage.setItem('ff_token', authData.access_token);
-            setToken(authData.access_token);
+    const loginWithEmail = async (email: string, password: string) => {
+        setIsLoading(true);
+        try {
+            const data = await authApi.loginWithEmail(email, password);
+            localStorage.setItem('ff_token', data.access_token);
+            setToken(data.access_token);
             const fullUser = await authApi.getMe();
             setUser(fullUser);
             setNeedsLogin(false);
             setError(null);
+        } catch (err: any) {
+            setError(err.response?.data?.detail || 'Ошибка входа');
+            throw err;
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    };
 
-    const registerWithEmail = useCallback(async (email: string, password: string, name: string) => {
-        const authData = await authApi.registerWithEmail(email, password, name);
-        if (authData.access_token) {
-            localStorage.setItem('ff_token', authData.access_token);
-            setToken(authData.access_token);
+    const registerWithEmail = async (email: string, password: string, name: string) => {
+        setIsLoading(true);
+        try {
+            const data = await authApi.registerWithEmail(email, password, name);
+            localStorage.setItem('ff_token', data.access_token);
+            setToken(data.access_token);
             const fullUser = await authApi.getMe();
             setUser(fullUser);
             setNeedsLogin(false);
             setError(null);
+        } catch (err: any) {
+            setError(err.response?.data?.detail || 'Ошибка регистрации');
+            throw err;
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
         let attempts = 0;
-        const maxAttempts = 20; // 20 * 150ms = 3 seconds
+        const maxAttempts = 10;
 
         const checkAuth = async () => {
-            attempts++;
-            console.log(`[Auth] Check attempt ${attempts}...`);
+            try {
+                attempts++;
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlToken = urlParams.get('token');
 
-            // --- MAGIC LINK: token from URL query param or hash ---
-            const urlParams = new URLSearchParams(window.location.search);
-            let urlToken = urlParams.get('token');
-
-            // Also check hash (common for VK/fragment transitions)
-            if (!urlToken && window.location.hash.includes('token=')) {
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                urlToken = hashParams.get('token');
-            }
-
-            if (urlToken) {
-                console.log('[Auth] Magic link token detected!');
-                localStorage.setItem('ff_token', urlToken);
-                setToken(urlToken);
-
-
-                // Clean URL so token isn't visible / shareable
-                window.history.replaceState({}, '', window.location.pathname);
-
-                try {
-                    const fullUser = await authApi.getMe();
-                    setUser(fullUser);
-                } catch (err) {
-                    console.error('[Auth] Magic link token invalid:', err);
-                    localStorage.removeItem('ff_token');
-                    setToken(null);
-                    setNeedsLogin(true);
-                }
-                setIsLoading(false);
-                return;
-            }
-
-            // --- SAVED TOKEN: check if localStorage has a valid token ---
-            const savedToken = localStorage.getItem('ff_token');
-            if (savedToken && !urlToken) {
-                // Try to use existing token (works for returning web users)
-                try {
-                    const fullUser = await authApi.getMe();
-                    setUser(fullUser);
-                    setToken(savedToken);
-                    setIsLoading(false);
-                    return;
-                } catch (err) {
-                    console.warn('[Auth] Saved token expired, clearing...');
-                    localStorage.removeItem('ff_token');
-                    setToken(null);
-                    // Fall through to Telegram check
-                }
-            }
-
-            // --- MOCK / DEBUG BYPASS ---
-            if (urlParams.get('mock') === '1') {
-                console.warn('[Auth] Mock mode enabled');
-                const mockUser = {
-                    id: 495294354,
-                    username: 'mock_user',
-                    first_name: 'Mock',
-                    last_name: 'Tester'
-                };
-                setUser(mockUser);
-                setIsLoading(false);
-                return;
-            }
-
-            // Get TG Object
-            const tg = (window as any).Telegram?.WebApp || WebApp;
-
-            // Check if we have valid initData (crucial!)
-            if (tg && tg.initData) {
-                console.log('[Auth] Valid SDK data detected!');
-                tg.ready();
-                tg.expand();
-
-                const tgUser = tg.initDataUnsafe?.user;
-                if (!tgUser) {
-                    setNeedsLogin(true);
-                    setIsLoading(false);
-                    return;
+                // 1. Check for token in URL (Magic link)
+                if (urlToken) {
+                    console.log('[Auth] Token found in URL');
+                    localStorage.setItem('ff_token', urlToken);
+                    setToken(urlToken);
+                    try {
+                        const fullUser = await authApi.getMe();
+                        setUser(fullUser);
+                        setIsLoading(false);
+                        return;
+                    } catch (err) {
+                        console.error('[Auth] URL token invalid');
+                        localStorage.removeItem('ff_token');
+                        setToken(null);
+                    }
                 }
 
-                console.log('[Auth] User detected:', tgUser.id);
-                setUser(tgUser);
+                // --- VK MINI APP: detect VK launch params ---
+                const vkUserId = urlParams.get('vk_user_id');
+                if (vkUserId) {
+                    console.log('[Auth] VK launch parameters detected!');
+                    const vkParams: Record<string, string> = {};
+                    urlParams.forEach((value, key) => {
+                        vkParams[key] = value;
+                    });
 
-                try {
-                    const authData = await authApi.login(tgUser.id, tgUser.username);
-                    if (authData.access_token) {
-                        localStorage.setItem('ff_token', authData.access_token);
-                        setToken(authData.access_token);
+                    try {
+                        // Get VK user info for proper name display
+                        const vkUserInfo = await Promise.race([
+                            vkBridge.send('VKWebAppGetUserInfo'),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+                        ]).catch(() => null) as any;
+                        const authData = await authApi.vkLogin(vkParams, vkUserInfo?.first_name, vkUserInfo?.last_name);
+                        if (authData.access_token) {
+                            localStorage.setItem('ff_token', authData.access_token);
+                            setToken(authData.access_token);
 
-                        try {
                             const fullUser = await authApi.getMe();
                             setUser(fullUser);
-                        } catch (getMeErr) {
-                            console.error('[Auth] Failed to fetch full profile:', getMeErr);
-                            setUser(tgUser);
+                            setIsLoading(false);
+                            return;
+                        } else {
+                            console.error('[Auth] VK Login failed: No access token');
+                            setNeedsLogin(true);
                         }
-                    } else {
-                        setUser(tgUser);
+                    } catch (vkErr: any) {
+                        console.error('[Auth] VK Login Exception:', vkErr);
+                        setError(vkErr.response?.data?.detail || vkErr.message || 'VK Auth Error');
                     }
-                } catch (apiErr: any) {
-                    const msg = apiErr.response?.data?.detail || apiErr.message || 'API Connection Error';
-                    setError(`Backend Connection Failure: ${msg}`);
+                    setIsLoading(false);
+                    return;
                 }
 
-                setIsLoading(false);
-                return;
-            }
+                // --- SAVED TOKEN: check if localStorage has a valid token ---
+                const savedToken = localStorage.getItem('ff_token');
+                if (savedToken && !urlToken) {
+                    try {
+                        const fullUser = await authApi.getMe();
+                        setUser(fullUser);
+                        setToken(savedToken);
+                        setIsLoading(false);
+                        return;
+                    } catch (err) {
+                        console.warn('[Auth] Saved token expired, clearing...');
+                        localStorage.removeItem('ff_token');
+                        setToken(null);
+                    }
+                }
 
-            // If no data yet, retry or show login form
-            if (attempts < maxAttempts) {
-                setTimeout(checkAuth, 150);
-            } else {
-                // No Telegram, no saved token — show login form
-                console.log('[Auth] No Telegram SDK, showing login form');
-                setNeedsLogin(true);
+                // --- MOCK / DEBUG BYPASS ---
+                if (urlParams.get('mock') === '1') {
+                    setUser({ id: 1, first_name: 'Mock User' });
+                    setIsLoading(false);
+                    return;
+                }
+
+                // 2. Fallback to Telegram Web App
+                const tg = (window as any).Telegram?.WebApp || WebApp;
+                if (tg && tg.initData) {
+                    tg.ready();
+                    const tgUser = tg.initDataUnsafe?.user;
+                    if (tgUser) {
+                        try {
+                            const authData = await authApi.login(tgUser.id, tgUser.username);
+                            if (authData.access_token) {
+                                localStorage.setItem('ff_token', authData.access_token);
+                                setToken(authData.access_token);
+                                const fullUser = await authApi.getMe();
+                                setUser(fullUser);
+                                setIsLoading(false);
+                                return;
+                            }
+                        } catch (err) {
+                            console.error('[Auth] TG Login failed');
+                        }
+                    }
+                }
+
+                // Retry or show login
+                if (attempts < maxAttempts) {
+                    setTimeout(checkAuth, 200);
+                } else {
+                    setNeedsLogin(true);
+                    setIsLoading(false);
+                }
+            } catch (globalErr: any) {
+                console.error('[Auth] Global Crash:', globalErr);
+                setError(`Crash: ${globalErr.message || 'Unknown'}`);
                 setIsLoading(false);
             }
         };
 
         checkAuth();
+
+        // Safety timeout: force loading=false after 5s
+        const panicTimer = setTimeout(() => {
+            setIsLoading(prev => {
+                if (prev) {
+                    console.warn('[Auth] Panic timer triggered');
+                    return false;
+                }
+                return prev;
+            });
+        }, 2500);
+
+        return () => clearTimeout(panicTimer);
+    }, []);
+
+    const refreshUser = useCallback(async () => {
+        try {
+            const freshUser = await authApi.getMe();
+            setUser(freshUser);
+        } catch (err) {
+            console.error('[Auth] refreshUser failed:', err);
+        }
     }, []);
 
     const isCurator = user?.tier === 'curator' || user?.role === 'curator';
@@ -196,6 +230,7 @@ export function useAuth() {
         isAdmin,
         isPro,
         isBasic,
-        isFree
+        isFree,
+        refreshUser
     };
 }

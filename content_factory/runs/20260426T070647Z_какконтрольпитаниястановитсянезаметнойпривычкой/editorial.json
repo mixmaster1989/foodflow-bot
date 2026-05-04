@@ -1,0 +1,28 @@
+{
+  "compliance": {
+    "action": "ok",
+    "reasons": [
+      "compliance_check_failed"
+    ],
+    "flags": [
+      "system_error"
+    ],
+    "internal_terms_found": [],
+    "banned_time_patterns_found": [],
+    "shaming_tokens_found": []
+  },
+  "chief": {
+    "decision": "regenerate",
+    "edits": [
+      "system_error"
+    ],
+    "notes": []
+  },
+  "judge": {
+    "ok": true,
+    "issues": [
+      "judge_failed"
+    ],
+    "new_facts_suspected": true
+  }
+}

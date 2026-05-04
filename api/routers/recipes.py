@@ -1,5 +1,7 @@
 """Recipes router for FoodFlow API."""
-from fastapi import APIRouter
+import pytz
+from datetime import datetime
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import or_, select
 
 from api.auth import CurrentUser, DBSession
@@ -62,29 +64,31 @@ async def generate_recipes(
         session.add(settings)
 
     # === Daily Refresh Limit Check (3 per day) ===
-    from datetime import date
-    today_str = date.today().isoformat()
+    msk_tz = pytz.timezone("Europe/Moscow")
+    today_str = datetime.now(msk_tz).date().isoformat()
 
     if request.refresh:
-        # Check if the limit is reached for today
         if settings.last_recipe_refresh_date == today_str:
             if settings.recipe_refresh_count >= 3:
-                from fastapi import HTTPException
                 raise HTTPException(
                     status_code=429,
                     detail="Лимит обновлений (3 в день) исчерпан. Попробуйте завтра!"
                 )
-            settings.recipe_refresh_count += 1
-        else:
-            # Reset for a new day
-            settings.last_recipe_refresh_date = today_str
-            settings.recipe_refresh_count = 1
-        
-        await session.commit()
+        # Don't commit the debit until we know the AI succeeded
 
     # Generate via AI
     ai_response = await AIService.generate_recipes(ingredients, request.category, settings)
     recipes = ai_response.get("recipes", []) if ai_response else []
+
+    if request.refresh:
+        if not recipes:
+            raise HTTPException(status_code=503, detail="AI временно недоступен, попробуйте ещё раз")
+        if settings.last_recipe_refresh_date == today_str:
+            settings.recipe_refresh_count += 1
+        else:
+            settings.last_recipe_refresh_date = today_str
+            settings.recipe_refresh_count = 1
+        await session.commit()
 
     # Store in cache
     if recipes:

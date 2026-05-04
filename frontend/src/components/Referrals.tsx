@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Home, Gift, Users, WalletCards, Copy, CheckCircle2 } from 'lucide-react';
 import WebAppConfig from '@twa-dev/sdk';
 import { referralsApi } from '../api/client';
+import { useToast } from './Toast';
 
 interface ReferralsProps {
     user: any;
@@ -30,6 +31,7 @@ interface ReferralsState {
 }
 
 export const Referrals: React.FC<ReferralsProps> = ({ user, onNavigate }) => {
+    const toast = useToast()
     const [state, setState] = useState<ReferralsState>({
         loading: true,
         error: null,
@@ -79,7 +81,7 @@ export const Referrals: React.FC<ReferralsProps> = ({ user, onNavigate }) => {
             setCopySuccess(true);
             setTimeout(() => setCopySuccess(false), 2000);
         } catch {
-            alert('Не удалось скопировать ссылку. Скопируйте её вручную.');
+            toast.warning('Не удалось скопировать ссылку — скопируйте вручную');
         }
     };
 
@@ -106,7 +108,7 @@ export const Referrals: React.FC<ReferralsProps> = ({ user, onNavigate }) => {
             }
         }
 
-        alert(text);
+        toast.success(text);
     };
 
     const handleActivateReward = async (rewardId: number) => {
@@ -119,7 +121,7 @@ export const Referrals: React.FC<ReferralsProps> = ({ user, onNavigate }) => {
             }
         } catch (err) {
             console.error('Activate reward error', err);
-            alert('Не удалось активировать бонус. Проверьте лимит или попробуйте позже.');
+            toast.error('Не удалось активировать бонус. Проверьте лимит или попробуйте позже.');
         }
     };
 

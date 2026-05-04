@@ -16,8 +16,8 @@ async def test_start_onboarding_new_user(db_session, mock_telegram_message, mock
 
     await start_onboarding(mock_telegram_message, mock_fsm_context)
 
-    # Check that state was set
-    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_gender)
+    # Check that state was set (первый шаг онбординга — acquisition source)
+    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_source)
     # Check that message was sent
     mock_telegram_message.answer.assert_called_once()
 
@@ -36,8 +36,8 @@ async def test_start_onboarding_existing_user_not_initialized(
 
     await start_onboarding(mock_telegram_message, mock_fsm_context)
 
-    # Check that state was set
-    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_gender)
+    # Check that state was set (первый шаг онбординга — acquisition source)
+    mock_fsm_context.set_state.assert_called_once_with(OnboardingStates.waiting_for_source)
 
 
 @pytest.mark.asyncio
@@ -173,7 +173,8 @@ async def test_handle_goal_accept(
     # Check that state was cleared
     mock_fsm_context.clear.assert_called_once()
     mock_callback_query.answer.assert_called_once()
-    mock_callback_query.message.answer.assert_called_once()
+    # finish_onboarding_process делает 2 вызова answer: финальный текст + «горячий» вопрос
+    assert mock_callback_query.message.answer.call_count == 2
 
     # Check that settings were saved
     stmt = select(UserSettings).where(UserSettings.user_id == sample_user.id)

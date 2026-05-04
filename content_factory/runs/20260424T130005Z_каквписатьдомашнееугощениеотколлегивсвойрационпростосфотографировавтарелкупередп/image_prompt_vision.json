@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person point of view (POV) holding a sleek modern smartphone, taking a photo of a wooden office table filled with festive plates of traditional crepes and pastries. A glowing teal and lime green holographic interface overlays the phone screen, displaying abstract data charts and nutritional scanning pulses. Photorealistic lifestyle, subtle cyberpunk aesthetic, soft warm indoor lighting contrasted with sharp neon blue and green accents. High-end office environment in the background with lush green plants and futuristic glass windows. Premium commercial photography style, 8k resolution, cinematic depth of field.",
+  "negative_prompt": "text, letters, words, numbers, watermark, logo, QR code, brand name, distorted hands, extra fingers, blurry face, messy cables, low resolution, ugly, deformed, signature.",
+  "notes": [
+    "Used a POV shot to mimic the user's experience of 'photographing the plate' as mentioned in the text.",
+    "Combined the 'warm wood' of the food setting with 'teal/green' neon accents to maintain brand consistency with the references.",
+    "Swapped the generic burger for the 'crepes and pastries' mentioned in the post to make it context-relevant.",
+    "Specified a holographic overlay to represent the FoodFlow bot's AI analysis without using actual text."
+  ]
+}

@@ -48,6 +48,7 @@ class UniversalInputStates(StatesGroup):
     batch_editing = State()       # Editing individual item in batch
     batch_time_selection = State() # Selecting time for the whole batch
     batch_waiting_for_macro_value = State() # Waiting for KBJU value input
+    waiting_for_herbalife_milk = State()    # Waiting for milk/water choice for F1
 
 # --- HANDLERS ---
 
@@ -387,6 +388,19 @@ async def universal_action_ate(callback: types.CallbackQuery, state: FSMContext)
             await callback.answer("⚠️ Нет текста для анализа.", show_alert=True)
             return
 
+        # Re-check for multi-item input: AIBrain may have returned unknown/failed
+        # on the first pass (e.g. intent=unknown for voice without punctuation).
+        # If it now detects multi, route to batch instead of single normalizer.
+        brain_result = await AIBrainService.analyze_text(content)
+        if brain_result and isinstance(brain_result, dict) and brain_result.get("multi") and brain_result.get("items"):
+            items = brain_result["items"]
+            if len(items) > 1:
+                status_msg = await callback.message.edit_text(
+                    f"🧠 <b>Вижу {len(items)} блюд — анализирую...</b>", parse_mode="HTML"
+                )
+                await process_batch_food_logging(callback.message, state, items, status_msg)
+                return
+
         await process_text_food_logging(callback, state, content)
 
 
@@ -663,7 +677,7 @@ async def move_from_fridge_to_ate(callback: types.CallbackQuery, state: FSMConte
         await session.delete(product)
         await session.commit()
 
-    await callback.answer("🔄 Переношу в лог питания...")
+    await callback.answer("🔄 Добавляю в дневник питания...")
 
     # Redirect to food logging logic
     # We use process_text_food_logging which will show KBJU confirmation
@@ -1325,64 +1339,161 @@ async def process_herbalife_input(
         # 2. Parse Quantity
         qty_data = herbalife_expert.parse_quantity(text)
 
-        # 3. Calculate
-        nutr = herbalife_expert.calculate_nutrition(product, qty_data["amount"], qty_data["unit"])
+        # 3. Check if it's an F1 shake and needs milk/water clarification
+        is_shake = product.get("subcategory") == "Протеиновые коктейли"
+        # Don't ask if it's already specified in the text
+        needs_clarification = is_shake
+        
+        lower_text = text.lower()
+        already_specified = "молок" in lower_text or "вод" in lower_text
 
-        # 4. Save to Log
-        final_name = f"{nutr['name']} ({int(nutr['weight'])}г/ед)"
-        async for session in get_db():
-            from database.models import ConsumptionLog
-            log = ConsumptionLog(
-                user_id=user_id,
-                product_name=final_name,
-                base_name=product["id"],
-                calories=nutr["calories"],
-                protein=nutr["protein"],
-                fat=nutr["fat"],
-                carbs=nutr["carbs"],
-                fiber=nutr["fiber"],
-                date=datetime.now()
+        if needs_clarification and not already_specified:
+            await state.update_data(
+                herbalife_pending_product=product,
+                herbalife_qty=qty_data,
+                herbalife_status_msg_id=msg.message_id
             )
-            session.add(log)
-            await session.commit()
-
-        await state.clear()
-
-        # 5. Success UI
-        warnings_text = ""
-        if nutr["warnings"]:
-            warnings_text = "\n\n⚠️ <b>Важно:</b>\n" + "\n".join([f"• {w}" for w in nutr["warnings"]])
-
-        await msg.edit_text(
-            f"🌿 <b>Записано по базе эксперта!</b>\n\n"
-            f"🍽️ {final_name}\n\n"
-            f"🔥 <b>{int(nutr['calories'])}</b> ккал\n"
-            f"🥩 {nutr['protein']:.1f} | 🥑 {nutr['fat']:.1f} | 🍞 {nutr['carbs']:.1f} | 🥬 {nutr['fiber']:.1f}"
-            f"{warnings_text}",
-            parse_mode="HTML"
-        )
-
-        # AI Guide Contextual Advice (Separate Message)
-        async for session in get_db():
-            if await AIGuideService.is_active(user_id, session):
-                current_meal = {
-                    "name": final_name,
-                    "calories": nutr["calories"],
-                    "protein": nutr["protein"],
-                    "fat": nutr["fat"],
-                    "carbs": nutr["carbs"]
-                }
-                advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
-                if advice:
-                    await msg.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+            await state.set_state(UniversalInputStates.waiting_for_herbalife_milk)
             
-            # Track activity for Guide missions
-            await AIGuideService.track_activity(user_id, "log_herbalife", session)
-            break
+            builder = InlineKeyboardBuilder()
+            builder.button(text="💧 На воде", callback_data="h_base:water")
+            builder.button(text="🥛 На молоке", callback_data="h_base:milk")
+            builder.button(text="❌ Отмена", callback_data="u_action_cancel")
+            builder.adjust(2, 1)
+
+            await msg.edit_text(
+                f"🌿 <b>{product['name']}</b>\n\n"
+                f"❓ <b>На чем готовим коктейль?</b>",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            return
+
+        # 4. Calculate (Default logic or with specified base)
+        base = "milk" if "молок" in lower_text else "water"
+        nutr = _calculate_herbalife_with_base(product, qty_data, base)
+        
+        await _finalize_herbalife_logging(user_id, product, nutr, state, msg)
 
     except Exception as e:
         logger.error(f"Herbalife Expert Error: {e}", exc_info=True)
         await msg.edit_text(f"❌ Ошибка эксперта: {e}")
+
+@router.callback_query(UniversalInputStates.waiting_for_herbalife_milk, F.data.startswith("h_base:"))
+async def herbalife_milk_choice(callback: types.CallbackQuery, state: FSMContext):
+    """Handle the milk/water choice for Herbalife."""
+    choice = callback.data.split(":")[1] # "water" or "milk"
+    data = await state.get_data()
+    product = data.get("herbalife_pending_product")
+    qty_data = data.get("herbalife_qty")
+    
+    if not product or not qty_data:
+        await callback.answer("⚠️ Ошибка контекста", show_alert=True)
+        return
+
+    await callback.answer()
+    
+    nutr = _calculate_herbalife_with_base(product, qty_data, choice)
+    await _finalize_herbalife_logging(callback.from_user.id, product, nutr, state, callback.message)
+
+def _calculate_herbalife_with_base(product: dict, qty_data: dict, base: str) -> dict:
+    """Helper to calculate nutrition including base (milk/water)."""
+    # 1. Base powder nutrition
+    nutr = herbalife_expert.calculate_nutrition(product, qty_data["amount"], qty_data["unit"])
+    
+    # 2. Apply "On Water" override if it's a shake and 26g/serving
+    is_shake = product.get("subcategory") == "Протеиновые коктейли"
+    
+    # If 26g (or 1 serving which defaults to 26g), use the specific numbers provided by user
+    is_standard_serving = False
+    if qty_data["unit"] == "serving" and qty_data["amount"] == 1.0:
+        is_standard_serving = True
+    elif qty_data["unit"] in ["g", "г"] and qty_data["amount"] == 26.0:
+        is_standard_serving = True
+        
+    if is_shake and is_standard_serving and base == "water":
+        # User requested values for 26g on water: 98 / 9.1 / 2.5 / 8.6 / 4.7
+        nutr["calories"] = 98.0
+        nutr["protein"] = 9.1
+        nutr["fat"] = 2.5
+        nutr["carbs"] = 8.6
+        nutr["fiber"] = 4.7
+        nutr["name"] = f"{product['name']} (на воде)"
+    elif is_shake and is_standard_serving and base == "milk":
+        # Use nutrition_per_serving from DB if it exists (usually has milk values)
+        # or add milk bonus
+        per_serving = product.get("nutrition_per_serving")
+        if per_serving:
+            nutr["calories"] = per_serving.get("energy_kcal", nutr["calories"])
+            nutr["protein"] = per_serving.get("protein_g", nutr["protein"])
+            nutr["fat"] = per_serving.get("fat_g", nutr["fat"])
+            nutr["carbs"] = per_serving.get("carbs_g", nutr["carbs"])
+            nutr["fiber"] = per_serving.get("fiber_g", nutr["fiber"])
+            nutr["name"] = f"{product['name']} (на молоке)"
+        else:
+            # Fallback: add standard milk bonus (250ml 1.5%)
+            nutr["calories"] += 115
+            nutr["protein"] += 8.0
+            nutr["fat"] += 3.7
+            nutr["carbs"] += 12.0
+            nutr["name"] = f"{product['name']} (на молоке)"
+    
+    return nutr
+
+async def _finalize_herbalife_logging(user_id: int, product: dict, nutr: dict, state: FSMContext, msg: types.Message):
+    """Save to log and show success."""
+    final_name = nutr['name']
+    if "(" not in final_name:
+        final_name = f"{nutr['name']} ({int(nutr['weight'])}г/ед)"
+
+    async for session in get_db():
+        from database.models import ConsumptionLog
+        log = ConsumptionLog(
+            user_id=user_id,
+            product_name=final_name,
+            base_name=product["id"],
+            calories=nutr["calories"],
+            protein=nutr["protein"],
+            fat=nutr["fat"],
+            carbs=nutr["carbs"],
+            fiber=nutr["fiber"],
+            date=datetime.now()
+        )
+        session.add(log)
+        await session.commit()
+
+    await state.clear()
+
+    # 5. Success UI
+    warnings_text = ""
+    if nutr.get("warnings"):
+        warnings_text = "\n\n⚠️ <b>Важно:</b>\n" + "\n".join([f"• {w}" for w in nutr["warnings"]])
+
+    await msg.edit_text(
+        f"🌿 <b>Записано по базе эксперта!</b>\n\n"
+        f"🍽️ {final_name}\n\n"
+        f"🔥 <b>{int(nutr['calories'])}</b> ккал\n"
+        f"🥩 {nutr['protein']:.1f} | 🥑 {nutr['fat']:.1f} | 🍞 {nutr['carbs']:.1f} | 🥬 {nutr['fiber']:.1f}"
+        f"{warnings_text}",
+        parse_mode="HTML"
+    )
+
+    # AI Guide Contextual Advice
+    async for session in get_db():
+        if await AIGuideService.is_active(user_id, session):
+            current_meal = {
+                "name": final_name,
+                "calories": nutr["calories"],
+                "protein": nutr["protein"],
+                "fat": nutr["fat"],
+                "carbs": nutr["carbs"]
+            }
+            advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
+            if advice:
+                await msg.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
+        
+        await AIGuideService.track_activity(user_id, "log_herbalife", session)
+        break
 
 
 @router.message(UniversalInputStates.waiting_for_weight, F.text)

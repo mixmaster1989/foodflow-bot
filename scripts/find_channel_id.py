@@ -2,8 +2,9 @@
 import asyncio
 import aiohttp
 import json
+import os
 
-TOKEN = "8486697960:AAFxWmY9vR0SjCgSDV-_HJoQujStkqq-l-E"
+TOKEN = os.environ.get("RECEPTION_BOT_TOKEN") or os.environ.get("BOT_TOKEN") or ""
 
 async def get_updates():
     url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"

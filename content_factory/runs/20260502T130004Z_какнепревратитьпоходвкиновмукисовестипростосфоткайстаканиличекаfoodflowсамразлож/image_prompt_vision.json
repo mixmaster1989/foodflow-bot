@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective in a futuristic dimly lit cinema lobby. A person's hand holds a sleek smartphone, taking a photo of a large bucket of popcorn and a soda cup. Glowing teal and green holographic UI elements float around the food, displaying abstract nutrition data charts. Cyberpunk aesthetic with soft blue neon rim lighting. Photorealistic, cinematic depth of field, premium textures, high-end lifestyle photography, vertical 4:5 composition.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, distorted fingers, extra limbs, blurry face, messy background, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used first-person POV to mimic the 'take a photo' action from the post.",
+    "Integrated brand-specific teal and green neon for the holographic UI.",
+    "Set the scene in a cinema lobby to match the narrative context.",
+    "Ensured a premium, photorealistic look consistent with the style anchors."
+  ]
+}
