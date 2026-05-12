@@ -1,9 +1,10 @@
 """Tests for the 9 security/logic bugs fixed in the security checkpoint."""
-import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
-from httpx import AsyncClient, ASGITransport
+
+import pytest
 from fastapi import HTTPException
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from api.main import app
@@ -11,7 +12,6 @@ from database.base import get_db
 from database.models import (
     ConsumptionLog,
     Product,
-    Receipt,
     SavedDish,
     Subscription,
     User,
@@ -116,11 +116,11 @@ async def test_vk_login_fails_closed_without_secret(client):
 @pytest.mark.asyncio
 async def test_group_filter_passes_non_message_updates():
     """GroupFilterMiddleware must call handler for pre_checkout_query and other non-message updates."""
-    from aiogram.types import Update
     from unittest.mock import MagicMock
 
     # Build a minimal middleware instance without importing main.py setup
     from aiogram import BaseMiddleware
+    from aiogram.types import Update
 
     class GroupFilterMiddleware(BaseMiddleware):
         async def __call__(self, handler, event, data):
@@ -157,9 +157,10 @@ async def test_group_filter_passes_non_message_updates():
 @pytest.mark.asyncio
 async def test_group_filter_drops_group_message():
     """GroupFilterMiddleware must drop regular group messages."""
+    from unittest.mock import MagicMock
+
     from aiogram import BaseMiddleware
     from aiogram.types import Update
-    from unittest.mock import MagicMock
 
     class GroupFilterMiddleware(BaseMiddleware):
         async def __call__(self, handler, event, data):

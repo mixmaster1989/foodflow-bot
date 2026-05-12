@@ -1,14 +1,16 @@
-import aiohttp
-from config import OPENROUTER_API_KEY
-import os
 import logging
+
+import aiohttp
+
+from config import OPENROUTER_API_KEY
+
 
 async def speech_to_text(file_path: str) -> str:
     url = "https://openrouter.ai/api/v1/audio/transcriptions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}"
     }
-    
+
     try:
         data = aiohttp.FormData()
         data.add_field('file', open(file_path, 'rb'))

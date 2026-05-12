@@ -5,28 +5,26 @@ Contains:
 - generate_curator_morning_summary: Aggregate ward stats for curator.
 - generate_ward_ai_report: AI nutritionist analysis for a specific ward.
 """
+import csv
+import io
 import logging
+import os
 from datetime import date, datetime, timedelta
 
-import aiohttp
 from sqlalchemy import and_, func, select
 
-from config import settings
 from database.base import get_db
 from database.models import (
-    ConsumptionLog,
-    User,
-    UserSettings,
-    UserFeedback,
-    Subscription,
-    ReferralEvent,
     PAID_SOURCES,
     PAYMENT_SOURCE_STARS,
     PAYMENT_SOURCE_YOOKASSA,
+    ConsumptionLog,
+    ReferralEvent,
+    Subscription,
+    User,
+    UserFeedback,
+    UserSettings,
 )
-import os
-import csv
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +139,7 @@ async def generate_ward_ai_report(ward_id: int) -> dict | None:
     Returns dict with 'text' (AI analysis) and 'prompt_data' for image card.
     """
     from services.daily_nutrition_report import (
-        NUTRITION_PROMPT,
         get_nutrition_report,
-        sanitize_telegram_html,
     )
 
     yesterday = (datetime.now() - timedelta(days=1)).date()
@@ -396,7 +392,7 @@ async def send_daily_visual_report(user_id: int, bot) -> bool:
     from aiogram.types import BufferedInputFile
 
     from database.models import User
-    from services.image_renderer import draw_daily_card
+    from services.svg_renderer import draw_daily_card
 
     logger = logging.getLogger("reports.visual")
     today = datetime.now().date()
@@ -416,7 +412,8 @@ async def send_daily_visual_report(user_id: int, bot) -> bool:
                 "protein": settings.protein_goal if settings and settings.protein_goal else 100,
                 "fat": settings.fat_goal if settings and settings.fat_goal else 70,
                 "carbs": settings.carb_goal if settings and settings.carb_goal else 250,
-                "fiber": settings.fiber_goal if settings and settings.fiber_goal else 30
+                "fiber": settings.fiber_goal if settings and settings.fiber_goal else 30,
+                "water": settings.water_goal if settings else 2000
             }
 
             # 3. Fetch Logs for Today
@@ -533,7 +530,7 @@ async def generate_admin_daily_digest() -> str:
             db_size = os.path.getsize(db_path) / (1024 * 1024)
         except Exception:
             db_size = 0
-        
+
         break
 
     # Calculations
@@ -563,28 +560,28 @@ async def generate_admin_stats_csv(days: int = 30) -> io.BytesIO:
     """
     output = io.StringIO()
     writer = csv.writer(output)
-    
+
     # Header
     writer.writerow([
-        "Date", "New Users", "Ref Signups", "Active Users", 
-        "Food Logs", "Feedback", "Sales RUB", "Rev RUB", 
+        "Date", "New Users", "Ref Signups", "Active Users",
+        "Food Logs", "Feedback", "Sales RUB", "Rev RUB",
         "Sales Stars", "Rev Stars"
     ])
-    
+
     prices_rub = {"basic": 199, "pro": 299, "curator": 499}
     prices_stars = {"basic": 130, "pro": 200, "curator": 350}
 
     async for session in get_db():
         for i in range(days):
             target_date = (datetime.now() - timedelta(days=i+1)).date()
-            
+
             # Metrics
             nu = (await session.execute(select(func.count(User.id)).where(func.date(User.created_at) == target_date))).scalar() or 0
             ref = (await session.execute(select(func.count(ReferralEvent.id)).where(and_(func.date(ReferralEvent.created_at) == target_date, ReferralEvent.event_type == "signup")))).scalar() or 0
             au = (await session.execute(select(func.count(func.distinct(ConsumptionLog.user_id))).where(func.date(ConsumptionLog.date) == target_date))).scalar() or 0
             lc = (await session.execute(select(func.count(ConsumptionLog.id)).where(func.date(ConsumptionLog.date) == target_date))).scalar() or 0
             fc = (await session.execute(select(func.count(UserFeedback.id)).where(func.date(UserFeedback.created_at) == target_date))).scalar() or 0
-            
+
             # Payments (only real paid sources: stars + yookassa)
             subs = (await session.execute(select(Subscription).where(and_(func.date(Subscription.starts_at) == target_date, Subscription.payment_source.in_(list(PAID_SOURCES)))))).scalars().all()
 
@@ -599,13 +596,13 @@ async def generate_admin_stats_csv(days: int = 30) -> io.BytesIO:
                 elif s.payment_source == PAYMENT_SOURCE_YOOKASSA:
                     p_rub += 1
                     r_rub += prices_rub.get(s.tier, 0)
-            
+
             writer.writerow([
                 target_date.strftime("%Y-%m-%d"), nu, ref, au, lc, fc, p_rub, r_rub, p_xtr, r_xtr
             ])
-            
+
         break
-    
+
     # Convert to bytes for Telegram send_document
     output.seek(0)
     byte_output = io.BytesIO(output.getvalue().encode('utf-8'))

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION ---
 DRY_RUN = False  # Set to False to actually send messages
 TEST_MODE = False # Set to True to send only to specific test IDs
-TEST_USER_IDS = [432823154] 
+TEST_USER_IDS = [432823154]
 
 USER_MESSAGE = """🍎 <b>FoodFlow стал еще умнее: Большое обновление логики!</b>
 

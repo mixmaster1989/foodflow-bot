@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Content Factory publishing (optional)
     CONTENT_FACTORY_TELEGRAM_TOKEN: str | None = None
     CONTENT_FACTORY_TARGET_CHAT_ID: int | None = None
-    
+
     # VK Mini App
     VK_APP_ID: int = 54530169
     VK_APP_SECRET: str = ""  # To be set in .env
@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     VK_TOKEN: str | None = None
     VK_GROUP_ID: int | None = None
     VK_API_VERSION: str = "5.199"
+
+    # Dzen (Yandex Zen) publishing (optional)
+    DZEN_TOKEN: str | None = None
+    DZEN_CHANNEL_ID: str | None = None  # Usually the channel slug or ID
 
 
     # Paths

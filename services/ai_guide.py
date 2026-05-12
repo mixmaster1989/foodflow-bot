@@ -1,12 +1,16 @@
-import logging
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict
 import json
+import logging
+from datetime import datetime
 
-from sqlalchemy import select, func, desc
-from database.base import async_session
-from database.models import UserSettings, UserActivity, ConsumptionLog, Product, GuideHistory
-from services.ai_brain import AIBrainService
+from sqlalchemy import desc, func, select
+
+from database.models import (
+    ConsumptionLog,
+    GuideHistory,
+    Product,
+    UserActivity,
+    UserSettings,
+)
 from services.ai import AIService
 
 logger = logging.getLogger(__name__)
@@ -19,10 +23,10 @@ class AIGuideService:
         """Check if Guide is paid and enabled for user."""
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if not settings or not settings.guide_active_until:
              return False
-             
+
         return settings.guide_active_until > datetime.now()
 
     @classmethod
@@ -30,15 +34,15 @@ class AIGuideService:
         """Log that user used a specific feature."""
         # Check if already logged today for this feature to avoid spamming
         stmt = select(UserActivity).where(
-            UserActivity.user_id == user_id, 
+            UserActivity.user_id == user_id,
             UserActivity.feature_name == feature
         ).order_by(desc(UserActivity.last_used_at)).limit(1)
-        
+
         last_activity = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if last_activity and (datetime.now() - last_activity.last_used_at).total_seconds() < 3600:
              return # Already logged in the last hour
-             
+
         new_activity = UserActivity(user_id=user_id, feature_name=feature)
         session.add(new_activity)
         await session.commit()
@@ -46,7 +50,7 @@ class AIGuideService:
     @classmethod
     async def get_contextual_advice(cls, user_id: int, current_meal: dict, session, stream: bool = False):
         """Generate AI comment for the current meal based on history/fridge."""
-        
+
         # 1. Fetch User Settings & Context
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings = (await session.execute(stmt)).scalar_one_or_none()
@@ -56,7 +60,7 @@ class AIGuideService:
         # 2. Fetch Daily Context (Today's totals)
         from database.models import WaterLog
         today = datetime.now().date()
-        
+
         # Today's food
         today_food_stmt = select(ConsumptionLog).where(
             ConsumptionLog.user_id == user_id,
@@ -67,34 +71,34 @@ class AIGuideService:
         today_p = sum(i.protein for i in today_items)
         today_f = sum(i.fat for i in today_items)
         today_c = sum(i.carbs for i in today_items)
-        
+
         # Today's water
         today_water_stmt = select(func.sum(WaterLog.amount_ml)).where(
             WaterLog.user_id == user_id,
             func.date(WaterLog.date) == today
         )
         today_water = (await session.execute(today_water_stmt)).scalar() or 0
-        
+
         # Last 5 items with dates
         hist_stmt = select(ConsumptionLog).where(ConsumptionLog.user_id == user_id).order_by(desc(ConsumptionLog.date)).limit(5)
         history = (await session.execute(hist_stmt)).scalars().all()
         history_desc = "\n".join([f"- {h.date.strftime('%d.%m %H:%M')}: {h.product_name} ({h.calories} ккал)" for h in history])
-        
+
         # 3. Fetch Conversation History (Memory)
         memory_context = await cls.get_history_context(user_id, session)
-        
+
         # 4. Fetch Unused Features (Missions)
         # 1. Fetch used features
         activity_stmt = select(UserActivity.feature_name).where(UserActivity.user_id == user_id).distinct()
         used_features = (await session.execute(activity_stmt)).scalars().all()
         all_feature_list = ["fridge", "recipes", "weight", "water", "shopping_list"]
         unused_features = [f for f in all_feature_list if f not in used_features]
-        
+
         # 5. Fetch Fridge Summary (Optional context)
         fridge_stmt = select(Product).where(Product.user_id == user_id).limit(10)
         fridge_items = (await session.execute(fridge_stmt)).scalars().all()
         fridge_desc = ", ".join([p.name for p in fridge_items]) if fridge_items else "Холодильник пока пуст."
-        
+
         # 6. Build Prompt for AI Brain
         config = settings.guide_config or {}
         personality = config.get("personality", "soft")
@@ -166,10 +170,10 @@ class AIGuideService:
                      user_msg = f"Лог еды: {current_meal['name']} ({current_meal['calories']} ккал)"
                      await cls.save_to_history(user_id, "user", user_msg, session)
                      await cls.save_to_history(user_id, "assistant", response, session)
-                     
+
                      # Check for compression trigger (50k tokens)
                      await cls.check_and_compress(user_id, session)
-                     
+
                  return response
              else:
                  async def stream_generator():
@@ -178,7 +182,7 @@ class AIGuideService:
                      async for token in AIService.get_completion_stream(guide_prompt):
                          full_res += token
                          yield token
-                         
+
                      if full_res:
                          try:
                              # Use fresh session for delayed DB save
@@ -205,10 +209,10 @@ class AIGuideService:
 
         from database.models import WaterLog
         today = datetime.now().date()
-        
+
         # Today's water total
         w_stmt = select(func.sum(WaterLog.amount_ml)).where(
-            WaterLog.user_id == user_id, 
+            WaterLog.user_id == user_id,
             func.date(WaterLog.date) == today
         )
         today_water = (await session.execute(w_stmt)).scalar() or 0
@@ -219,7 +223,7 @@ class AIGuideService:
             func.date(ConsumptionLog.date) == today
         ).order_by(desc(ConsumptionLog.date)).limit(1)
         last_food = (await session.execute(f_stmt)).scalar_one_or_none()
-        
+
         last_food_desc = f"{last_food.product_name} ({last_food.calories} ккал)" if last_food else "Сегодня еще не ел"
 
         config = settings.guide_config or {}
@@ -271,7 +275,7 @@ class AIGuideService:
                      async for token in AIService.get_completion_stream(guide_prompt):
                          full_res += token
                          yield token
-                         
+
                      if full_res:
                          try:
                              # Use fresh session for delayed DB save
@@ -312,15 +316,15 @@ class AIGuideService:
         """Fetch history context for the prompt."""
         stmt = select(GuideHistory).where(GuideHistory.user_id == user_id).order_by(GuideHistory.created_at.asc())
         history = (await session.execute(stmt)).scalars().all()
-        
+
         if not history:
             return "История пуста."
-            
+
         lines = []
         for h in history:
             prefix = "🔔 ИТОГ:" if h.is_summary else f"{h.role.upper()}:"
             lines.append(f"{prefix} {h.content}")
-            
+
         return "\n".join(lines)
 
     @classmethod
@@ -328,7 +332,7 @@ class AIGuideService:
         """Check token count and trigger compression if > 50k."""
         token_sum_stmt = select(func.sum(GuideHistory.tokens)).where(GuideHistory.user_id == user_id)
         total_tokens = (await session.execute(token_sum_stmt)).scalar() or 0
-        
+
         if total_tokens > 50000:
             logger.info(f"Triggering history compression for user {user_id} ({total_tokens} tokens)")
             await cls.compress_history(user_id, session)
@@ -337,7 +341,7 @@ class AIGuideService:
     async def compress_history(cls, user_id: int, session):
         """Summarize history and replace with a summary entry."""
         context = await cls.get_history_context(user_id, session)
-        
+
         compress_prompt = f"""
 Ты — архивариус системы питания FoodFlow. Тебе нужно СЖАТЬ историю общения Гида с пользователем.
 Вся эта история будет заменена на твой краткий пересказ.
@@ -350,30 +354,30 @@ class AIGuideService:
 ИТОГОВОЕ САММАРИ (максимум 500 токенов):
 """
         summary = await AIService.get_completion(compress_prompt)
-        
+
         if summary:
             # Delete old history
             from sqlalchemy import delete
             del_stmt = delete(GuideHistory).where(GuideHistory.user_id == user_id)
             await session.execute(del_stmt)
-            
+
             # Save new summary
             await cls.save_to_history(user_id, "summary", summary, session, is_summary=True)
             logger.info(f"History compressed for user {user_id}")
 
     @classmethod
-    async def get_mission_for_user(cls, user_id: int, session) -> Optional[str]:
+    async def get_mission_for_user(cls, user_id: int, session) -> str | None:
         """Suggest a feature the user hasn't tried yet."""
         # 1. Fetch used features
         stmt = select(UserActivity.feature_name).where(UserActivity.user_id == user_id).distinct()
         used_features = (await session.execute(stmt)).scalars().all()
-        
+
         all_features = ["fridge", "recipes", "weight", "water", "shopping_list"]
         unused = [f for f in all_features if f not in used_features]
-        
+
         if not unused:
              return None # User is a pro!
-             
+
         target = unused[0]
         missions = {
             "fridge": "Я заметил, ты еще не заглядывал в «Холодильник». Попробуй добавить туда продукты, и я помогу тебе не дать им пропасть!",
@@ -382,5 +386,5 @@ class AIGuideService:
             "water": "Водный баланс так же важен, как и еда. Отметь стакан воды сегодня!",
             "shopping_list": "Чтобы не покупать лишнего, используй «Список покупок»."
         }
-        
+
         return missions.get(target)

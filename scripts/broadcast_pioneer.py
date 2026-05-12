@@ -1,8 +1,10 @@
 import asyncio
-import sqlite3
 import logging
+import sqlite3
+
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
+
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +39,7 @@ FoodFlow — молодой проект. Мы стремимся к совер�
 🍏 <i>С любовью, команда FoodFlow.</i>"""
 
 from aiogram.types import FSInputFile
+
 IMAGE_PATH = "/home/user1/.gemini/antigravity/brain/e93a5828-1fda-45de-951f-5d6245149dfe/pioneer_welcome_art_1774074412128.png"
 
 async def broadcast():
@@ -44,12 +47,12 @@ async def broadcast():
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM users")
     users = cursor.fetchall()
-    
+
     photo = FSInputFile(IMAGE_PATH)
-    
+
     success_count = 0
     fail_count = 0
-    
+
     for (user_id,) in users:
         try:
              await bot.send_photo(chat_id=user_id, photo=photo, caption=TEXT_PART_1)
@@ -60,7 +63,7 @@ async def broadcast():
         except Exception as e:
              logging.error(f"Failed for {user_id}: {e}")
              fail_count += 1
-             
+
     print(f"Broadcast complete: {success_count} success, {fail_count} failed")
     await bot.session.close()
 

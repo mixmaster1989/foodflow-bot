@@ -1,7 +1,8 @@
 import asyncio
-import aiohttp
-import os
 import json
+import os
+
+import aiohttp
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,27 +11,27 @@ async def test_usage():
     url = "https://openrouter.ai/api/v1/chat/completions"
     api_key = os.getenv("OPENROUTER_API_KEY")
     proxy = os.getenv("GROK_PROXY")
-    
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": "openai/gpt-audio-mini",
         "messages": [{"role": "user", "content": "How many tokens is this?"}],
         "stream": True,
         # OpenRouter often requires this to include usage in stream
-        "stream_options": {"include_usage": True} 
+        "stream_options": {"include_usage": True}
     }
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload, proxy=proxy) as resp:
                 if resp.status != 200:
                     print(f"Error: {await resp.text()}")
                     return
-                
+
                 async for line in resp.content:
                     line = line.decode('utf-8').strip()
                     if line.startswith("data: "):

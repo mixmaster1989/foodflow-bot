@@ -1,16 +1,17 @@
 import asyncio
+import logging
 import os
 import sys
-import logging
-from aiogram import Bot, types
+
+from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 
 # Добавляем путь к проекту
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
-from database.base import init_db, get_db
-from database.models import User, Subscription, ConsumptionLog
+from database.base import get_db, init_db
+from database.models import ConsumptionLog, Subscription, User
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("feedback_campaign")
@@ -18,16 +19,16 @@ logger = logging.getLogger("feedback_campaign")
 async def run_campaign():
     await init_db()
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     targets = []
-    
+
     async for session in get_db():
         # Query for users who:
         # 1. Are on 'free' tier
         # 2. Joined after launch campaign (is_founding_member=0)
         # 3. Have 0 consumption logs
         # 4. (Optional) joined more than 2 days ago to avoid spamming just-joined users
-        
+
         stmt = (
             select(User.id)
             .join(Subscription, User.id == Subscription.user_id)
@@ -41,7 +42,7 @@ async def run_campaign():
             .group_by(User.id)
             .having(func.count(ConsumptionLog.id) == 0)
         )
-        
+
         result = await session.execute(stmt)
         targets = [row[0] for row in result.fetchall()]
         break
@@ -52,7 +53,7 @@ async def run_campaign():
         return
 
     print(f"🚀 Starting feedback campaign for {len(targets)} users...")
-    
+
     builder = InlineKeyboardBuilder()
     options = [
         ("⏳ Нет времени вести дневник", "poll_fb:no_time"),
@@ -64,7 +65,7 @@ async def run_campaign():
     for text, data in options:
         builder.button(text=text, callback_data=data)
     builder.adjust(1)
-    
+
     msg_text = (
         "🎁 <b>Мы скучаем по тебе в FoodFlow!</b>\n\n"
         "Заметили, что ты перестал заглядывать к нам. Нам очень важно понять: что пошло не так?\n\n"

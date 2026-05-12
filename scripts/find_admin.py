@@ -1,7 +1,10 @@
 import asyncio
+
 from sqlalchemy import select
-from database.base import init_db, get_db
+
+from database.base import get_db, init_db
 from database.models import User
+
 
 async def main():
     await init_db()

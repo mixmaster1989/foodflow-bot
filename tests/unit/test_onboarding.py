@@ -163,7 +163,8 @@ async def test_handle_goal_accept(
     mock_callback_query.message.delete = AsyncMock()
     mock_callback_query.message.answer = AsyncMock()
 
-    with patch('handlers.onboarding.get_db') as mock_get_db:
+    with patch("handlers.onboarding.get_db") as mock_get_db, \
+         patch("handlers.onboarding.run_onboarding_demo", new_callable=AsyncMock) as mock_demo:
         async def db_generator():
             yield db_session
         mock_get_db.return_value = db_generator()
@@ -173,8 +174,9 @@ async def test_handle_goal_accept(
     # Check that state was cleared
     mock_fsm_context.clear.assert_called_once()
     mock_callback_query.answer.assert_called_once()
-    # finish_onboarding_process делает 2 вызова answer: финальный текст + «горячий» вопрос
-    assert mock_callback_query.message.answer.call_count == 2
+    # Теперь только 1 вызов congrats (второй — это запуск демо)
+    assert mock_callback_query.message.answer.call_count == 1
+    mock_demo.assert_called_once()
 
     # Check that settings were saved
     stmt = select(UserSettings).where(UserSettings.user_id == sample_user.id)

@@ -6,15 +6,17 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
-from database.base import init_db, get_db
-from database.models import UserFeedback, User
+
+from database.base import get_db, init_db
+from database.models import User, UserFeedback
+
 
 async def check_feedback():
     await init_db()
     async for session in get_db():
         stmt = select(UserFeedback, User).join(User, UserFeedback.user_id == User.id).order_by(UserFeedback.created_at.desc())
         results = (await session.execute(stmt)).all()
-        
+
         if not results:
             print("📭 Пока ответов нет.")
             return

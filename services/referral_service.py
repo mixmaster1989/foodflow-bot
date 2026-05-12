@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 
 from sqlalchemy import select
 
@@ -14,7 +13,6 @@ from database.models import (
     User,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -22,14 +20,14 @@ class ReferralService:
     """Service layer for referral accounting and rewards."""
 
     @staticmethod
-    async def _get_user(session, user_id: int) -> Optional[User]:
+    async def _get_user(session, user_id: int) -> User | None:
         return await session.get(User, user_id)
 
     @staticmethod
     async def generate_referral_token(
         user_id: int,
-        days: Optional[int] = None,
-    ) -> Optional[tuple[str, Optional[datetime]]]:
+        days: int | None = None,
+    ) -> tuple[str, datetime | None] | None:
         """
         (Re)generate personal referral token for a user.
 
@@ -49,7 +47,7 @@ class ReferralService:
             now = datetime.now()
 
             if not days:
-                expires_at: Optional[datetime] = None
+                expires_at: datetime | None = None
             else:
                 expires_at = now + timedelta(days=days)
 
@@ -190,10 +188,9 @@ class ReferralService:
                 return False
 
             # Explicitly fetch subscription instead of using user.subscription (lazy load fails in async)
-            from database.models import Subscription
             sub_stmt = select(Subscription).where(Subscription.user_id == user_id)
             sub = (await session.execute(sub_stmt)).scalar_one_or_none()
-            
+
             now = datetime.now()
 
             # Determine target tier from reward_type

@@ -1,9 +1,9 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from api.main import app
 from database.base import get_db
-from database.models import User, ReferralReward
+from database.models import ReferralReward, User
 
 
 @pytest.fixture(scope="function")

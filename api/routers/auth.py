@@ -1,13 +1,13 @@
+import base64
+import hashlib
+import hmac
 from datetime import datetime, timedelta
-from typing import Annotated, Optional
-from fastapi import APIRouter, HTTPException, status, Request, Depends
+from urllib.parse import urlencode
+
+import pytz
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
-import hmac
-import hashlib
-import base64
-import pytz
-from urllib.parse import urlencode
 
 from api.auth import (
     CurrentUser,
@@ -15,7 +15,16 @@ from api.auth import (
     create_access_token,
     pwd_context,
 )
-from api.schemas import SubscriptionRead, Token, UserCreate, UserLogin, UserSettingsRead, UserSettingsUpdate, WebUserRegister, WebUserLogin
+from api.schemas import (
+    SubscriptionRead,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserSettingsRead,
+    UserSettingsUpdate,
+    WebUserLogin,
+    WebUserRegister,
+)
 from config import settings
 from database.models import PAYMENT_SOURCE_TRIAL, Subscription, User, UserSettings
 
@@ -31,7 +40,7 @@ def verify_vk_signature(query_params: dict, client_secret: str) -> bool:
     # Filter keys starting with 'vk_' and sort alphabetically
     vk_params = {k: v for k, v in query_params.items() if k.startswith("vk_")}
     sorted_keys = sorted(vk_params.keys())
-    
+
     # Create query string
     data_string = urlencode({k: vk_params[k] for k in sorted_keys})
 
@@ -138,6 +147,7 @@ async def get_current_user_info(user: CurrentUser, session: DBSession):
     if subscription:
         # Check if active based on dates and flag
         from datetime import datetime
+
         import pytz
         msk_tz = pytz.timezone("Europe/Moscow")
         now = datetime.now(msk_tz).replace(tzinfo=None)
@@ -145,7 +155,7 @@ async def get_current_user_info(user: CurrentUser, session: DBSession):
         is_active = subscription.is_active and (
             subscription.expires_at is None or subscription.expires_at > now
         )
-        
+
         if is_active:
             tier = subscription.tier
 
@@ -191,7 +201,7 @@ async def login_with_password(data: PasswordLogin, session: DBSession):
 
     # 2. Verify password (Global OR Individual)
     individual_password = generate_user_password(data.telegram_id)
-    
+
     is_global = data.password == settings.GLOBAL_PASSWORD
     is_individual = data.password == individual_password
 
@@ -235,7 +245,6 @@ async def web_register(data: WebUserRegister, session: DBSession):
     Issues 3 days of PRO subscription as a welcome gift.
     """
     import random
-    from datetime import datetime, timedelta
 
     # Check email uniqueness
     stmt = select(User).where(User.email == data.email.lower())
@@ -324,17 +333,17 @@ async def sync_profile(
 ):
     if not request.first_name:
         return {"status": "skipped"}
-    
+
     new_full_name = request.first_name
     if request.last_name:
         new_full_name = f"{request.first_name} {request.last_name}"
-        
+
     if current_user.first_name != new_full_name:
         current_user.first_name = new_full_name
         session.add(current_user)
         await session.commit()
         return {"status": "updated", "name": new_full_name}
-    
+
     return {"status": "synced"}
 
 
@@ -379,7 +388,7 @@ async def vk_login(request: VKAuthRequest, session: DBSession):
             new_full_name = request.first_name
             if request.last_name:
                 new_full_name = f"{request.first_name} {request.last_name}"
-            
+
             if user.first_name != new_full_name:
                 user.first_name = new_full_name
                 session.add(user)
@@ -409,12 +418,12 @@ async def vk_login(request: VKAuthRequest, session: DBSession):
             first_name=full_name,
         )
         session.add(user)
-        
+
         # Create default settings
         user_settings = UserSettings(user_id=new_id, is_initialized=False)
         session.add(user_settings)
         await session.commit()
-    
+
     access_token = create_access_token(data={"sub": user.id})
     print(f"🦊 [VK-AUTH] VK User Login: {vk_id} (Internal ID: {user.id})")
     return Token(access_token=access_token)

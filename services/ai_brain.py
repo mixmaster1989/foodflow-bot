@@ -11,6 +11,37 @@ from monitoring import get_ai_semaphore, stats
 
 logger = logging.getLogger("ai.brain")
 
+def _extract_first_json_object(content: str) -> str | None:
+    """Extract the first complete JSON object from content, ignoring trailing data."""
+    start = content.find('{')
+    if start < 0:
+        # Check for array if object not found
+        start = content.find('[')
+        if start < 0: return None
+        
+    depth = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(content[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in ('{', '['):
+            depth += 1
+        elif ch in ('}', ']'):
+            depth -= 1
+            if depth == 0:
+                return content[start:i + 1]
+    return None
+
 class AIBrainService:
     """Core AI Brain Service for semantic understanding of user input."""
 
@@ -42,10 +73,13 @@ class AIBrainService:
 1. 'log_consumption' — пользователь ЯВНО указал, что СЪЕЛ.
 2. 'add_to_fridge' — пользователь ЯВНО указал, что КУПИЛ или хочет ДОБАВИТЬ.
 3. 'unknown' — если нет явного глагола действия или просто название продукта.
+4. 'nonsense' — если ввод это абракадабра, случайные буквы, мат или бессмыслица (например: "ываыва", "asdfgh", "привет как дела").
 
 ЕСЛИ ОДИН ПРОДУКТ — верни JSON объект:
 {
-  "intent": "log_consumption" | "add_to_fridge" | "unknown",
+  "intent": "log_consumption" | "add_to_fridge" | "unknown" | "nonsense",
+  "is_nonsense": false, # true если это абракадабра
+  "ai_comment": "Вежливый остроумный отказ на русском если это nonsense",
   "product": "Название блюда целиком",
   "weight": 100 | null,
   "quantity": 1,
@@ -56,6 +90,7 @@ class AIBrainService:
 ЕСЛИ ПРОДУКТОВ НЕСКОЛЬКО — верни JSON:
 {
   "intent": "log_consumption",
+  "is_nonsense": false,
   "multi": true,
   "items": [
     {"product": "Продукт 1", "weight": 100 | null},
@@ -215,9 +250,51 @@ class AIBrainService:
 
 
     @classmethod
-    async def analyze_image(cls, message_or_path: any, prompt: str = "Describe this image.") -> str | None:
-        """Analyze image using Vision model. Accepts aiogram Message or file path."""
+    async def analyze_image(cls, message_or_path: any, prompt_override: str = None) -> dict | None:
+        """Analyze image using Vision model. 
+        
+        Returns dict with:
+        - is_edible: bool
+        - food_name: str (normalized name)
+        - is_receipt: bool
+        - is_pricetag: bool
+        - ai_comment: str (friendly AI refusal if not edible)
+        - description: str (full visual description)
+        """
         import base64
+
+        # Core Vision Prompt (The "Intelligence" of the bot)
+        prompt = prompt_override or """
+        Analyze this image for a food-tracking AI assistant.
+        
+        TASK:
+        1. Determine if the image contains:
+           - FOOD/DISH (ready to eat)
+           - GROCERY PRODUCT (packaged)
+           - RECEIPT (grocery receipt with list of items)
+           - PRICE TAG (shelf label with price/name)
+        
+        2. If it's NOT food/receipt/product (e.g., person, animal, car, landscape, non-food object):
+           - Set is_edible: false
+           - Write a friendly, witty refusal in "ai_comment" in RUSSIAN. 
+             Example: "Котики — это друзья, а не еда! Пожалей пушистика. 😉"
+        
+        3. If it IS food/product/receipt:
+           - Set is_edible: true
+           - Extract "food_name" (short name in RU, e.g. "Борщ", "Черника")
+           - Set is_receipt: true if it's a receipt.
+           - Set is_pricetag: true if it's a shelf price tag.
+        
+        RETURN ONLY JSON:
+        {
+          "is_edible": true,
+          "food_name": "Название (RU)",
+          "is_receipt": false,
+          "is_pricetag": false,
+          "ai_comment": null,
+          "description": "Full visual description"
+        }
+        """
 
         # Determine image source
         b64_image = None
@@ -278,7 +355,8 @@ class AIBrainService:
                                         }
                                     ]
                                 }
-                            ]
+                            ],
+                            "response_format": {"type": "json_object"}
                         }
 
                         logger.info(f"Vision Analysis: Trying model {model}...")
@@ -292,8 +370,20 @@ class AIBrainService:
                             if response.status == 200:
                                 data = await response.json()
                                 content = data['choices'][0]['message']['content']
-                                logger.info(f"Vision Analysis ({model}): {content[:100]}...")
-                                return content
+                                logger.info(f"Vision Analysis ({model}) Raw: {content[:150]}...")
+                                
+                                # Robust JSON extraction
+                                content = content.replace("```json", "").replace("```", "").strip()
+                                extracted = _extract_first_json_object(content)
+                                if extracted:
+                                    content = extracted
+                                
+                                try:
+                                    result = json.loads(content)
+                                    return result
+                                except json.JSONDecodeError:
+                                    logger.error(f"Vision JSON Decode Error ({model}): {content}")
+                                    continue # Try next model
                             else:
                                 error_text = await response.text()
                                 logger.warning(f"Vision API Error ({model}): {response.status} - {error_text}")

@@ -83,7 +83,7 @@ VERA_REPORT = """# 🌸 С 8 Марта, Вера!
 **С праздником! Ты — наше вдохновение. 🌸**"""
 
 # Загружаем текущие V2 (где только Ольга и Юля)
-with open("data/march_8_ai_gifts_v2.json", "r", encoding="utf-8") as f:
+with open("data/march_8_ai_gifts_v2.json", encoding="utf-8") as f:
     gifts = json.load(f)
 
 # Добавляем Татьяну и Веру

@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end photorealistic lifestyle shot of a simple home meal: a plate of buckwheat with a meat patty and a side salad on a warm wooden table. A person's hand is holding a modern smartphone, framing the plate through the camera lens. Subtle cyberpunk aesthetic with glowing teal and blue holographic data interfaces floating around the plate, showing abstract nutritional charts and bars. Dim evening lighting with soft neon accents. Premium cinematic quality, 8k resolution, shallow depth of field, sharp focus on the food and the phone screen, teal and orange color grading.",
+  "negative_prompt": "readable text, letters, numbers, words, watermark, QR code, logo, brand name, distorted hands, extra fingers, blurry face, messy environment, low resolution, cartoon, 3d render",
+  "notes": [
+    "Used the 'phone framing' technique from ref_shopping_mode.png to represent the bot interaction.",
+    "Swapped the gourmet food for the requested 'buckwheat and patty' while maintaining a premium lighting style to match main_menu.png.",
+    "Integrated teal/blue neon glows as 'holographic data' to represent the nutritional summary mentioned in the post.",
+    "Set the scene in a dim evening environment to align with the 'late dinner' context of the text."
+  ]
+}

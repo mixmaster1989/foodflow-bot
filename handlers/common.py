@@ -17,10 +17,15 @@ from aiogram.types import (
 from sqlalchemy.future import select
 
 from database.base import get_db
-from database.models import User, UserSettings, ReferralEvent, ReferralReward, UserFeedback
-from services.referral_service import ReferralService
+from database.models import (
+    ReferralEvent,
+    ReferralReward,
+    User,
+    UserFeedback,
+    UserSettings,
+)
 from handlers.menu import show_main_menu
-from handlers.onboarding import start_onboarding
+from services.referral_service import ReferralService
 
 router = Router()
 
@@ -75,6 +80,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     ad_campaign = None
     marathon_invite_id = None
     curator = None
+    pioneer_referrer_id = None  # Pioneer program referral
 
     if len(message.text.split()) > 1:
         args = message.text.split()[1]
@@ -85,6 +91,8 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         elif args.startswith("ad_"):
             # рекламная кампания, например /start ad_launch2026
             ad_campaign = args[3:]
+        elif args.startswith("pioneer_") and args[8:].isdigit():
+            pioneer_referrer_id = int(args[8:])
 
     async for session in get_db():
         # Handle Marathon Invite
@@ -246,6 +254,15 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             except Exception:
                 pass  # Не ломаем /start из-за аналитики
 
+        # Process Pioneer referral (if user came via pioneer_XXXXX deep link)
+        if pioneer_referrer_id and pioneer_referrer_id != message.from_user.id:
+            try:
+                from handlers.pioneer import process_pioneer_referral
+                await process_pioneer_referral(message.from_user.id, pioneer_referrer_id, message.bot)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(f"Pioneer referral processing failed for {pioneer_referrer_id}", exc_info=True)
+
         # CRITICAL FIX: Make sure user is verified AFTER finishing onboarding
         # This ensures they NEVER see the password prompt again
         user_db = await session.get(User, message.from_user.id)
@@ -257,10 +274,15 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
         settings_result = await session.execute(settings_stmt)
         settings = settings_result.scalar_one_or_none()
+        from handlers.onboarding_demo import run_onboarding_demo
 
         if not settings or not settings.is_initialized:
-            # Start onboarding
-            await start_onboarding(message, state)
+            # Start tracking onboarding duration
+            from datetime import datetime
+            await state.update_data(onboarding_start_time=datetime.now().isoformat())
+            
+            # Start with Magic: show the interactive demo first
+            await run_onboarding_demo(message, state)
             return
 
     # Send a separate message to force the ReplyKeyboard to appear

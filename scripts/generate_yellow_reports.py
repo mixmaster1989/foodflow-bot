@@ -114,7 +114,7 @@ ELENA_T_REPORT = """# 🌸 С Праздником, Елена!
 **С праздником! Мы верим в тебя! 🌸**"""
 
 # Загружаем текущие отчеты (Зеленая группа)
-with open("data/march_8_ai_gifts_v2.json", "r", encoding="utf-8") as f:
+with open("data/march_8_ai_gifts_v2.json", encoding="utf-8") as f:
     gifts = json.load(f)
 
 # Добавляем Желтую группу

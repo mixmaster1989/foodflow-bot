@@ -1,11 +1,8 @@
-from datetime import datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import select
 
-from database.base import get_db
 from database.models import Subscription, User
 from handlers.payments import handle_check_yookassa_payment, successful_payment_handler
 

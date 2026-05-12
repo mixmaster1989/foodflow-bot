@@ -11,10 +11,9 @@ from aiogram.types import (
 )
 from sqlalchemy import select
 
+from config import settings
 from database.base import get_db
 from database.models import Subscription
-
-from config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,8 @@
-import uuid
 import logging
+import uuid
+
 from yookassa import Configuration, Payment
+
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ class YooKassaService:
                 "description": description,
                 "metadata": metadata
             }, idempotency_key)
-            
+
             return payment
         except Exception as e:
             logger.error(f"Failed to create YooKassa payment: {e}", exc_info=True)

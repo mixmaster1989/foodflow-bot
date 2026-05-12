@@ -13,17 +13,22 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 import argparse
+
 from aiogram import Bot
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from database.base import engine, init_db
 from database.models import (
-    User, Subscription, ConsumptionLog, UserFeedback,
     PAYMENT_SOURCE_TRIAL,
+    ConsumptionLog,
+    Subscription,
+    User,
+    UserFeedback,
 )
 
 SURVEY_START = "2026-04-16"
@@ -172,7 +177,7 @@ async def run(dry_run: bool):
             await asyncio.sleep(0.15)
 
     await bot.session.close()
-    print(f"\n✅ Готово!")
+    print("\n✅ Готово!")
 
 
 if __name__ == "__main__":

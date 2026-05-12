@@ -13,6 +13,7 @@ Provides a single menu for user actions:
 """
 import logging
 import os
+import time
 from datetime import datetime
 
 from aiogram import Bot, F, Router, types
@@ -22,17 +23,18 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 
+from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog, Product, SavedDish
 from handlers.i_ate import show_confirmation_interface
 from services.ai_brain import AIBrainService
-from services.herbalife_expert import herbalife_expert
-from services.normalization import NormalizationService
-from services.kbju_core import KBJUCoreService
 from services.ai_guide import AIGuideService
+from services.herbalife_expert import herbalife_expert
+from services.kbju_core import KBJUCoreService
+from services.normalization import NormalizationService
 from services.voice_stt import SpeechToText
+from utils.analytics import log_event
 from utils.parsing import safe_float
-from config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -55,6 +57,7 @@ class UniversalInputStates(StatesGroup):
 @router.message(F.voice)
 async def handle_voice(message: types.Message, bot: Bot, state: FSMContext, user_tier: str = "free") -> None:
     """Handle voice messages with STT."""
+    await log_event(message.from_user.id, "input_type_selected", {"type": "voice"})
 
     if user_tier == "free":
         from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -114,6 +117,7 @@ async def handle_voice(message: types.Message, bot: Bot, state: FSMContext, user
 @router.message(F.photo, StateFilter(None))
 async def handle_photo(message: types.Message, state: FSMContext, user_tier: str = "free") -> None:
     """Handle photos when no specific state is active. Auto-analyze content."""
+    await log_event(message.from_user.id, "input_type_selected", {"type": "photo"})
 
     if user_tier in ["free", "basic"]:
         from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -131,15 +135,25 @@ async def handle_photo(message: types.Message, state: FSMContext, user_tier: str
     status_msg = await message.reply("👀 <b>Смотрю, что на фото...</b>", parse_mode="HTML")
 
     try:
-        # 1. Analyze via Vision
-        description = await AIBrainService.analyze_image(message, prompt="Что на фото? Если это еда или продукты, напиши название и вкус. Если чек - напиши 'чек'.")
+        start_time = time.time()
+        result = await AIBrainService.analyze_image(message)
+        latency_ms = int((time.time() - start_time) * 1000)
 
-        logger.info(f"📸 Photo Analysis Result: '{description}'")
+        if not result:
+            await log_event(message.from_user.id, "vision_error", {"ms": latency_ms, "type": "empty_response"})
+            await status_msg.edit_text("❌ Не удалось понять, что на фото.")
+            return
 
-        if not description:
-             await status_msg.edit_text("❌ Не удалось понять, что на фото.")
+        if not result.get("is_edible", True) and not result.get("is_receipt") and not result.get("is_pricetag"):
+             refusal = result.get("ai_comment") or "Извините, я не вижу здесь еды. Попробуйте сфотографировать что-то съедобное! 😊"
+             await status_msg.edit_text(f"🛑 <b>{refusal}</b>", parse_mode="HTML")
+             await state.clear()
              return
 
+        await log_event(message.from_user.id, "vision_latency", {"ms": latency_ms, "success": True})
+        
+        description = result.get("food_name") or result.get("description")
+        
         # 2. Update status
         await status_msg.edit_text(f"👀 <b>Вижу:</b> <blockquote>{description[:50]}...</blockquote>", parse_mode="HTML")
 
@@ -159,6 +173,7 @@ async def handle_photo(message: types.Message, state: FSMContext, user_tier: str
 @router.message(F.text, StateFilter(None))
 async def handle_text(message: types.Message, state: FSMContext) -> None:
     """Handle text messages when no state is active."""
+    await log_event(message.from_user.id, "input_type_selected", {"type": "text"})
     # Ignore commands
     if message.text.startswith("/"):
         return
@@ -188,6 +203,13 @@ async def process_universal_input(
              status_msg = await message.reply(f"🧠 <b>Думаю:</b> <blockquote>{content}</blockquote>", parse_mode="HTML")
 
         brain_result = await AIBrainService.analyze_text(content)
+
+        if brain_result and isinstance(brain_result, dict) and brain_result.get("is_nonsense"):
+             refusal = brain_result.get("ai_comment") or "Извините, я не понял сообщение. Попробуйте написать по-другому! 😊"
+             await status_msg.edit_text(f"🛑 <b>{refusal}</b>", parse_mode="HTML")
+             await state.clear()
+             return
+
         is_herbalife = await herbalife_expert.find_product_by_alias(content)
 
         # --- SMART FORK: Multi-item vs Single-item ---
@@ -852,9 +874,9 @@ async def process_text_food_logging(
             async for session in get_db():
                 core_result = await KBJUCoreService.get_product_nutrition(text, session, weight_grams=weight_override)
                 break
-            
+
             logger.info(f"🚀 KBJUCore Pilot Result for '{text}': {core_result}")
-            
+
             # Add [ЭТАЛОН] label if it's from cache
             prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
             name = prefix + core_result.display_name
@@ -870,6 +892,12 @@ async def process_text_food_logging(
             # STANDARD FLOW: NormalizationService
             result = await NormalizationService.analyze_food_intake(text)
             logger.info(f"🍌 Normalization Result for '{text}': {result}")
+
+            if not result.get("is_food", True):
+                error_msg = result.get("error_message") or "Извините, я не могу распознать это как еду. Попробуйте написать по-другому! 😊"
+                await msg.edit_text(f"🛑 <b>{error_msg}</b>", parse_mode="HTML")
+                await state.clear()
+                return
 
             logger.info(
                 "KBJU_FLOW universal_text analyzed user_id=%s text=%r weight_override=%r -> name=%r base=%r weight_grams=%r weight_missing=%r kbju_raw={kcal:%s p:%s f:%s c:%s fi:%s}",
@@ -1343,7 +1371,7 @@ async def process_herbalife_input(
         is_shake = product.get("subcategory") == "Протеиновые коктейли"
         # Don't ask if it's already specified in the text
         needs_clarification = is_shake
-        
+
         lower_text = text.lower()
         already_specified = "молок" in lower_text or "вод" in lower_text
 
@@ -1354,7 +1382,7 @@ async def process_herbalife_input(
                 herbalife_status_msg_id=msg.message_id
             )
             await state.set_state(UniversalInputStates.waiting_for_herbalife_milk)
-            
+
             builder = InlineKeyboardBuilder()
             builder.button(text="💧 На воде", callback_data="h_base:water")
             builder.button(text="🥛 На молоке", callback_data="h_base:milk")
@@ -1372,7 +1400,7 @@ async def process_herbalife_input(
         # 4. Calculate (Default logic or with specified base)
         base = "milk" if "молок" in lower_text else "water"
         nutr = _calculate_herbalife_with_base(product, qty_data, base)
-        
+
         await _finalize_herbalife_logging(user_id, product, nutr, state, msg)
 
     except Exception as e:
@@ -1386,13 +1414,13 @@ async def herbalife_milk_choice(callback: types.CallbackQuery, state: FSMContext
     data = await state.get_data()
     product = data.get("herbalife_pending_product")
     qty_data = data.get("herbalife_qty")
-    
+
     if not product or not qty_data:
         await callback.answer("⚠️ Ошибка контекста", show_alert=True)
         return
 
     await callback.answer()
-    
+
     nutr = _calculate_herbalife_with_base(product, qty_data, choice)
     await _finalize_herbalife_logging(callback.from_user.id, product, nutr, state, callback.message)
 
@@ -1400,44 +1428,41 @@ def _calculate_herbalife_with_base(product: dict, qty_data: dict, base: str) -> 
     """Helper to calculate nutrition including base (milk/water)."""
     # 1. Base powder nutrition
     nutr = herbalife_expert.calculate_nutrition(product, qty_data["amount"], qty_data["unit"])
-    
-    # 2. Apply "On Water" override if it's a shake and 26g/serving
+
+    amount = qty_data["amount"]
+
+    # 2. Apply water/milk logic (proportional to amount)
     is_shake = product.get("subcategory") == "Протеиновые коктейли"
-    
-    # If 26g (or 1 serving which defaults to 26g), use the specific numbers provided by user
-    is_standard_serving = False
-    if qty_data["unit"] == "serving" and qty_data["amount"] == 1.0:
-        is_standard_serving = True
-    elif qty_data["unit"] in ["g", "г"] and qty_data["amount"] == 26.0:
-        is_standard_serving = True
-        
-    if is_shake and is_standard_serving and base == "water":
-        # User requested values for 26g on water: 98 / 9.1 / 2.5 / 8.6 / 4.7
-        nutr["calories"] = 98.0
-        nutr["protein"] = 9.1
-        nutr["fat"] = 2.5
-        nutr["carbs"] = 8.6
-        nutr["fiber"] = 4.7
-        nutr["name"] = f"{product['name']} (на воде)"
-    elif is_shake and is_standard_serving and base == "milk":
-        # Use nutrition_per_serving from DB if it exists (usually has milk values)
-        # or add milk bonus
-        per_serving = product.get("nutrition_per_serving")
-        if per_serving:
-            nutr["calories"] = per_serving.get("energy_kcal", nutr["calories"])
-            nutr["protein"] = per_serving.get("protein_g", nutr["protein"])
-            nutr["fat"] = per_serving.get("fat_g", nutr["fat"])
-            nutr["carbs"] = per_serving.get("carbs_g", nutr["carbs"])
-            nutr["fiber"] = per_serving.get("fiber_g", nutr["fiber"])
-            nutr["name"] = f"{product['name']} (на молоке)"
-        else:
-            # Fallback: add standard milk bonus (250ml 1.5%)
-            nutr["calories"] += 115
-            nutr["protein"] += 8.0
-            nutr["fat"] += 3.7
-            nutr["carbs"] += 12.0
-            nutr["name"] = f"{product['name']} (на молоке)"
-    
+
+    if is_shake:
+        if base == "water":
+            # 98 kcal is for 26g on water
+            nutr["calories"] = 98.0 * amount
+            nutr["protein"] = 9.1 * amount
+            nutr["fat"] = 2.5 * amount
+            nutr["carbs"] = 8.6 * amount
+            nutr["fiber"] = 4.7 * amount
+            nutr["name"] = f"{product['name']} (на воде, {amount} порц.)"
+        elif base == "milk":
+            # 214 kcal is standard for 26g on milk (from DB or fallback)
+            # We take the base powder and add milk bonus for EACH portion
+            per_serving = product.get("nutrition_per_serving")
+            if per_serving and per_serving.get("energy_kcal"):
+                # Use official milk-based serving values if they exist
+                nutr["calories"] = per_serving["energy_kcal"] * amount
+                nutr["protein"] = per_serving["protein_g"] * amount
+                nutr["fat"] = per_serving["fat_g"] * amount
+                nutr["carbs"] = per_serving["carbs_g"] * amount
+                nutr["fiber"] = per_serving.get("fiber_g", 0) * amount
+            else:
+                # Manual calculation: Powder + Milk (115 kcal / 250ml)
+                nutr["calories"] = (nutr["calories"] + (115 * amount))
+                nutr["protein"] = (nutr["protein"] + (8.0 * amount))
+                nutr["fat"] = (nutr["fat"] + (3.7 * amount))
+                nutr["carbs"] = (nutr["carbs"] + (12.0 * amount))
+
+            nutr["name"] = f"{product['name']} (на молоке, {amount} порц.)"
+
     return nutr
 
 async def _finalize_herbalife_logging(user_id: int, product: dict, nutr: dict, state: FSMContext, msg: types.Message):
@@ -1491,7 +1516,7 @@ async def _finalize_herbalife_logging(user_id: int, product: dict, nutr: dict, s
             advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
             if advice:
                 await msg.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
-        
+
         await AIGuideService.track_activity(user_id, "log_herbalife", session)
         break
 
@@ -1920,7 +1945,7 @@ async def process_batch_time_selection(callback: types.CallbackQuery, state: FSM
 async def process_batch_manual_time_input(message: types.Message, state: FSMContext) -> None:
     """Handle manual text time input for batch."""
     from utils.time_picker import parse_manual_time
-    
+
     selected_time = parse_manual_time(message.text)
     if not selected_time:
         await message.reply(
@@ -1966,7 +1991,7 @@ async def batch_confirm_all_from_message(message: types.Message, state: FSMConte
         await session.commit()
 
     await state.clear()
-    
+
     time_str = timestamp.strftime("%H:%M")
     await message.answer(
         f"✅ <b>Записано {saved_count} поз.</b> ({time_str})\n"
@@ -1994,7 +2019,7 @@ async def batch_confirm_all_from_message(message: types.Message, state: FSMConte
             advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
             if advice:
                 await message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
-        
+
         await AIGuideService.track_activity(user_id, "log_batch", session)
         break
 
@@ -2058,7 +2083,7 @@ async def batch_confirm_all(callback: types.CallbackQuery, state: FSMContext, ti
             advice = await AIGuideService.get_contextual_advice(user_id, current_meal, session)
             if advice:
                 await callback.message.answer(f"🤖 <b>Гид:</b> <i>{advice}</i>", parse_mode="HTML")
-        
+
         await AIGuideService.track_activity(user_id, "log_batch", session)
         break
 

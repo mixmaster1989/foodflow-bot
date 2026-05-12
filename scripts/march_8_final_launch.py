@@ -3,7 +3,8 @@ import json
 import logging
 import os
 import sys
-from aiogram import Bot, types
+
+from aiogram import Bot
 from aiogram.types import FSInputFile
 
 # Добавляем путь к корню проекта
@@ -41,16 +42,16 @@ def split_text(text, limit=4000):
 
 async def send_campaign():
     bot = Bot(token=settings.BOT_TOKEN)
-    with open(REPORTS_FILE, "r", encoding="utf-8") as f:
+    with open(REPORTS_FILE, encoding="utf-8") as f:
         reports = json.load(f)
-    
+
     logger.info(f"--- ДОРАССЫЛКА ДЛЯ ЗЕЛЕНОЙ ГРУППЫ (DRY_RUN={DRY_RUN}) ---")
-    
+
     count = 0
     for user_id, name in FAILED_USERS.items():
         report_text = reports.get(str(user_id))
         if not report_text: continue
-        
+
         try:
             if DRY_RUN:
                 logger.info(f"[DRY_RUN] Отправка чанками для {name} ({user_id})")
@@ -59,22 +60,22 @@ async def send_campaign():
                 if os.path.exists(GREETING_IMAGE):
                     photo = FSInputFile(GREETING_IMAGE)
                     await bot.send_photo(chat_id=user_id, photo=photo)
-                
+
                 # 2. Отправка текста частями
                 chunks = split_text(report_text)
                 for i, chunk in enumerate(chunks):
                     await bot.send_message(chat_id=user_id, text=chunk, parse_mode="Markdown")
                     logger.info(f"✅ Чанк {i+1}/{len(chunks)} для {name} отправлен.")
-                
+
                 logger.info(f"🏁 Полный отчет для {name} доставлен.")
-            
+
             count += 1
             await asyncio.sleep(1)
             await asyncio.sleep(0.5) # Пауза между пользователями
-            
+
         except Exception as e:
             logger.error(f"❌ Ошибка для {name} ({user_id}): {e}")
-            
+
     await bot.session.close()
     logger.info(f"--- РАССЫЛКА ЗАВЕРШЕНА. Всего адресатов: {count} ---")
 

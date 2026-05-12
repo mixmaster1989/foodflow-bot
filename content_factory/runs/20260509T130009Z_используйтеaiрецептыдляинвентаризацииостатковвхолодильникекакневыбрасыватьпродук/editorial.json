@@ -1,0 +1,28 @@
+{
+  "compliance": {
+    "action": "ok",
+    "reasons": [
+      "Текст соответствует тональности для РФ аудитории (не айтишная метафора, дружелюбный тон).",
+      "Отсутствуют медицинские заявления и гарантии похудения.",
+      "Нет персональных данных, дат или внутренних программных терминов.",
+      "Текст фокусируется на удобстве бытового процесса (инвентаризация и расчет), а не на лекции."
+    ],
+    "flags": [],
+    "revise_edits": [],
+    "internal_terms_found": [],
+    "banned_time_patterns_found": [],
+    "shaming_tokens_found": []
+  },
+  "chief": {
+    "decision": "regenerate",
+    "edits": [
+      "system_error"
+    ],
+    "notes": []
+  },
+  "judge": {
+    "ok": true,
+    "issues": [],
+    "new_facts_suspected": false
+  }
+}

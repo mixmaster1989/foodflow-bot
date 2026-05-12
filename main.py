@@ -15,11 +15,16 @@ from handlers import (
     feedback,
     fridge,
     fridge_search,
+    guide,
     herbalife,
     i_ate,
+    marketing,
     menu,
     onboarding,
+    onboarding_demo,
     payments,
+    pilot_commands,
+    pioneer,
     receipt,
     recipes,
     referrals,
@@ -30,16 +35,13 @@ from handlers import (
     subscription,
     support,
     survey,
+    testers,
     universal_input,
     user_settings,
     ward_interactions,
     # global_input,
     water,
     weight,
-    marketing,
-    pilot_commands,
-    guide,
-    testers,
 )
 from handlers.marathon import curator_menu
 
@@ -62,12 +64,13 @@ async def main():
     dp = Dispatcher()
 
     # Register Middleware
+    from aiogram import BaseMiddleware
+    from aiogram.types import Update
+
     from handlers.auth import AuthMiddleware
     from middleware.admin_logger import AdminLoggerMiddleware
     from middleware.paywall import PaywallMiddleware
     from middleware.user_enrichment import UserEnrichmentMiddleware
-    from aiogram import BaseMiddleware
-    from aiogram.types import Update
 
     class GroupFilterMiddleware(BaseMiddleware):
         """Drop group messages early — only allow /mstats and mkt_ callbacks through."""
@@ -93,7 +96,7 @@ async def main():
     dp.update.outer_middleware(GroupFilterMiddleware())
     dp.update.middleware(AdminLoggerMiddleware(bot)) # Logs and forwards to admin
     dp.update.middleware(UserEnrichmentMiddleware())  # Auto-enrich user profiles
-    
+
     dp.update.middleware(AuthMiddleware())
 
     # Paywall should intercept messages and callbacks
@@ -134,6 +137,8 @@ async def main():
     dp.include_router(ward_interactions.router)
     dp.include_router(marketing.router) # Marketing analytics for group
     # dp.include_router(global_input.router) # DEPRECATED
+    dp.include_router(pioneer.router)  # Pioneer program (inline)
+    dp.include_router(onboarding_demo.router)  # Onboarding demo flow
     dp.include_router(universal_input.router) # Universal Handler (Text/Voice/Photo)
     dp.include_router(guide.router)
     dp.include_router(testers.router) # Beta testers recruitment
@@ -143,7 +148,6 @@ async def main():
     start_scheduler(bot, dp)
 
     # Reset Menu Button to Default (remove Web App from input field)
-    from aiogram.types import MenuButtonDefault
     try:
         # NOTE: Temporarily commented out due to network timeouts to api.telegram.org
         # await bot.set_chat_menu_button(

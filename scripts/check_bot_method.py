@@ -1,6 +1,9 @@
 import asyncio
+
 from aiogram import Bot
+
 from config import settings
+
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)

@@ -6,10 +6,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-from content_factory.http_client import openrouter_post
-
 from config import settings
+from content_factory.http_client import openrouter_post
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +47,6 @@ SHAMING_TOKENS = [
 
 HARD_BLOCK_FLAGS = {"medical_claims", "result_guarantees", "pii", "dangerous"}
 
-WEAK_ENDING_PATTERNS = [
-    r"\bостальное\b",
-    r"не требует лишних переживаний",
-    r"бот возьм[её]т на себя",
-    r"вопрос регулярности",
-    r"главное\s+[-—]\s*регулярность",
-]
-
 LECTURE_PATTERNS = [
     r"\bсмысл простой\b",
     r"худеют\s+не\s+за\s+сч[её]т",
@@ -92,10 +82,6 @@ def _find_banned(text: str) -> list[str]:
 def _find_shaming(text: str) -> list[str]:
     low = text.lower()
     return [t for t in SHAMING_TOKENS if t in low]
-
-def _has_weak_ending(text: str) -> bool:
-    low = text.lower()
-    return any(re.search(p, low) for p in WEAK_ENDING_PATTERNS)
 
 def _has_lecture(text: str) -> bool:
     low = text.lower()
@@ -186,10 +172,8 @@ async def compliance_check(topic: str, text: str, *, tone_mode: str = "soft") ->
     internal_hits = _contains_internal_terms(text)
     banned_hits = _find_banned(text)
     shaming_hits = _find_shaming(text)
-    weak_ending = _has_weak_ending(text)
     lecture = _has_lecture(text)
     kbju_repetition = _kbju_count(text) > 1
-    hook_too_long = _last_sentence_word_count(text) > 10
 
     tone_mode = (tone_mode or "soft").lower()
     if tone_mode not in {"soft", "hard"}:
@@ -215,7 +199,7 @@ async def compliance_check(topic: str, text: str, *, tone_mode: str = "soft") ->
 - персональные данные
 
 Отдельно проверь: нет ли внутренних названий из кода и дат/годов в тексте.
-Дополнительно (качество): если финал ватный/без выбора или текст превращается в лекцию — проси revise.
+Дополнительно (качество): если текст превращается в скучную лекцию — проси revise. Финал должен быть дружелюбным и естественным.
 
 ТЕМА: {topic}
 ТЕКСТ:
@@ -225,7 +209,7 @@ async def compliance_check(topic: str, text: str, *, tone_mode: str = "soft") ->
 {{
   "action": "ok" | "revise" | "block",
   "reasons": ["..."],
-  "flags": ["medical_claims", "result_guarantees", "shaming", "dangerous", "pii", "internal_terms", "dates", "weak_cta", "lecture", "kbju_repetition", "hook_too_long"],
+  "flags": ["medical_claims", "result_guarantees", "shaming", "dangerous", "pii", "internal_terms", "dates", "lecture", "kbju_repetition"],
   "revise_edits": ["точечная правка 1", "точечная правка 2"],
   "internal_terms_found": {internal_hits},
   "banned_time_patterns_found": {banned_hits},
@@ -243,14 +227,10 @@ async def compliance_check(topic: str, text: str, *, tone_mode: str = "soft") ->
                 res.setdefault("flags", []).append("dates")
             if shaming_hits and "shaming" not in res.get("flags", []):
                 res.setdefault("flags", []).append("shaming")
-            if weak_ending and "weak_cta" not in res.get("flags", []):
-                res.setdefault("flags", []).append("weak_cta")
             if lecture and "lecture" not in res.get("flags", []):
                 res.setdefault("flags", []).append("lecture")
             if kbju_repetition and "kbju_repetition" not in res.get("flags", []):
                 res.setdefault("flags", []).append("kbju_repetition")
-            if hook_too_long and "hook_too_long" not in res.get("flags", []):
-                res.setdefault("flags", []).append("hook_too_long")
             if internal_hits:
                 res["internal_terms_found"] = internal_hits
             if banned_hits:
@@ -277,10 +257,6 @@ async def compliance_check(topic: str, text: str, *, tone_mode: str = "soft") ->
                     edits.append("Запрещены слова/обороты: «нормальный человек», «тупо», «цирк», «страдают», «поздравляю» (сарказм), «смешно».")
                 if lecture:
                     edits.append("Убери объяснялку/лекцию (например «смысл простой…»). Замени на сцену → действие → короткий вывод.")
-                if weak_ending:
-                    edits.append("Сделай финал жёстким: 1 предложение ДО 10 слов, выбор/давление (либо/либо, или/или). Запрещено «остальное…/бот возьмёт…/не переживай…».")
-                if hook_too_long:
-                    edits.append("Укороти финальную строку до 10 слов максимум. Оставь только выбор/давление, без пояснений.")
                 if kbju_repetition:
                     edits.append("Не повторяй «КБЖУ» в каждом абзаце. Оставь 1 раз, дальше пиши «цифры/сводка/понятно что съел(а)».")
                 if banned_hits:
@@ -320,13 +296,12 @@ async def chief_editor(
 Ты — главный редактор FoodFlow. ЦА: РФ, обычные люди (не кодеры).
 
 Правила:
-- ВНИМАНИЕ: "ТЕМА" — это наш внутренний бриф-задание. Он не публикуется и это не заголовок! Запрещено оценивать ТЕМУ или предлагать правки к ТЕМЕ (например, "убрать IT-слово из подзаголовка/темы"). Оценивай только сам ТЕКСТ.
+- ВНИМАНИЕ: "ТЕМА" — это наш внутренний бриф-задание. Он не публикуется и это не заголовок! Оценивай только сам ТЕКСТ.
 - нельзя добавлять новые факты о продукте, только переформулировать
 - нельзя упоминать внутренние названия из кода
 - нельзя писать месяц/год/дату в тексте
-- стиль: коротко, читаемо, 2–3 абзаца, в конце жёсткий/чёткий крючок (1 строка)
-- финальная строка: 1 предложение ДО 10 слов, выбор/давление (либо/либо, или/или). Никаких «остальное…».
-- не скатывайся в «объяснялку» (например «смысл простой…»), держи сцену→действие→удар.
+- стиль: коротко, читаемо, 2–3 абзаца. Финал должен быть дружелюбным, без жесткого давления или ультиматумов "либо/либо".
+- не скатывайся в «объяснялку» (например «смысл простой…»), держи сцену→действие→мягкий вывод.
 - «КБЖУ» не повторять в каждом абзаце: 1 раз максимум, дальше «цифры/сводка».
 - ЗАПРЕЩЁННЫЕ слова-гарантии: «точно», «гарантированно», «обязательно», «наверняка», «100%» — не используй.
 - ЗАПРЕЩЕНЫ временны́е обещания: «через минуту», «за секунды», «мгновенно», «сразу увидишь» и подобные — не добавляй даже если звучит красиво.
@@ -410,7 +385,7 @@ async def apply_edits(
         history_context = "\n\nИСТОРИЯ ПРЕДЫДУЩИХ ПРАВОК:\n"
         for i, attempt in enumerate(previous_attempts, 1):
             history_context += f"Попытка {i} не прошла, потому что: {attempt.get('reason', 'unknown')}\n"
-    
+
     prompt += history_context
 
     for m in REWRITER_MODELS:
@@ -442,16 +417,18 @@ async def judge_diff(
 
 Ты — строгий редактор-судья. Сравни ДО и ПОСЛЕ.
 
-Найди:
-- появились ли новые факты/фичи, которых не было ни в ДО, ни в ТЕМЕ. (Если новая фича/условие явно упоминается в ТЕМЕ — её появление в тексте ПОСЛЕ разрешено и не считается ошибкой).
-- появились ли обещания результата / медицинские утверждения
-- появились ли внутренние термины из кода
+Найди СЕРЬЕЗНЫЕ НАРУШЕНИЯ:
+- появились ли новые КОНКРЕТНЫЕ фичи, которых не было ни в ДО, ни в ТЕМЕ (например "бот умеет заказывать доставку").
+- появились ли медицинские утверждения или цифры-гарантии (например "похудеешь на 5 кг").
+- появились ли внутренние термины из кода.
 
-ВАЖНО: слово «результат» само по себе НЕ является обещанием результата. Обещание — это конкретика/гарантия:
-- цифры (кг/см/проценты) и сроки (за 7 дней/неделю/месяц)
-- временны́е обещания: «через минуту», «за секунды», «мгновенно», «сразу увидишь»
-- слова-гарантии: «гарантированно», «точно», «обязательно», «наверняка», «100%»
-- слова-усилители применительно к данным/результатам продукта которых не было в ДО: «полная», «точная», «исчерпывающая»
+РАЗРЕШЕНО (НЕ БЛОКИРУЙ И НЕ ПИШИ В ISSUES):
+- Синонимы, перефразирование (например "цифры" -> "сводка", "сканирование" -> "быстрая проверка").
+- Оценочные прилагательные и выводы, которые не обещают конкретных цифр (например "стало проще делать выбор", "удобно", "понятно").
+- Смягчение текста, удаление жесткого "либо/либо" и замена на мягкий призыв.
+- Упрощение формулировок.
+
+ВАЖНО: слово «результат» само по себе НЕ является обещанием результата. Обещание — это конкретика/гарантия.
 
 Добавление мягкого CTA («попробуй», «сфотографируй») — допустимо, если не добавляет новых фактов.
 
@@ -500,10 +477,10 @@ async def judge_diff(
 
 
 async def editorial_pipeline(
-    topic: str, 
-    text: str, 
-    *, 
-    tone_mode: str = "soft", 
+    topic: str,
+    text: str,
+    *,
+    tone_mode: str = "soft",
     max_compliance_rewrites: int = 2,
     previous_attempts: list[dict] | None = None,
     is_last_chance: bool = False

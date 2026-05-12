@@ -127,6 +127,7 @@ async def stats_placeholder(callback: types.CallbackQuery) -> None:
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+
 class EditLogStates(StatesGroup):
     """FSM states for editing consumption log."""
     waiting_for_field_value = State()
@@ -170,12 +171,12 @@ async def stats_history_handler(callback: types.CallbackQuery) -> None:
             time_str = log.date.strftime("%H:%M")
             # Edit button
             builder.button(
-                text=f"✏️ {time_str} {log.product_name[:15]}", 
+                text=f"✏️ {time_str} {log.product_name[:15]}",
                 callback_data=f"edit_log_show_fields:{log.id}:{target_date}"
             )
             # Delete button
             builder.button(
-                text="🗑️", 
+                text="🗑️",
                 callback_data=f"delete_log:{log.id}:{target_date}"
             )
 
@@ -247,7 +248,7 @@ async def edit_log_show_fields(callback: types.CallbackQuery, state: FSMContext)
         builder.button(text="5. 🥑 Жиры", callback_data=f"edit_log_field:{log_id}:fat:{target_date}")
         builder.button(text="6. 🍞 Углеводы", callback_data=f"edit_log_field:{log_id}:carbs:{target_date}")
         builder.button(text="7. 🥬 Клетчатка", callback_data=f"edit_log_field:{log_id}:fiber:{target_date}")
-        
+
         builder.adjust(2)
         builder.row(types.InlineKeyboardButton(text="🔙 Назад", callback_data=f"stats_history:{target_date}"))
 
@@ -289,8 +290,8 @@ async def edit_log_select_field(callback: types.CallbackQuery, state: FSMContext
     }
 
     await state.update_data(
-        edit_log_id=log_id, 
-        edit_field=field, 
+        edit_log_id=log_id,
+        edit_field=field,
         edit_target_date=target_date,
         edit_msg_id=callback.message.message_id # Store bot message ID to edit it later
     )
@@ -340,16 +341,16 @@ async def process_edit_log_value(message: types.Message, state: FSMContext, bot:
                 except ValueError:
                     await message.answer("❌ Введите число.")
                     return
-            
+
             await session.commit()
             await message.answer(f"✅ Поле <b>{field}</b> обновлено!", parse_mode="HTML")
-            
+
         except Exception as e:
             logger.error(f"Failed to update log {log_id}: {e}")
             await message.answer(f"❌ Ошибка обновления: {e}")
 
     await state.clear()
-    
+
     # Return to history list using the STORED bot message ID
     # Re-trigger history handler with the correct message object
     try:
@@ -358,7 +359,7 @@ async def process_edit_log_value(message: types.Message, state: FSMContext, bot:
             message_id=edit_msg_id,
             reply_markup=None # Temporary clear or keep
         )
-        
+
         # Fake a callback to reuse the handler
         class FakeCallback:
             def __init__(self, message, user, data):

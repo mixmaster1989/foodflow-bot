@@ -1,10 +1,12 @@
 import logging
+
 from aiogram import Router, types
 from aiogram.filters import Command, StateFilter
 from sqlalchemy import select
+
+from config import settings
 from database.base import get_db
 from database.models import CanonicalProduct
-from config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -21,7 +23,7 @@ async def cmd_etalon_list(message: types.Message):
             stmt = select(CanonicalProduct).where(CanonicalProduct.is_verified == True).order_by(CanonicalProduct.base_name)
             result = await session.execute(stmt)
             products = result.scalars().all()
-            
+
             if not products:
                 await message.answer("📭 В базе эталонов пока пусто.")
                 return
@@ -29,9 +31,9 @@ async def cmd_etalon_list(message: types.Message):
             text = "💎 <b>Список эталонных продуктов (на 100г):</b>\n\n"
             for p in products:
                 text += f"• <b>{p.base_name.capitalize()}</b>: {int(p.calories)} ккал ({p.protein}Б/{p.fat}Ж/{p.carbs}У)\n"
-            
+
             text += "\n<i>Эти продукты распознаются мгновенно и с гарантированной точностью.</i>"
-            
+
             # Divide long messages if needed
             if len(text) > 4000:
                 parts = [text[i:i+4000] for i in range(0, len(text), 4000)]
@@ -40,7 +42,7 @@ async def cmd_etalon_list(message: types.Message):
             else:
                 await message.answer(text, parse_mode="HTML")
             break
-            
+
     except Exception as e:
         logger.error(f"Error in /etalon command: {e}")
         await message.answer("❌ Ошибка при получении списка.")

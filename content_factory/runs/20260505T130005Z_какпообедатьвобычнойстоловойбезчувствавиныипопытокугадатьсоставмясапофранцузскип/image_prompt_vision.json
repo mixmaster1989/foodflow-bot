@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) holding a sleek modern smartphone, taking a photo of a delicious plate of food on a warm wooden table. The plate contains golden breaded cutlets and a fresh salad. Floating above the plate are subtle, glowing holographic interface elements (HUD) in teal and lime green, displaying abstract data visualizations and nutritional charts. The background is a premium, dimly lit interior with soft blue and teal neon accents. Cinematic lighting, photorealistic textures, 8k resolution, high-end lifestyle photography style, vertical composition.",
+  "negative_prompt": "text, letters, numbers, words, typography, logo, watermark, QR code, signature, distorted hands, extra fingers, blurry face, messy environment, low quality, cartoon, illustration.",
+  "notes": [
+    "Used a POV (Point of View) angle to directly mirror the 'take a photo' action described in the post.",
+    "Incorporated the teal/green neon palette from the brand references into the holographic HUD and environment lighting.",
+    "Swapped a 'messy canteen' look for a 'premium lifestyle' look to maintain the high-end brand aesthetic while keeping the food items (cutlets) relevant to the text.",
+    "Specifically requested abstract data visualizations for the HUD to avoid the AI generating gibberish text or numbers."
+  ]
+}

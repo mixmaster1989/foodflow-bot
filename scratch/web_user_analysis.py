@@ -2,6 +2,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+
 def analyze_web_users():
     db_path = "foodflow.db"
     conn = sqlite3.connect(db_path)

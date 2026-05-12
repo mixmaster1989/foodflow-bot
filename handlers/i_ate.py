@@ -6,14 +6,14 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from config import settings
 from database.base import get_db
-from database.models import ConsumptionLog
-from services.normalization import NormalizationService
+from database.models import ConsumptionLog, SavedDish, User, UserSettings
 from services.ai_guide import AIGuideService
+from services.normalization import NormalizationService
+from utils.analytics import log_event
 from utils.parsing import safe_float
 
 router = Router()
@@ -33,13 +33,42 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.set_state(IAteStates.waiting_for_description)
 
-    photo_path = types.FSInputFile("assets/i_ate.png")
+    user_id = callback.from_user.id
+    
+    # Dynamic UI logic: hide advanced buttons for new users
+    saved_dishes_count = 0
+    logs_count = 0
+    
+    async for session in get_db():
+        # Count saved dishes
+        stmt_dishes = select(func.count(SavedDish.id)).where(SavedDish.user_id == user_id)
+        saved_dishes_count = (await session.execute(stmt_dishes)).scalar() or 0
+        
+        # Count total logs
+        stmt_logs = select(func.count(ConsumptionLog.id)).where(ConsumptionLog.user_id == user_id)
+        logs_count = (await session.execute(stmt_logs)).scalar() or 0
+        break
 
+    photo_path = types.FSInputFile("assets/i_ate.png")
     builder = InlineKeyboardBuilder()
-    builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
-    builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
+    
+    # 1. My Dishes (only if they have any)
+    if saved_dishes_count > 0:
+        builder.button(text="⭐ Мои блюда", callback_data="menu_saved_dishes")
+    
+    # 2. Build Dish (only for experienced users: 3+ logs)
+    if logs_count >= 3:
+        builder.button(text="🏗️ Собрать блюдо", callback_data="menu_build_dish")
+    
+    # 3. Always show Cancel/Back
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    builder.adjust(2, 1)
+    
+    # Adjust layout based on button count
+    btns_count = len(builder.export())
+    if btns_count == 3:
+        builder.adjust(2, 1)
+    else:
+        builder.adjust(1)
 
     caption = (
         "🍽️ <b>Что съел(а)?</b>\n\n"
@@ -64,8 +93,8 @@ async def i_ate_start(callback: types.CallbackQuery, state: FSMContext) -> None:
         await callback.message.answer_photo(
             photo=photo_path,
             caption=caption,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
         )
 
 
@@ -117,11 +146,19 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
         status_msg = await message.answer("👀 <b>Смотрю, что на фото...</b>", parse_mode="HTML")
         try:
             from services.ai_brain import AIBrainService
-            description = await AIBrainService.analyze_image(message, prompt="Что на фото? Опиши еду кратко.")
-            if not description:
+            result = await AIBrainService.analyze_image(message)
+            
+            if not result:
                 await status_msg.edit_text("❌ Не удалось понять, что на фото. Попробуйте написать текстом.")
                 return
-            
+
+            if not result.get("is_edible", True):
+                refusal = result.get("ai_comment") or "Извините, я не вижу здесь еды. Попробуйте сфотографировать что-то съедобное! 😊"
+                await status_msg.edit_text(f"🛑 <b>{refusal}</b>", parse_mode="HTML")
+                await state.clear()
+                return
+
+            description = result.get("food_name") or result.get("description")
             await status_msg.edit_text(f"👀 <b>Вижу:</b> <blockquote>{description}</blockquote>", parse_mode="HTML")
             logger.info(f"📸 I_ATE Vision: {description}")
         except Exception as e:
@@ -160,6 +197,12 @@ async def i_ate_process(message: types.Message, state: FSMContext) -> None:
 
         # Single item: use NormalizationService as before
         result = await NormalizationService.analyze_food_intake(description)
+
+        if not result.get("is_food", True):
+            error_msg = result.get("error_message") or "Извините, я не могу распознать это как еду. Попробуйте написать по-другому! 😊"
+            await status_msg.edit_text(f"🛑 <b>{error_msg}</b>", parse_mode="HTML")
+            await state.clear()
+            return
 
         name = result.get("name", description)
         calories = safe_float(result.get("calories"))
@@ -381,10 +424,11 @@ async def show_confirmation_interface(message: types.Message, state: FSMContext,
     builder.button(text="✅ Прямо сейчас", callback_data="i_ate_confirm_now")
     builder.button(text="🕓 Другое время", callback_data="i_ate_ask_time")
     builder.button(text="🍱 Это несколько блюд", callback_data="u_split_to_batch")
+    await log_event(message.from_user.id, "ai_retry_click", {"action": "split_to_batch", "original": product.get("name")})
     builder.button(text="✏️ Ред. Вес", callback_data="edit_field_weight")
     builder.button(text="✏️ Ред. КБЖУ", callback_data="i_ate_edit_macros")
     builder.button(text="❌ Отмена", callback_data="main_menu")
-    builder.adjust(2, 1, 2, 1)
+    builder.adjust(1, 1, 1, 2, 1)
 
     await state.set_state(IAteStates.waiting_for_confirmation)
 
@@ -428,7 +472,7 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
 async def process_manual_time_input(message: types.Message, state: FSMContext):
     """Handle manual text time input."""
     from utils.time_picker import parse_manual_time
-    
+
     selected_time = parse_manual_time(message.text)
     if not selected_time:
         await message.reply(
@@ -442,7 +486,7 @@ async def process_manual_time_input(message: types.Message, state: FSMContext):
     # To use process_save, we need a CallbackQuery-like object or refactor process_save
     # process_save currently expects callback: types.CallbackQuery
     # Let's create a wrapper or refactor process_save to take (user_id, message_to_edit_or_send, state, timestamp)
-    
+
     await process_save_from_message(message, state, selected_time)
 
 async def process_save_from_message(message: types.Message, state: FSMContext, timestamp: datetime):
@@ -464,6 +508,11 @@ async def process_save_from_message(message: types.Message, state: FSMContext, t
         )
         session.add(log)
         await session.commit()
+
+    await log_event(message.from_user.id, "food_logged", {
+        "product": product['name'],
+        "calories": product.get('calories100')
+    })
 
     await state.clear()
 
@@ -489,7 +538,7 @@ async def process_save_from_message(message: types.Message, state: FSMContext, t
             advice = await AIGuideService.get_contextual_advice(message.from_user.id, current_meal, session)
             if advice:
                 guide_comment = f"\n\n🤖 <b>Гид:</b> <i>{advice}</i>"
-        
+
         # Track activity for Guide missions
         await AIGuideService.track_activity(message.from_user.id, "log_food", session)
         break
@@ -509,26 +558,45 @@ async def process_save_from_message(message: types.Message, state: FSMContext, t
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(message.from_user.id, message.bot)
 
-    # Guide: first-log gift activation
+    # Guide: first-log gift bridge (check if personality is missing)
+    async for session in get_db():
+        stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
+        settings_obj = (await session.execute(stmt)).scalar_one_or_none()
+        has_personality = settings_obj and settings_obj.guide_config and settings_obj.guide_config.get("personality")
+        
+        if not has_personality:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🎁 ЗАБРАТЬ ПОДАРОК 🎁", callback_data="guide_claim_gift")
+            builder.button(text="🏠 В меню", callback_data="main_menu")
+            builder.adjust(1)
+            await message.answer(
+                "🎁 <b>Вам подарок за первую запись!</b>\n\n"
+                "Я подготовил для вас нечто особенное, чтобы путь к цели был легче и интереснее. Заберете?",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+        break
+
+    # Pioneer offer bridge — after 3rd food log
     async for session in get_db():
         logs_count = (await session.execute(
             select(func.count()).select_from(ConsumptionLog).where(ConsumptionLog.user_id == message.from_user.id)
         )).scalar() or 0
-        if logs_count == 1 and not await AIGuideService.is_active(message.from_user.id, session):
+        user_db = await session.get(User, message.from_user.id)
+
+        if logs_count >= 3 and user_db and not user_db.pioneer_offered and not user_db.is_pioneer:
             builder = InlineKeyboardBuilder()
-            builder.button(text="🌸 Поддерживающий", callback_data="first_guide_pers:soft")
-            builder.button(text="🦾 Строгий", callback_data="first_guide_pers:hard")
-            builder.button(text="📊 Аналитик", callback_data="first_guide_pers:direct")
+            builder.button(text="🛰️ УЗНАТЬ ПОДРОБНОСТИ 🛰️", callback_data="pioneer_claim_info")
+            builder.button(text="🏠 В меню", callback_data="main_menu")
             builder.adjust(1)
             await message.answer(
-                "🤖 <b>Знакомься — твой Личный ИИ-Гид!</b>\n\n"
-                "Ты сделал первую запись — и это повод для подарка 🎁\n\n"
-                "<b>ИИ-Гид активируется на 3 дня бесплатно.</b>\n\n"
-                "После каждого приёма пищи я буду анализировать рацион и давать персональные советы.\n\n"
-                "Выбери мой характер:",
+                "🏆 <b>Вам доступен секретный статус!</b>\n\n"
+                "Вы уже активно пользуетесь FoodFlow, и мы хотим пригласить вас в закрытый клуб Пионеров. Интересно?",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup()
             )
+            user_db.pioneer_offered = True
+            await session.commit()
         break
 
 async def process_save(callback: types.CallbackQuery, state: FSMContext, timestamp: datetime):
@@ -567,6 +635,11 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
         session.add(log)
         await session.commit()
 
+    await log_event(callback.from_user.id, "food_logged", {
+        "product": product['name'],
+        "calories": product.get('calories100')
+    })
+
     await state.clear()
 
     # Format success message with full details
@@ -588,29 +661,28 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
 
     await callback.message.edit_text(success_text, parse_mode="HTML")
 
-    # NEW: Send visual progress card
+    # Send visual progress card
     from services.reports import send_daily_visual_report
     await send_daily_visual_report(callback.from_user.id, callback.bot)
 
-    # 5. Guide: first-log gift activation OR regular advice
+    # 5. Guide: first-log gift bridge OR regular advice
     async for session in get_db():
-        logs_count = (await session.execute(
-            select(func.count()).select_from(ConsumptionLog).where(ConsumptionLog.user_id == callback.from_user.id)
-        )).scalar() or 0
         guide_active = await AIGuideService.is_active(callback.from_user.id, session)
+        
+        # Check if guide personality is configured
+        stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
+        settings_obj = (await session.execute(stmt)).scalar_one_or_none()
+        has_personality = settings_obj and settings_obj.guide_config and settings_obj.guide_config.get("personality")
 
-        if logs_count == 1 and not guide_active:
+        if not has_personality:
+            # Send Bridge Message for Guide Gift
             builder = InlineKeyboardBuilder()
-            builder.button(text="🌸 Поддерживающий", callback_data="first_guide_pers:soft")
-            builder.button(text="🦾 Строгий", callback_data="first_guide_pers:hard")
-            builder.button(text="📊 Аналитик", callback_data="first_guide_pers:direct")
+            builder.button(text="🎁 ЗАБРАТЬ ПОДАРОК 🎁", callback_data="guide_claim_gift")
+            builder.button(text="🏠 В меню", callback_data="main_menu")
             builder.adjust(1)
             await callback.message.answer(
-                "🤖 <b>Знакомься — твой Личный ИИ-Гид!</b>\n\n"
-                "Ты сделал первую запись — и это повод для подарка 🎁\n\n"
-                "<b>ИИ-Гид активируется на 3 дня бесплатно.</b>\n\n"
-                "После каждого приёма пищи я буду анализировать рацион и давать персональные советы.\n\n"
-                "Выбери мой характер:",
+                "🎁 <b>Вам подарок за первую запись!</b>\n\n"
+                "Я подготовил для вас нечто особенное, чтобы путь к цели был легче и интереснее. Заберете?",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup()
             )
@@ -630,14 +702,40 @@ async def process_save(callback: types.CallbackQuery, state: FSMContext, timesta
         await AIGuideService.track_activity(callback.from_user.id, "log_food", session)
         break
 
+    # Pioneer offer bridge — after 3rd food log
+    from sqlalchemy import func
+    async for session in get_db():
+        logs_count = (await session.execute(
+            select(func.count()).select_from(ConsumptionLog).where(ConsumptionLog.user_id == callback.from_user.id)
+        )).scalar() or 0
+        user_db = await session.get(User, callback.from_user.id)
+        
+        if logs_count >= 3 and user_db and not user_db.pioneer_offered and not user_db.is_pioneer:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🛰️ УЗНАТЬ ПОДРОБНОСТИ 🛰️", callback_data="pioneer_claim_info")
+            builder.button(text="🏠 В меню", callback_data="main_menu")
+            builder.adjust(1)
+            await callback.message.answer(
+                "🏆 <b>Вам доступен секретный статус!</b>\n\n"
+                "Вы уже активно пользуетесь FoodFlow, и мы хотим пригласить вас в закрытый клуб Пионеров. Интересно?",
+                parse_mode="HTML",
+                reply_markup=builder.as_markup()
+            )
+            # We mark it as offered later in the callback to be safe, or here
+            user_db.pioneer_offered = True
+            await session.commit()
+        break
+
     # await callback.answer() - Removed
 @router.callback_query(F.data == "edit_field_weight", IAteStates.waiting_for_confirmation)
 async def start_edit_weight(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(IAteStates.waiting_for_weight) # Reuse existing logic
+    await log_event(callback.from_user.id, "ai_retry_click", {"field": "weight"})
     await callback.message.edit_text("⚖️ Введите новый вес (числом):")
 
 @router.callback_query(F.data == "i_ate_edit_macros", IAteStates.waiting_for_confirmation)
 async def start_edit_macros(callback: types.CallbackQuery, state: FSMContext):
+    await log_event(callback.from_user.id, "ai_retry_click", {"field": "macros"})
     builder = InlineKeyboardBuilder()
     builder.button(text="🔥 Ккал", callback_data="edit_macro_calories100")
     builder.button(text="🥩 Белки", callback_data="edit_macro_protein100")

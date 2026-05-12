@@ -3,8 +3,8 @@ import json
 import logging
 import os
 import sys
+
 import aiohttp
-from datetime import datetime
 
 # Добавляем путь к корню проекта
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,7 +73,7 @@ async def call_openrouter(model, prompt):
         "model": model,
         "messages": [{"role": "user", "content": prompt}]
     }
-    
+
     # Используем прокси для преодоления региональных ограничений
     async with aiohttp.ClientSession() as session:
         try:
@@ -112,7 +112,7 @@ def summarize_weight(weight_logs):
 async def generate_full_gift(user_json):
     name = f"{user_json['profile']['first_name']} {user_json['profile']['last_name'] or ''}".strip()
     sd = user_json.get('settings', {})
-    
+
     # Шаг 1: Анализ (GPT-5.4)
     logger.info(f"--- Шаг 1: Анализ для {name} (GPT-5.4) ---")
     analysis_prompt = PROMPT_ANALYST.format(
@@ -129,18 +129,18 @@ async def generate_full_gift(user_json):
     logger.info(f"--- Шаг 2: Стилизация для {name} (Claude 4.6) ---")
     style_prompt = PROMPT_STYLIST.format(raw_analysis=raw_analysis)
     final_gift = await call_openrouter(MODEL_STYLIST, style_prompt)
-    
+
     return final_gift
 
 async def main():
     logger.info("🚀 Запуск генератора подарков ЭЛИТ уровня (с ПРОКСИ)...")
-    with open('data/march_8_stats.json', 'r', encoding='utf-8') as f:
+    with open('data/march_8_stats.json', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     output_path = "data/march_8_ai_gifts_v2.json"
     gifts = {}
     if os.path.exists(output_path):
-        with open(output_path, "r", encoding="utf-8") as f:
+        with open(output_path, encoding="utf-8") as f:
             gifts = json.load(f)
             logger.info(f"Загружено {len(gifts)} уже готовых отчетов.")
 

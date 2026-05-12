@@ -1,8 +1,10 @@
 
 import asyncio
 import logging
+
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
+
 from config import settings
 from services.scheduler import send_admin_digest
 

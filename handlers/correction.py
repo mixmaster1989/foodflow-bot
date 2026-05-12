@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from database.base import get_db
 from database.models import Product
+from utils.analytics import log_event
 from utils.message_cleanup import schedule_message_deletion
 
 router = Router()
@@ -73,6 +74,7 @@ async def start_correction(callback: types.CallbackQuery, bot: Bot, state: FSMCo
 
         # Store product_id in state
         await state.update_data(product_id=product_id)
+        await log_event(callback.from_user.id, "ai_retry_click", {"action": "product_correction", "product_id": product_id})
 
         # Build keyboard with field selection buttons
         builder = InlineKeyboardBuilder()

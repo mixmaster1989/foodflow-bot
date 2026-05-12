@@ -1,8 +1,8 @@
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.filters import Command
+
 from database.base import SessionLocal
 from database.models import User
-from config import OPENROUTER_API_KEY
 
 router = Router()
 

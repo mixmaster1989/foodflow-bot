@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective of a traveler's hand holding a sleek smartphone, taking a photo of an airplane meal tray featuring a chicken dish, a small bun, and juice. The setting is a premium futuristic airport lounge with large windows overlooking a cyberpunk city at dusk. Subtle teal and neon green holographic UI elements float around the food, indicating nutritional scanning. Cinematic lighting, soft bokeh, high-end photorealistic lifestyle photography, teal and blue color palette with warm wood accents.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, distorted fingers, extra limbs, blurry face, messy environment, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used a first-person POV to mimic the 'snap and send' action described in the post.",
+    "Integrated teal/green neon holograms to maintain the brand's cyberpunk aesthetic.",
+    "Set the scene in a premium airport lounge to reflect the business trip context.",
+    "Ensured the food items (chicken, bun, juice) match the narrative precisely."
+  ]
+}

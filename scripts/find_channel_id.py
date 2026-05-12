@@ -1,8 +1,8 @@
 
 import asyncio
-import aiohttp
-import json
 import os
+
+import aiohttp
 
 TOKEN = os.environ.get("RECEPTION_BOT_TOKEN") or os.environ.get("BOT_TOKEN") or ""
 
@@ -26,7 +26,7 @@ async def get_updates():
                     chat = update["my_chat_member"]["chat"]
                     if chat["type"] == "channel":
                         print(f"Found Channel ID (from my_chat_member): {chat['id']} - Name: {chat.get('title')}")
-                
+
                 if "channel_post" in update:
                     chat = update["channel_post"]["chat"]
                     print(f"Found Channel ID (from channel_post): {chat['id']} - Name: {chat.get('title')}")

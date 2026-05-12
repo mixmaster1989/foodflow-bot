@@ -1,27 +1,24 @@
 from datetime import datetime
-from typing import Optional
 
+from aiogram import Bot
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from aiogram import Bot
-
 from api.auth import CurrentUser, DBSession
 from api.schemas import (
-    ReferralMeResponse,
-    ReferralRewardPendingRead,
     ReferralActivateRequest,
     ReferralGenerateLinkRequest,
     ReferralGenerateLinkResponse,
+    ReferralMeResponse,
+    ReferralRewardPendingRead,
 )
 from config import settings
 from database.models import ReferralEvent, ReferralReward, User
 from services.referral_service import ReferralService
 
-
 router = APIRouter()
 
-_BOT_USERNAME_CACHE: Optional[str] = None
+_BOT_USERNAME_CACHE: str | None = None
 
 
 async def _get_bot_username() -> str:
@@ -76,8 +73,8 @@ async def get_my_referrals(user: CurrentUser, session: DBSession):
     )
 
     # Current referral link data
-    referral_link: Optional[str] = None
-    referral_token_expires_at: Optional[datetime] = None
+    referral_link: str | None = None
+    referral_token_expires_at: datetime | None = None
     if db_user and db_user.referral_token:
         bot_username = await _get_bot_username()
         referral_link = f"https://t.me/{bot_username}?start=ref_{db_user.referral_token}"

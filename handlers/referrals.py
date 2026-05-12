@@ -6,9 +6,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 
 from database.base import get_db
-from database.models import ReferralReward, ReferralEvent, User
+from database.models import ReferralEvent, ReferralReward, User
 from services.referral_service import ReferralService
-
 
 router = Router()
 logger = logging.getLogger(__name__)

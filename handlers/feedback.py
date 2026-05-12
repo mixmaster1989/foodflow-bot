@@ -9,7 +9,6 @@ from database.models import (
     PAID_SOURCES,
     PAYMENT_SOURCE_FEEDBACK,
     Subscription,
-    User,
     UserFeedback,
 )
 
@@ -30,7 +29,7 @@ async def process_feedback_poll(callback: types.CallbackQuery) -> None:
             (UserFeedback.user_id == user_id) & (UserFeedback.feedback_type == poll_id)
         )
         existing = (await session.execute(dup_stmt)).scalar_one_or_none()
-        
+
         if existing:
             await callback.answer("⚠️ Вы уже получили бонус за этот опрос!", show_alert=True)
             return
@@ -87,7 +86,7 @@ async def process_feedback_poll(callback: types.CallbackQuery) -> None:
         "Ваше мнение поможет нам стать лучше.\n"
         "Как и обещали, мы продлили вам <b>PRO-статус на 3 дня</b>. Пользуйтесь с удовольствием! 🎁"
     )
-    
+
     try:
         await callback.message.edit_text(
             text=success_text,
@@ -95,5 +94,5 @@ async def process_feedback_poll(callback: types.CallbackQuery) -> None:
         )
     except Exception:
         await callback.message.answer(success_text, parse_mode="HTML")
-        
+
     await callback.answer("Бонус начислен! 🎉")

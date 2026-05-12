@@ -13,17 +13,23 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, func, select
 
-from services.daily_nutrition_report import run_daily_report
 from database.base import get_db
-from database.models import Subscription, User, UserSettings, ConsumptionLog, PAYMENT_SOURCE_TRIAL
+from database.models import (
+    PAYMENT_SOURCE_TRIAL,
+    ConsumptionLog,
+    Subscription,
+    User,
+    UserSettings,
+)
 from handlers.weight import WeightStates
+from services.daily_nutrition_report import run_daily_report
 from services.reports import (
+    generate_admin_daily_digest,
     generate_curator_morning_summary,
     generate_daily_report,
     generate_ward_ai_report,
-    generate_admin_daily_digest,
 )
 
 logger = logging.getLogger(__name__)
@@ -165,7 +171,7 @@ async def send_curator_summaries(bot: Bot) -> None:
 
     from aiogram.types import BufferedInputFile
 
-    from services.image_renderer import draw_daily_card
+    from services.svg_renderer import draw_daily_card
 
     current_hour = datetime.now().strftime("%H:00")
     logger.info(f"Running curator summary check for hour {current_hour}")
@@ -342,7 +348,7 @@ async def send_onboarding_reminders(bot: Bot) -> None:
             # Skip mock/test users that trigger Bad Request: chat not found
             if user.id in [999999999, 123456789, 987654321]:
                 continue
-                
+
             # Check if they have UserSettings (meaning they finished onboarding)
             settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)
             settings = (await session.execute(settings_stmt)).scalar_one_or_none()
@@ -370,7 +376,7 @@ async def send_onboarding_reminders(bot: Bot) -> None:
 
         if users:
             await session.commit()
-            
+
         logger.info(f"Sent {reminded_count} onboarding reminders.")
         break
 
@@ -378,11 +384,11 @@ async def send_onboarding_reminders(bot: Bot) -> None:
 async def send_admin_digest(bot: Bot) -> None:
     """Send global daily digest to all admins."""
     logger.info("Running admin daily digest job")
-    
+
     try:
         digest_text = await generate_admin_daily_digest()
         from config import settings
-        
+
         for admin_id in settings.ADMIN_IDS:
             try:
                 await bot.send_message(
@@ -424,7 +430,6 @@ async def send_trial_drip(bot: Bot) -> None:
     - День 2 (через ~48ч): Предупреждение "завтра закончится"
     - День 3 (через ~72ч): Финальное предложение со скидкой + downsell
     """
-    from datetime import timedelta
     now = datetime.now()
     logger.info("Running trial drip check...")
 
@@ -539,6 +544,7 @@ async def send_trial_drip(bot: Bot) -> None:
 async def send_first_log_nudge(bot: Bot) -> None:
     """Разово нуджит пользователей, завершивших онбординг 3+ часа назад, но не внёсших ни одного лога."""
     from datetime import timedelta
+
     from database.models import UserFeedback
 
     now = datetime.now()

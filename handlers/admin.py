@@ -6,6 +6,7 @@ from aiogram import Bot, F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 
@@ -15,7 +16,6 @@ from database.models import User
 from handlers.base import BaseCommandHandler
 from monitoring import get_system_health
 from services.reports import generate_admin_daily_digest, generate_admin_stats_csv
-from aiogram.types import BufferedInputFile
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -189,7 +189,7 @@ async def admin_view_stars_handler(callback: types.CallbackQuery, bot: Bot):
         # Use the NEW Bot API method available in Aiogram 3.22+
         # get_my_star_balance returns a StarAmount object with 'amount' field
         balance = await bot.get_my_star_balance()
-        
+
         await callback.message.answer(
             f"💰 <b>Баланс Telegram Stars</b>\n\n"
             f"На счету бота: <b>{balance.amount} ⭐</b>\n\n"
@@ -199,7 +199,7 @@ async def admin_view_stars_handler(callback: types.CallbackQuery, bot: Bot):
     except Exception as e:
         logger.error(f"Failed to get Stars balance: {e}")
         await callback.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
-    
+
     await callback.answer()
 
 
@@ -254,10 +254,10 @@ async def admin_stats_command(message: types.Message):
 
     try:
         digest_text = await generate_admin_daily_digest()
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="📊 Скачать CSV (30 дней)", callback_data="admin_export_csv")
-        
+
         await message.answer(digest_text, parse_mode="HTML", reply_markup=builder.as_markup())
     except Exception as e:
         logger.error(f"Error in /admin_stats: {e}")
@@ -279,7 +279,7 @@ async def admin_export_handler(event: types.Message | types.CallbackQuery, bot: 
     try:
         csv_io = await generate_admin_stats_csv(days=30)
         document = BufferedInputFile(csv_io.getvalue(), filename=f"stats_export_{datetime.now().strftime('%Y%m%d')}.csv")
-        
+
         await bot.send_document(
             chat_id=user_id,
             document=document,

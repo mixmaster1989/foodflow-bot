@@ -9,8 +9,16 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
+
 from database.base import get_db
-from database.models import User, UserSettings, ConsumptionLog, WaterLog, WeightLog, Subscription
+from database.models import (
+    ConsumptionLog,
+    Subscription,
+    User,
+    UserSettings,
+    WaterLog,
+    WeightLog,
+)
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,13 +40,13 @@ def json_serial(obj):
 async def get_user_full_data(session, user_id):
     """Сбор всех данных по одному пользователю."""
     data = {"user_id": user_id}
-    
+
     # 1. Основной профиль и настройки
     stmt_user = select(User).where(User.id == user_id)
     user = (await session.execute(stmt_user)).scalar_one_or_none()
     if not user:
         return None
-        
+
     data["profile"] = {
         "username": user.username,
         "first_name": user.first_name,
@@ -46,7 +54,7 @@ async def get_user_full_data(session, user_id):
         "role": user.role,
         "created_at": user.created_at
     }
-    
+
     stmt_settings = select(UserSettings).where(UserSettings.user_id == user_id)
     settings = (await session.execute(stmt_settings)).scalar_one_or_none()
     if settings:
@@ -65,7 +73,7 @@ async def get_user_full_data(session, user_id):
             "allergies": settings.allergies,
             "is_initialized": settings.is_initialized
         }
-    
+
     # 2. Логи питания (все)
     stmt_cons = select(ConsumptionLog).where(ConsumptionLog.user_id == user_id).order_by(ConsumptionLog.date)
     cons_logs = (await session.execute(stmt_cons)).scalars().all()
@@ -80,21 +88,21 @@ async def get_user_full_data(session, user_id):
             "date": log.date
         } for log in cons_logs
     ]
-    
+
     # 3. Логи воды
     stmt_water = select(WaterLog).where(WaterLog.user_id == user_id).order_by(WaterLog.date)
     water_logs = (await session.execute(stmt_water)).scalars().all()
     data["water_logs"] = [
         {"amount_ml": log.amount_ml, "date": log.date} for log in water_logs
     ]
-    
+
     # 4. Логи веса
     stmt_weight = select(WeightLog).where(WeightLog.user_id == user_id).order_by(WeightLog.recorded_at)
     weight_logs = (await session.execute(stmt_weight)).scalars().all()
     data["weight_logs"] = [
         {"weight": log.weight, "date": log.recorded_at} for log in weight_logs
     ]
-    
+
     # 5. Подписка
     stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
     sub = (await session.execute(stmt_sub)).scalar_one_or_none()
@@ -106,16 +114,16 @@ async def get_user_full_data(session, user_id):
             "is_active": sub.is_active,
             "auto_renew": sub.auto_renew
         }
-        
+
     return data
 
 async def main():
     logger.info("🔍 Начинаю экспорт полной статистики пользователей...")
     all_data = []
-    
+
     # Создаем папку data, если её нет
     os.makedirs("data", exist_ok=True)
-    
+
     async for session in get_db():
         for user_id in TARGET_IDS:
             logger.info(f"обработка пользователя {user_id}...")
@@ -123,11 +131,11 @@ async def main():
             if user_data:
                 all_data.append(user_data)
         break # Выход из генератора сессии
-        
+
     output_path = "data/march_8_stats.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(all_data, f, ensure_ascii=False, indent=2, default=json_serial)
-    
+
     logger.info(f"✅ Экспорт завершен. Данные сохранены в {output_path}")
     logger.info(f"Всего обработано пользователей: {len(all_data)}")
 

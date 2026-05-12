@@ -456,7 +456,12 @@
         "Ф1",
         "Ф1 Ванила",
         "Formula 1 Vanilla",
-        "F1 vanilla"
+        "F1 vanilla",
+        "Коктейль Гербалайф",
+        "коктейль Гербалайф",
+        "Коктейль Herbalife",
+        "коктейль Herbalife",
+        "Коктейль Формула 1 Гербалайф"
       ],
       "description": "Сбалансированная еда в стакане. Заменяет полноценный прием пищи. Содержит соевый белок, пищевые волокна и 25 витаминов и минералов.",
       "measurement_unit": "граммы",
@@ -510,86 +515,247 @@
       "name": "Протеиновый коктейль Формула 1 со вкусом шоколада",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Шоколад", "Ф1 Шоколад", "Шоколадный коктейль", "F1 Chocolate"],
+      "aliases": [
+        "Шоколад",
+        "Ф1 Шоколад",
+        "Шоколадный коктейль",
+        "F1 Chocolate"
+      ],
       "description": "Сбалансированная еда в стакане. Заменяет полноценный прием пищи.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26, "description": "3 мерные ложки (26г)"},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0, "note": "С 250мл соевого молока"},
-      "compatible_with": ["f3_protein", "green_max"]
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26,
+        "description": "3 мерные ложки (26г)"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0,
+        "note": "С 250мл соевого молока"
+      },
+      "compatible_with": [
+        "f3_protein",
+        "green_max"
+      ]
     },
     {
       "id": "f1_strawberry",
       "name": "Протеиновый коктейль Формула 1 со вкусом клубники",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Клубника", "Ф1 Клубника", "Клубничный коктейль", "F1 Strawberry"],
+      "aliases": [
+        "Клубника",
+        "Ф1 Клубника",
+        "Клубничный коктейль",
+        "F1 Strawberry"
+      ],
       "description": "Сбалансированная еда в стакане. Заменяет полноценный прием пищи.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0},
-      "compatible_with": ["f3_protein", "green_max"]
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      },
+      "compatible_with": [
+        "f3_protein",
+        "green_max"
+      ]
     },
     {
       "id": "f1_melon",
       "name": "Протеиновый коктейль Формула 1 со вкусом дыни",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Дыня", "Ф1 Дыня", "Дынный коктейль", "F1 Melon"],
+      "aliases": [
+        "Дыня",
+        "Ф1 Дыня",
+        "Дынный коктейль",
+        "F1 Melon"
+      ],
       "description": "Сбалансированная еда в стакане.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0}
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      }
     },
     {
       "id": "f1_banana",
       "name": "Протеиновый коктейль Формула 1 со вкусом банана с карамелью",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Банан с карамелью", "Ф1 Банан", "Банановый коктейль", "F1 Banana"],
+      "aliases": [
+        "Банан с карамелью",
+        "Ф1 Банан",
+        "Банановый коктейль",
+        "F1 Banana"
+      ],
       "description": "Сбалансированная еда в стакане.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0}
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      }
     },
     {
       "id": "f1_mango",
       "name": "Протеиновый коктейль Формула 1 со вкусом манго",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Манго", "Ф1 Манго", "F1 Mango"],
+      "aliases": [
+        "Манго",
+        "Ф1 Манго",
+        "F1 Mango"
+      ],
       "description": "Сбалансированная еда в стакане.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0}
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      }
     },
     {
       "id": "f1_coconut",
       "name": "Протеиновый коктейль Формула 1 со вкусом кокоса",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Кокос", "Ф1 Кокос", "Кокосовый коктейль", "F1 Coconut"],
+      "aliases": [
+        "Кокос",
+        "Ф1 Кокос",
+        "Кокосовый коктейль",
+        "F1 Coconut"
+      ],
       "description": "Сбалансированная еда в стакане.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0}
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      }
     },
     {
       "id": "f1_cookies",
       "name": "Протеиновый коктейль Формула 1 со вкусом хрустящего печенья",
       "category": "Еда",
       "subcategory": "Протеиновые коктейли",
-      "aliases": ["Хрустящее печенье", "Печенье", "Ф1 Печенье", "F1 Cookies"],
+      "aliases": [
+        "Хрустящее печенье",
+        "Печенье",
+        "Ф1 Печенье",
+        "F1 Cookies"
+      ],
       "description": "Сбалансированная еда в стакане.",
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 3, "unit": "мерные ложки", "grams": 26},
-      "nutrition_per_100g": {"energy_kcal": 376.9, "protein_g": 35.0, "carbs_g": 33.1, "fat_g": 9.6, "fiber_g": 18.1},
-      "nutrition_per_serving": {"serving_size_g": 26, "energy_kcal": 214, "protein_g": 16.0, "carbs_g": 21.0, "fat_g": 6.3, "fiber_g": 5.0}
+      "standard_serving": {
+        "amount": 3,
+        "unit": "мерные ложки",
+        "grams": 26
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 376.9,
+        "protein_g": 35.0,
+        "carbs_g": 33.1,
+        "fat_g": 9.6,
+        "fiber_g": 18.1
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 26,
+        "energy_kcal": 214,
+        "protein_g": 16.0,
+        "carbs_g": 21.0,
+        "fat_g": 6.3,
+        "fiber_g": 5.0
+      }
     },
     {
       "id": "f3_protein",
@@ -601,7 +767,14 @@
         "Ф3",
         "Белок",
         "F3",
-        "Formula 3 Protein"
+        "Formula 3 Protein",
+        "Белок Гербалайф",
+        "белок Гербалайф",
+        "Белковая смесь Гербалайф",
+        "Белок (Протеиновая смесь) Гербалайф",
+        "Белок (протеин) Гербалайф",
+        "Белок Herbalife",
+        "Протеин Гербалайф"
       ],
       "description": "Специализированная белковая смесь с нейтральным вкусом и запахом. Добавляется в коктейли, супы, соусы для повышения содержания белка.",
       "measurement_unit": "граммы",
@@ -775,7 +948,10 @@
         "Батончик",
         "Protein Bar",
         "ББ",
-        "Formula 1 Express"
+        "Formula 1 Express",
+        "Батончик Гербалайф",
+        "батончик Гербалайф",
+        "Батончик Herbalife"
       ],
       "description": "Полноценный прием пищи в удобном формате. Содержит высокое содержание соевого белка, пищевых волокон и 25 витаминов и минералов.",
       "measurement_unit": "штуки",
@@ -843,7 +1019,14 @@
         "Алоэ",
         "Aloe Classic",
         "Алоэ классический",
-        "Aloe Concentrate"
+        "Aloe Concentrate",
+        "Алое Гербалайф",
+        "алое Гербалайф",
+        "Алоэ Гербалайф",
+        "алоэ Гербалайф",
+        "Концентрат Алоэ Вера Гербалайф",
+        "Алое Herbalife",
+        "Алоэ Herbalife"
       ],
       "description": "Растительный напиток содержит 40% холодного отжима сока алоэ вера из целого листа. Поддерживает пищеварение и микрофлору.",
       "measurement_unit": "миллилитры",
@@ -886,7 +1069,7 @@
         "notes": "Разводить в воде. ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ"
       },
       "warnings": [
-        "ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ - концентрат опасен неразбавленным",
+        "ПИТЬ ТОЛЬКО В РАЗБАВЛЕННОМ ВИДЕ - рекомендуется употреблять только в разбавленном виде",
         "Не использовать горячую воду",
         "Встряхивать перед использованием"
       ],
@@ -982,7 +1165,11 @@
         "Чай",
         "Herbal Tea Concentrate",
         "Травяной чай",
-        "Tea"
+        "Tea",
+        "Чай Гербалайф",
+        "чай Гербалайф",
+        "Чай Herbalife",
+        "Травяной напиток Гербалайф"
       ],
       "description": "Тонизирующий напиток на основе зеленого и черного чая (Orange Pekoe), кардамона, кофеина и гибискуса. Содержит 5 фитокомпонентов.",
       "measurement_unit": "граммы",
@@ -1026,33 +1213,90 @@
       "name": "Травяной напиток со вкусом лимона",
       "category": "Напитки",
       "subcategory": "Чаи и напитки",
-      "aliases": ["Чай лимон", "Лимонный чай", "Tea Lemon"],
+      "aliases": [
+        "Чай лимон",
+        "Лимонный чай",
+        "Tea Lemon"
+      ],
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 1.7, "unit": "граммы", "description": "½ чайной ложки"},
-      "nutrition_per_100g": {"energy_kcal": 354, "protein_g": 13.0, "carbs_g": 82.0, "fat_g": 0.0},
-      "nutrition_per_serving": {"serving_size_g": 1.7, "energy_kcal": 6, "protein_g": 0.2, "carbs_g": 1.4, "fat_g": 0.0}
+      "standard_serving": {
+        "amount": 1.7,
+        "unit": "граммы",
+        "description": "½ чайной ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 354,
+        "protein_g": 13.0,
+        "carbs_g": 82.0,
+        "fat_g": 0.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 1.7,
+        "energy_kcal": 6,
+        "protein_g": 0.2,
+        "carbs_g": 1.4,
+        "fat_g": 0.0
+      }
     },
     {
       "id": "herbal_tea_raspberry",
       "name": "Травяной напиток со вкусом малины",
       "category": "Напитки",
       "subcategory": "Чаи и напитки",
-      "aliases": ["Чай малина", "Малиновый чай", "Tea Raspberry"],
+      "aliases": [
+        "Чай малина",
+        "Малиновый чай",
+        "Tea Raspberry"
+      ],
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 1.7, "unit": "граммы", "description": "½ чайной ложки"},
-      "nutrition_per_100g": {"energy_kcal": 354, "protein_g": 13.0, "carbs_g": 82.0, "fat_g": 0.0},
-      "nutrition_per_serving": {"serving_size_g": 1.7, "energy_kcal": 6, "protein_g": 0.2, "carbs_g": 1.4, "fat_g": 0.0}
+      "standard_serving": {
+        "amount": 1.7,
+        "unit": "граммы",
+        "description": "½ чайной ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 354,
+        "protein_g": 13.0,
+        "carbs_g": 82.0,
+        "fat_g": 0.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 1.7,
+        "energy_kcal": 6,
+        "protein_g": 0.2,
+        "carbs_g": 1.4,
+        "fat_g": 0.0
+      }
     },
     {
       "id": "herbal_tea_mango",
       "name": "Травяной напиток со вкусом манго-питахайя",
       "category": "Напитки",
       "subcategory": "Чаи и напитки",
-      "aliases": ["Чай манго", "Манго питахайя", "Tea Mango"],
+      "aliases": [
+        "Чай манго",
+        "Манго питахайя",
+        "Tea Mango"
+      ],
       "measurement_unit": "граммы",
-      "standard_serving": {"amount": 1.7, "unit": "граммы", "description": "½ чайной ложки"},
-      "nutrition_per_100g": {"energy_kcal": 354, "protein_g": 13.0, "carbs_g": 82.0, "fat_g": 0.0},
-      "nutrition_per_serving": {"serving_size_g": 1.7, "energy_kcal": 6, "protein_g": 0.2, "carbs_g": 1.4, "fat_g": 0.0}
+      "standard_serving": {
+        "amount": 1.7,
+        "unit": "граммы",
+        "description": "½ чайной ложки"
+      },
+      "nutrition_per_100g": {
+        "energy_kcal": 354,
+        "protein_g": 13.0,
+        "carbs_g": 82.0,
+        "fat_g": 0.0
+      },
+      "nutrition_per_serving": {
+        "serving_size_g": 1.7,
+        "energy_kcal": 6,
+        "protein_g": 0.2,
+        "carbs_g": 1.4,
+        "fat_g": 0.0
+      }
     },
     {
       "id": "oyahn",
@@ -1063,7 +1307,13 @@
       "aliases": [
         "ОЯН",
         "Oat Apple Fiber Drink",
-        "Овсяный напиток"
+        "Овсяный напиток",
+        "Оян Гербалайф",
+        "оян Гербалайф",
+        "ОЯН Гербалайф",
+        "Овсяно-яблочный напиток Гербалайф",
+        "Овсяный напиток Гербалайф",
+        "Овсяно-яблочный напиток Herbalife"
       ],
       "description": "Комплекс натуральных пищевых волокон (клетчатки), необходимых для поддержки оптимального функционирования пищеварительной системы. Содержит 6 натуральных источников клетчатки.",
       "measurement_unit": "граммы",

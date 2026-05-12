@@ -197,25 +197,27 @@ class NormalizationService:
         prompt = f'''Analyze this food intake description: "{description}"
 
 TASK:
-1. Extract the food name (in Russian)
-2. Extract the "base_name" (Essence) - the generic name of the product without weight, brand, or adjectives if possible (e.g. "Яблоко 150г" -> "Яблоко", "Творог 5% Простоквашино" -> "Творог 5%").
-3. Detect if weight/portion is specified.
-4. Calculate KBJU based on the specified weight.
+1. Determine if the input is actually FOOD or a meal. 
+   - If it's nonsense, a non-food object, or just a greeting (e.g. "asdf", "hello", "table") -> is_food: false.
+   - If it's a food/meal -> is_food: true.
+2. Extract the food name (in Russian)
+3. Extract the "base_name" (generic essence)
+4. Detect if weight/portion is specified.
+5. Calculate KBJU.
 
-WEIGHT DETECTION RULES:
-- "банан 150" -> 150 grams
-- "банан 150г" -> 150 grams
-- "хлеб 40" -> 40 grams
-- "2 кг" -> 2000 grams (1 KG = 1000g, ALWAYS convert to grams)
-- "свинина 1.5 кг" -> 1500 grams
-- "2 яйца" -> ~120g (calculate based on count)
-- "тарелка борща" -> ~300g (estimate standard portion)
-- "банан" (no number) -> weight_missing: true (return per 100g)
-- ALWAYS extract the number if it appears after the name.
-- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'гречка', 'рис', 'овсянка', 'пшено' etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if the user explicitly specifies 'сухая' or 'сырая'.
+GENERIC PRODUCTS RULE (Elegant Handling):
+- If the description is too vague (e.g., just "seeds", "meat", "salad", "fish"), do NOT return 0 calories.
+- Instead, provide an AVERAGE KBJU for the most common items in that category.
+- Append " (в среднем)" to the "name" and "base_name" fields.
+- Example: "семена" -> name: "Семена (в среднем)", calories: ~550, etc.
+
+STRICT KBJU RULE:
+- Never return 0 calories for items that are clearly food. 0 is for water/tea/coffee ONLY.
 
 RETURN JSON ONLY:
 {{
+  "is_food": true,
+  "error_message": null,
   "name": "Название продукта (RU)",
   "base_name": "Суть продукта (RU)",
   "weight_grams": 150,
@@ -227,17 +229,19 @@ RETURN JSON ONLY:
   "fiber": 3.9
 }}
 
-If weight is NOT specified:
+If it is NOT food:
 {{
-  "name": "Банан",
-  "base_name": "Банан",
+  "is_food": false,
+  "error_message": "Вежливое объяснение на русском, почему это не еда",
+  "name": "{description}",
+  "base_name": "{description}",
   "weight_grams": null,
   "weight_missing": true,
-  "calories": 89,
-  "protein": 1.1,
-  "fat": 0.3,
-  "carbs": 22.8,
-  "fiber": 2.6
+  "calories": 0,
+  "protein": 0,
+  "fat": 0,
+  "carbs": 0,
+  "fiber": 0
 }}
 
 CRITICAL: Return ONLY JSON, no markdown, no explanations.'''

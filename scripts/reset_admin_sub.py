@@ -1,17 +1,20 @@
 
 import asyncio
-from sqlalchemy import select, update
-from database.base import init_db, get_db
+
+from sqlalchemy import select
+
+from database.base import get_db, init_db
 from database.models import Subscription
+
 
 async def reset_admin_sub():
     await init_db()
     admin_id = 432823154
-    
+
     async for session in get_db():
         stmt = select(Subscription).where(Subscription.user_id == admin_id)
         sub = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if sub:
             sub.tier = "free"
             sub.is_active = False

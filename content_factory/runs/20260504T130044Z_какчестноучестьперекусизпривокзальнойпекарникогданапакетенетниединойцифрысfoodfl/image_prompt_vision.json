@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person point of view holding a golden-brown puff pastry in a paper wrap inside a modern high-speed train. A smartphone in the other hand frames the pastry, displaying a sleek holographic interface with teal and lime green neon charts and abstract data nodes. Through the train window, a blurred evening cityscape with soft bokeh. Photorealistic, cinematic lighting, premium textures, subtle cyberpunk aesthetic, 4:5 aspect ratio.",
+  "negative_prompt": "readable text, letters, numbers, watermark, QR code, logo, distorted hands, extra fingers, blurry face, low resolution, messy environment, cartoonish.",
+  "notes": [
+    "Used a first-person perspective to mimic the 'on the go' commuter experience mentioned in the text.",
+    "Combined warm food tones (pastry) with cool brand colors (teal/green neon) for visual contrast.",
+    "Substituted specific UI text with 'abstract data nodes' and 'holographic charts' to avoid AI-generated gibberish.",
+    "Set the scene in a premium train interior to maintain the brand's high-end aesthetic."
+  ]
+}

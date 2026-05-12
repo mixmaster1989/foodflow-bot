@@ -1,11 +1,13 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy import select
 from datetime import datetime, timedelta
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 from api.main import app
 from database.base import get_db
-from database.models import User, UserSettings, Subscription
+from database.models import Subscription, User, UserSettings
+
 
 @pytest.fixture(scope="function")
 async def client(db_session):
@@ -25,21 +27,21 @@ async def test_web_register_and_onboarding_trigger(client, db_session):
         "password": "securepassword123",
         "name": "Web Traveler"
     }
-    
+
     # 1. Register
     resp = await client.post("/api/auth/web-register", json=payload)
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    
+
     # 2. Check DB State
     stmt = select(User).where(User.email == "new_user@example.com")
     user = (await db_session.execute(stmt)).scalar_one()
-    
+
     assert user.first_name == "Web Traveler"
     assert user.is_web_only is True
     assert user.id >= 100_000_000_000_000 # 15 digits
-    
+
     # 3. Check Subscription (GIFT)
     sub_stmt = select(Subscription).where(Subscription.user_id == user.id)
     sub = (await db_session.execute(sub_stmt)).scalar_one()
@@ -48,7 +50,7 @@ async def test_web_register_and_onboarding_trigger(client, db_session):
     # Should expire in 3 days
     expected_expiry = datetime.now() + timedelta(days=3)
     assert sub.expires_at.date() == expected_expiry.date()
-    
+
     # 4. Check Settings (is_initialized should be False)
     settings_stmt = select(UserSettings).where(UserSettings.user_id == user.id)
     settings = (await db_session.execute(settings_stmt)).scalar_one()
@@ -69,7 +71,7 @@ async def test_web_register_and_onboarding_trigger(client, db_session):
     assert update_resp.status_code == 200
     assert update_resp.json()["is_initialized"] is True
     assert update_resp.json()["weight"] == 85.5
-    
+
     # Verify in DB again
     await db_session.refresh(settings)
     assert settings.is_initialized is True
@@ -84,17 +86,17 @@ async def test_web_login_flow(client, db_session):
     user = User(id=999_888_777_666_555, email="login@test.com", password_hash=hashed, is_web_only=True)
     db_session.add(user)
     await db_session.commit()
-    
+
     # 1. Correct Login
     resp = await client.post("/api/auth/web-login", json={"email": "login@test.com", "password": "mypassword"})
     assert resp.status_code == 200
     assert "access_token" in resp.json()
-    
+
     # 2. Wrong Password
     resp = await client.post("/api/auth/web-login", json={"email": "login@test.com", "password": "wrong"})
     assert resp.status_code == 401
     assert "Неверный пароль" in resp.json()["detail"]
-    
+
     # 3. Non-existent email
     resp = await client.post("/api/auth/web-login", json={"email": "none@test.com", "password": "any"})
     assert resp.status_code == 401
@@ -105,7 +107,7 @@ async def test_duplicate_email_registration(client, db_session):
     user = User(id=111222, email="duplicate@test.com", is_web_only=True)
     db_session.add(user)
     await db_session.commit()
-    
+
     payload = {
         "email": "DUPLICATE@test.com", # Check case insensitivity
         "password": "pass",

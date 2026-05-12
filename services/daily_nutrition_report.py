@@ -27,7 +27,7 @@ from sqlalchemy import and_, select
 from config import settings
 from database.base import get_db
 from database.models import ConsumptionLog, User, UserSettings
-from services.image_renderer import draw_daily_card
+from services.svg_renderer import draw_daily_card
 
 # Logging
 logging.basicConfig(

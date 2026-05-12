@@ -21,11 +21,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import and_, func, select
 
 from database.base import get_db
-from database.models import Product, UserSettings, User, Subscription, UserFeedback
+from database.models import Product, Subscription, User, UserFeedback, UserSettings
 from handlers.menu import show_main_menu
+from handlers.onboarding_demo import run_onboarding_demo
 from services.consultant import ConsultantService
 from services.nutrition_calculator import NutritionCalculator
 from services.photo_queue import PhotoQueueManager
+from utils.analytics import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -70,36 +72,9 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
             await show_main_menu(message, message.from_user.first_name, message.from_user.id)
             return
 
-        # Check if we already have ad_campaign in UserFeedback
-        fb_stmt = select(UserFeedback).where(
-            and_(
-                UserFeedback.user_id == user_id,
-                UserFeedback.feedback_type == "ad_campaign"
-            )
-        )
-        fb = (await session.execute(fb_stmt)).scalar_one_or_none()
-
-        if fb:
-            # Skip source survey, go straight to gender
-            logger.info(f"User {user_id} has ad_campaign '{fb.answer}', skipping source survey")
-            await show_gender_selection(message, state)
-        else:
-            # Start onboarding with acquisition source survey
-            await state.set_state(OnboardingStates.waiting_for_source)
-
-            builder = InlineKeyboardBuilder()
-            for key, label in ACQUISITION_SOURCES.items():
-                builder.button(text=label, callback_data=f"onboarding_source:{key}")
-            builder.adjust(2)
-
-            welcome_text = (
-                "👋 <b>Добро пожаловать в FoodFlow!</b>\n\n"
-                "Я помогу тебе следить за питанием и управлять продуктами.\n\n"
-                "Для начала один вопрос:\n\n"
-                "📋 <b>Откуда вы о нас узнали?</b>"
-            )
-
-            await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        # NEW UX: Skip source survey at the start for ALL users.
+        # We will ask it at the very end of onboarding (in ask_source_if_needed).
+        await show_gender_selection(message, state)
 
 
 async def show_gender_selection(message: types.Message, state: FSMContext) -> None:
@@ -118,6 +93,7 @@ async def show_gender_selection(message: types.Message, state: FSMContext) -> No
     )
 
     await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await log_event(message.from_user.id, "onboarding_step_reached", {"step": "gender_selection"})
 
 
 @router.callback_query(F.data.startswith("onboarding_source:"))
@@ -153,26 +129,22 @@ async def handle_source_selection(callback: types.CallbackQuery, state: FSMConte
         await session.commit()
 
     logger.info(f"Acquisition source saved: user={user.id} source={source_key}")
+    await log_event(user.id, "onboarding_step_reached", {"step": "source_selection", "source": source_key})
 
-    # Transition to gender selection (step 1)
-    await state.set_state(OnboardingStates.waiting_for_gender)
-
-    builder = InlineKeyboardBuilder()
-    builder.button(text="👨 Мужской", callback_data="onboarding_gender:male")
-    builder.button(text="👩 Женский", callback_data="onboarding_gender:female")
-    builder.adjust(2)
-
-    text = (
-        "<b>✅ Спасибо!</b>\n\n"
-        "Теперь мне нужно узнать немного о тебе:\n\n"
-        "1️⃣ Выбери свой пол:"
-    )
-
-    try:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    except Exception:
-        await callback.message.delete()
+    # After source is saved, we finish the onboarding
+    data = await state.get_data()
+    targets = data.get("pending_targets")
+    
+    if targets:
+        await finish_onboarding_process(callback.message, state, targets)
+    else:
+        # Fallback if somehow targets are missing
+        await callback.message.edit_text("✨ <b>Профиль настроен!</b>\n\nЗагружаю магию...", parse_mode="HTML")
+        await finish_onboarding_process(callback.message, state, {"calories": 2000, "protein": 150, "fat": 70, "carbs": 200})
+    
+    await callback.answer()
 import asyncio
+
 
 async def show_ephemeral_warning(message: types.Message, text: str, parse_mode: str = None) -> None:
     """Show a warning message and auto-delete it after 6 seconds, also deleting the user's invalid input."""
@@ -180,22 +152,23 @@ async def show_ephemeral_warning(message: types.Message, text: str, parse_mode: 
         await message.delete()
     except Exception:
         pass
-        
+
     msg = await message.answer(text, parse_mode=parse_mode)
-    
+
     async def _delete():
         await asyncio.sleep(6)
         try:
             await msg.delete()
         except Exception:
             pass
-            
+
     asyncio.create_task(_delete())
 
 
 @router.message(OnboardingStates.waiting_for_source)
 async def handle_source_fallback(message: types.Message) -> None:
     """Handle text input during source selection."""
+    await log_event(message.from_user.id, "onboarding_invalid_input", {"step": "source"})
     await show_ephemeral_warning(message, "Пожалуйста, воспользуйтесь кнопками выше, чтобы выбрать ответ. 👆")
 
 
@@ -218,6 +191,7 @@ async def handle_gender_selection(callback: types.CallbackQuery, state: FSMConte
     except Exception:
         await callback.message.delete()
         await callback.message.answer(text, parse_mode="HTML")
+    await log_event(callback.from_user.id, "onboarding_step_reached", {"step": "age_input"})
     await callback.answer()
 
 
@@ -277,22 +251,23 @@ async def handle_weight_input(message: types.Message, state: FSMContext) -> None
 
         await state.update_data(weight=weight)
         await state.set_state(OnboardingStates.waiting_for_goal)
-        
+
         data = await state.get_data()
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
-        builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
+        builder.button(text="⚖️ Поддерживать вес", callback_data="onboarding_goal:maintain")
         builder.button(text="🥗 Здоровое питание", callback_data="onboarding_goal:healthy")
         builder.button(text="💪 Набрать массу", callback_data="onboarding_goal:gain_mass")
         builder.adjust(2)
 
         text = (
-            f"<b>✅ Данные приняты: {data.get('age')} лет, {data.get('height')} см, {weight} кг</b>\n\n"
+            f"<b>✅ Данные: возраст {data.get('age')}, рост {data.get('height')} см, вес {weight} кг</b>\n\n"
             "5️⃣ Выбери свою <b>главную цель</b>:"
         )
 
         await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await log_event(message.from_user.id, "onboarding_step_reached", {"step": "goal_selection"})
     except ValueError:
         await message.answer("Пожалуйста, введите число (например, 75.5).")
 
@@ -336,9 +311,19 @@ async def handle_goal_selection(callback: types.CallbackQuery, state: FSMContext
 
     # Show recommendations
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
+    builder.button(text="✅ Принять расчёт", callback_data="onboarding_goals:accept")
     builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
     builder.button(text="🔙 Назад", callback_data="onboarding_back:to_goal_selection")
+
+    # Rage back detection
+    import time
+    last_back = (await state.get_data()).get("last_back_time", 0)
+    now = time.time()
+    if now - last_back < 2.0:
+        await log_event(callback.from_user.id, "rage_back", {"step": "calorie_confirmation"})
+    await state.update_data(last_back_time=now)
+
+    await log_event(callback.from_user.id, "onboarding_back_clicked", {"from_step": "calorie_confirmation"})
     builder.adjust(1)
 
     goal_names = {
@@ -376,7 +361,7 @@ async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -
         await callback.answer("Ошибка данных, начните заново", show_alert=True)
         return
 
-    await finish_onboarding_process(callback.message, state, targets)
+    await ask_source_if_needed(callback.message, state, targets)
     await callback.answer()
 
 
@@ -384,7 +369,7 @@ async def handle_goal_accept(callback: types.CallbackQuery, state: FSMContext) -
 async def handle_calorie_confirmation_text(message: types.Message, state: FSMContext) -> None:
     """Handle text input during calorie confirmation (e.g. 'No', 'Too much')."""
     text = message.text.lower()
-    
+
     if any(word in text for word in ["нет", "не", "много", "no", "stop", "угл"]):
         await show_ephemeral_warning(
             message,
@@ -409,7 +394,8 @@ async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMCont
     await state.set_state(OnboardingStates.waiting_for_manual_calories)
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Назад", callback_data="onboarding_back:goals") # We need to handle this back
+    builder.button(text="🔙 Назад", callback_data="onboarding_back:goals")
+    builder.button(text="❌ Прервать", callback_data="onboarding_cancel")
 
     text = (
         "<b>✏️ Ввод своей нормы</b>\n\n"
@@ -419,10 +405,22 @@ async def handle_goal_manual_start(callback: types.CallbackQuery, state: FSMCont
 
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="onboarding_back:calorie_confirmation")
-    
+
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
+
+@router.callback_query(F.data == "onboarding_cancel")
+async def handle_onboarding_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Explicitly abandon onboarding."""
+    data = await state.get_data()
+    current_state = await state.get_state()
+    # Convert state object to string if needed
+    state_str = str(current_state).split(':')[-1] if current_state else "unknown"
+    await log_event(callback.from_user.id, "onboarding_abandoned", {"step": state_str})
+    await state.clear()
+    await callback.message.edit_text("❌ Регистрация прервана. Вы всегда можете начать заново, написав /start")
+    await callback.answer()
 
 @router.message(OnboardingStates.waiting_for_manual_calories)
 async def handle_manual_calories_input(message: types.Message, state: FSMContext) -> None:
@@ -440,10 +438,62 @@ async def handle_manual_calories_input(message: types.Message, state: FSMContext
         # Recalculate macros based on NEW calories
         targets = NutritionCalculator.calculate_macros(calories, weight, goal)
 
-        await finish_onboarding_process(message, state, targets)
+        await ask_source_if_needed(message, state, targets)
 
     except ValueError:
         await message.answer("Пожалуйста, введите целое число.")
+
+
+async def ask_source_if_needed(message: types.Message, state: FSMContext, targets: dict) -> None:
+    """Check if we need to ask about acquisition source. If not - finish immediately."""
+    user_id = message.chat.id
+    # Store targets in state so we can recover them after the survey callback
+    await state.update_data(pending_targets=targets)
+
+    async for session in get_db():
+        # Check if source is already known (ad_campaign)
+        from database.models import UserFeedback
+        from sqlalchemy import and_, select
+        
+        fb_stmt = select(UserFeedback).where(
+            and_(
+                UserFeedback.user_id == user_id,
+                UserFeedback.feedback_type == "ad_campaign"
+            )
+        )
+        fb = (await session.execute(fb_stmt)).scalar_one_or_none()
+
+        if fb:
+            # Source known (from deep link) -> Finish immediately
+            logger.info(f"User {user_id} has ad_campaign '{fb.answer}', skipping source survey")
+            await log_event(user_id, "onboarding_step_reached", {
+                "step": "source_selection", 
+                "source": "deeplink", 
+                "ad_campaign": fb.answer
+            })
+            await finish_onboarding_process(message, state, targets)
+        else:
+            # Source unknown -> Ask the question at the very end
+            await state.set_state(OnboardingStates.waiting_for_source)
+            builder = InlineKeyboardBuilder()
+            for key, label in ACQUISITION_SOURCES.items():
+                builder.button(text=label, callback_data=f"onboarding_source:{key}")
+            builder.adjust(2)
+
+            text = (
+                "📈 <b>Почти готово!</b>\n\n"
+                "Твоя норма рассчитана. Последний штрих: "
+                "подскажи, как ты о нас узнал? Нам это очень поможет! 🙏"
+            )
+            
+            # Message could be a callback_query.message or a direct message
+            if hasattr(message, "edit_text"):
+                try:
+                    await message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+                except Exception:
+                    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+            else:
+                await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 
 async def finish_onboarding_process(message: types.Message, state: FSMContext, targets: dict) -> None:
@@ -466,6 +516,17 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
         if goal in ["lose_weight", "gain_mass"]:
             water_goal += 500
 
+        # --- NEW: POPULATE GUIDE CONFIG ---
+        guide_config = {
+            "answers": {
+                "gender": gender,
+                "age": age,
+                "weight": weight,
+                "height": height,
+                "goal": goal
+            }
+        }
+
         if settings:
             settings.gender = gender
             settings.age = age
@@ -479,6 +540,7 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
             settings.fiber_goal = targets.get("fiber", 30)
             settings.water_goal = water_goal
             settings.is_initialized = True
+            settings.guide_config = guide_config
         else:
             settings = UserSettings(
                 user_id=user_id,
@@ -494,13 +556,14 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
                 fiber_goal=targets.get("fiber", 30),
                 water_goal=water_goal,
                 is_initialized=True,
+                guide_config=guide_config,
             )
             session.add(settings)
 
         # --- NEW: TRIAL LOGIC ---
         from datetime import datetime, timedelta
 
-        from database.models import PAYMENT_SOURCE_TRIAL, Subscription
+        from database.models import PAYMENT_SOURCE_TRIAL
 
         # Check if they already have one
         stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
@@ -526,6 +589,18 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
 
         await session.commit()
 
+    # Calculate duration
+    payload = {}
+    start_time_iso = data.get("onboarding_start_time")
+    if start_time_iso:
+        try:
+            start_time = datetime.fromisoformat(start_time_iso)
+            duration_sec = int((datetime.now() - start_time).total_seconds())
+            payload["duration_sec"] = duration_sec
+        except Exception:
+            pass
+
+    await log_event(user_id, "onboarding_finished", payload)
     await state.clear()
 
     goal_text = {
@@ -541,31 +616,26 @@ async def finish_onboarding_process(message: types.Message, state: FSMContext, t
         pass
 
     first_name = message.chat.first_name or "друг"
-    finish_text = (
-        f"🎉 <b>Готово, {first_name}!</b>\n\n"
-        "PRO активирован на 3 дня — всё открыто.\n\n"
-        "━━━━━━━━━━━━━━━\n"
-        "<b>Давай сразу попробуем.</b>\n"
-        "Напиши, скажи голосом или сфоткай — что ты ел сегодня?\n\n"
-        "<i>Например:</i>\n"
-        "• <code>овсянка 200г на молоке</code>\n"
-        "• <code>2 яйца, кофе с сахаром и бутер с сыром</code>\n"
-        "• <code>борщ 300 грамм</code>\n\n"
-        "Я посчитаю КБЖУ за 3 секунды ⚡\n\n"
-        "<i>Если ещё не ел — просто напиши «ещё не ел».</i>"
+
+    # DOPAMINE STRIKE: Show quick-start buttons instead of just a menu
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🍳 Яичница", callback_data="demo_quick:яичница 2 яйца")
+    builder.button(text="🥣 Каша", callback_data="demo_quick:овсяная каша 200г")
+    builder.button(text="☕ Кофе", callback_data="demo_quick:кофе с молоком")
+    builder.button(text="🥗 Салат", callback_data="demo_quick:овощной салат 200г")
+    builder.button(text="🥪 Бутерброд", callback_data="demo_quick:бутерброд с сыром")
+    builder.button(text="✍️ Написать своё", callback_data="menu_i_ate")
+    builder.adjust(2)
+
+    final_text = (
+        "🎉 <b>Готово!</b>\n\n"
+        "💎 <b>PRO активирован на 3 дня.</b>\n\n"
+        "Отправь, что ты ел сегодня — фото, голосом или текстом.\n"
+        "Я сам помогу определить порцию и калории.\n\n"
+        "<b>Что ты ел сегодня?</b>"
     )
 
-    await message.answer(finish_text, parse_mode="HTML")
-
-    # Capture user while hot — ask if they've eaten today
-    ate_builder = InlineKeyboardBuilder()
-    ate_builder.button(text="🍳 Да, запишем!", callback_data="onboard_ate_yes")
-    ate_builder.button(text="⏰ Нет, напомни в 8:00", callback_data="onboard_ate_no")
-    ate_builder.adjust(1)
-    await message.answer(
-        "Кстати — ты сегодня уже ел что-нибудь? 🍽️",
-        reply_markup=ate_builder.as_markup(),
-    )
+    await message.answer(final_text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 @router.callback_query(F.data == "onboard_ate_yes")
@@ -649,7 +719,7 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
     elif step == "goals":
         # Back to age from goal selection
         await state.set_state(OnboardingStates.waiting_for_age)
-        
+
         text = (
             "<b>2️⃣ Напиши свой возраст:</b>\n\n"
             "Пример: <code>30</code>"
@@ -664,16 +734,16 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
         # Back from calorie confirmation to goal selection
         await state.set_state(OnboardingStates.waiting_for_goal)
         data = await state.get_data()
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="📉 Похудеть", callback_data="onboarding_goal:lose_weight")
-        builder.button(text="⚖️ Не набирать", callback_data="onboarding_goal:maintain")
+        builder.button(text="⚖️ Поддерживать вес", callback_data="onboarding_goal:maintain")
         builder.button(text="🥗 Здоровое питание", callback_data="onboarding_goal:healthy")
         builder.button(text="💪 Набрать массу", callback_data="onboarding_goal:gain_mass")
         builder.adjust(2)
 
         text = (
-            f"<b>✅ Данные приняты: {data.get('age')} лет, {data.get('height')} см, {data.get('weight')} кг</b>\n\n"
+            f"<b>✅ Данные: возраст {data.get('age')}, рост {data.get('height')} см, вес {data.get('weight')} кг</b>\n\n"
             "5️⃣ Выбери свою <b>главную цель</b>:"
         )
         try:
@@ -686,10 +756,10 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
         # Back to goals from manual input
         data = await state.get_data()
         goal = data.get("goal", "healthy")
-        
+
         # We need to trigger handle_goal_selection again, but let's just show the goals with buttons
         await state.set_state(OnboardingStates.waiting_for_calorie_confirmation)
-        
+
         # Recalculate if targets are lost, but they should be in state
         targets = data.get("pending_targets")
         if not targets:
@@ -697,7 +767,7 @@ async def handle_back(callback: types.CallbackQuery, state: FSMContext) -> None:
             return
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Принять (авто)", callback_data="onboarding_goals:accept")
+        builder.button(text="✅ Принять расчёт", callback_data="onboarding_goals:accept")
         builder.button(text="✏️ Ввести свои калории", callback_data="onboarding_goals:manual")
         builder.adjust(1)
 

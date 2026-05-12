@@ -48,7 +48,7 @@ async def create_consumption_log(
 ):
     """Log food consumption (standard)."""
     msk_tz = pytz.timezone("Europe/Moscow")
-    
+
     log_date = datetime.now(msk_tz).replace(tzinfo=None)
     if log_data.date:
         if log_data.date.tzinfo:
@@ -84,7 +84,7 @@ async def create_manual_log(
         final_name = f"{log_data.product_name} ({int(log_data.weight_g)}г)"
 
     msk_tz = pytz.timezone("Europe/Moscow")
-    
+
     log_date = datetime.now(msk_tz).replace(tzinfo=None)
     if log_data.date:
         if log_data.date.tzinfo:
@@ -140,7 +140,7 @@ async def update_consumption_log(
 
     # Update fields
     update_data = log_data.model_dump(exclude_unset=True)
-    
+
     # Special handling for date to ensure consistency with timezone
     if "date" in update_data and update_data["date"]:
         msk_tz = pytz.timezone("Europe/Moscow")

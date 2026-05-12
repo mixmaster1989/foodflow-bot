@@ -2,9 +2,8 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -17,25 +16,25 @@ logger = logging.getLogger("api.main")
 limiter = Limiter(key_func=get_remote_address)
 
 from api.routers import (
+    ai_insight,
     assets,
     auth,
     consumption,
+    debug,
     herbalife,
     products,
     receipts,
     recipes,
     recognize,
+    referrals,
     reports,
+    saved_dishes,
     search,
     shopping_list,
     smart,
     universal,
-    saved_dishes,
     water,
     weight,
-    ai_insight,
-    referrals,
-    debug,
 )
 
 

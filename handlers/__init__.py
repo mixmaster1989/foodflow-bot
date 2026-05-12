@@ -6,6 +6,7 @@ from . import (
     correction,
     curator,
     errors,
+    feedback,
     fridge,
     global_input,
     herbalife,
@@ -16,6 +17,7 @@ from . import (
     onboarding,
     receipt,
     recipes,
+    referrals,
     saved_dishes,
     shopping,
     shopping_list,
@@ -23,8 +25,6 @@ from . import (
     support,
     user_settings,
     weight,
-    referrals,
-    feedback,
 )
 
 __all__ = [

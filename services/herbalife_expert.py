@@ -1,7 +1,7 @@
 import json
+import logging
 import os
 import re
-import logging
 from typing import Any
 
 logger = logging.getLogger("services.herbalife_expert")
@@ -36,7 +36,7 @@ class HerbalifeExpertService:
         clean_text = text.lower().strip()
         # Normalize: common Latin letters used in Herbalife abbreviations
         key_norm = clean_text.replace('f', 'ф').replace('n', 'н')
-        
+
         # 1. Fast Path: Straight alias match (Best match - longest alias wins)
         best_match = None
         max_alias_len = -1
@@ -56,7 +56,7 @@ class HerbalifeExpertService:
                     if len(alias) > max_alias_len:
                         max_alias_len = len(alias)
                         best_match = p
-        
+
         if best_match:
             return best_match
 
@@ -68,6 +68,11 @@ class HerbalifeExpertService:
             for p in products:
                 if p["id"] == matched_id:
                     return p
+
+        # Monitor: log when text looks like Herbalife but nothing matched
+        if any(kw in clean_text for kw in ("гербалайф", "herbalife", "герба")):
+            logger.warning(f"🌿 [HERBALIFE MISS] No product matched for: '{text}'")
+
         return None
 
     def get_product_by_id(self, product_id: str) -> dict | None:
@@ -83,8 +88,21 @@ class HerbalifeExpertService:
         Example: "3 ложки" -> {'amount': 3.0, 'unit': 'ложка'}
         """
         text = text.lower().replace(',', '.')
-        # Pattern for number + unit
-        match = re.search(r"(\d+(?:\.\d+)?)\s*(ложки?|ложк|g|г|ml|мл|шт|таблетки?|таблетк|капсул|колпач|колпак)", text)
+
+        # 1. Map text numbers to digits (common in voice input)
+        text_numbers = {
+            "одна": "1", "одну": "1", "один": "1",
+            "две": "2", "два": "2",
+            "три": "3",
+            "четыре": "4",
+            "пять": "5"
+        }
+        for word, digit in text_numbers.items():
+            text = text.replace(word, digit)
+
+        # 2. Pattern for number + unit
+        # Added 'порци' to the list of units
+        match = re.search(r"(\d+(?:\.\d+)?)\s*(ложки?|ложк|g|г|ml|мл|шт|таблетки?|таблетк|капсул|колпач|колпак|порци)", text)
 
         if match:
             return {
@@ -158,7 +176,7 @@ class HerbalifeExpertService:
             # Fallback: estimate ~0.5g per tablet
             total_grams = amount * 0.5
 
-        elif unit == "serving":
+        elif unit == "serving" or "порци" in unit:
             # 1. Try nutrition_per_serving directly first (most accurate for '1 serving' inputs)
             per_serving = product.get("nutrition_per_serving", {})
             if per_serving and amount == 1.0:
@@ -172,7 +190,7 @@ class HerbalifeExpertService:
                     "fiber": per_serving.get("fiber_g") or 0,
                     "warnings": product.get("warnings", [])
                 }
-            
+
             # 2. Fallback to gram calculation
             if std_serving.get("grams"):
                 total_grams = amount * std_serving["grams"]

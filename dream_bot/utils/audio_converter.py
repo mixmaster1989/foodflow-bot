@@ -1,6 +1,6 @@
 import asyncio
-import os
 import logging
+
 
 async def convert_ogg_to_wav(input_path: str, output_path: str):
     """Конвертирует Telegram OGG (Opus) в WAV (PCM16, 24kHz) для OpenAI"""
@@ -45,14 +45,14 @@ async def convert_wav_to_ogg(input_path: str, output_path: str):
         '-c:a', 'libopus', '-b:a', '32k',
         output_path
     ]
-    
+
     process = await asyncio.create_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
     stdout, stderr = await process.communicate()
-    
+
     # Если не вышло как pcm (например, там нормальный wav), пробуем обычный режим
     if process.returncode != 0:
         process = await asyncio.create_subprocess_exec(

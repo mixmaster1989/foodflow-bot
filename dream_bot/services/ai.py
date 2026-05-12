@@ -1,7 +1,9 @@
-import aiohttp
-import json
-from config import OPENROUTER_API_KEY
 import logging
+
+import aiohttp
+
+from config import OPENROUTER_API_KEY
+
 
 async def interpret_dream(dream_text: str) -> str:
     prompt = f"""Ты — ИИ-Толкователь Снов, великий Оракул, сочетающий в себе мудрость Карла Юнга и мистику древних пророков.

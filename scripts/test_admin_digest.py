@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.base import init_db
 from services.reports import generate_admin_daily_digest
 
+
 async def test_digest():
     await init_db()
     print("⏳ Генерирую админ-дайджест за вчера...")

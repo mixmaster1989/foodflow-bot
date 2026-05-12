@@ -1,7 +1,17 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
+
 from .base import Base
+
 
 class User(Base):
     __tablename__ = "users"

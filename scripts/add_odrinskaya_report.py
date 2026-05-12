@@ -32,7 +32,7 @@ ELENA_O_REPORT = """# 🌸 С Праздником 8 Марта, Елена!
 
 **С праздником! Сияй! 🌸**"""
 
-with open("data/march_8_ai_gifts_final.json", "r", encoding="utf-8") as f:
+with open("data/march_8_ai_gifts_final.json", encoding="utf-8") as f:
     gifts = json.load(f)
 
 gifts["911990304"] = ELENA_O_REPORT

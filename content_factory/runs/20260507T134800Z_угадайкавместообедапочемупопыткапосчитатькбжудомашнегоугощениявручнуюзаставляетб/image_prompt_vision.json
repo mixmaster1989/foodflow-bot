@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "High-end photorealistic lifestyle shot in a modern corporate office breakroom. On a warm wooden table sits a large platter piled with golden-brown traditional homemade pastries and Ossetian pies. A sleek smartphone is held in the foreground, its screen showing a clean camera interface focused on the food. Subtle cyberpunk aesthetic: thin holographic teal and lime green neon outlines hover around the pastries like a digital scanner. Soft cinematic lighting, depth of field with a blurred high-tech office background, premium textures, 8k resolution, teal and blue accent glow.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, readable UI, distorted hands, extra fingers, blurry face, messy environment, cartoon, illustration, low resolution.",
+  "notes": [
+    "Used the 'phone framing' technique from ref_shopping_mode to represent the app's scanning feature.",
+    "Focused on 'pies and pastries' to match the specific post context while maintaining the premium 'clean warm wood' look from main_menu.",
+    "Applied the brand-specific teal/green neon glow as a 'subtle cyberpunk accent' to signify AI analysis.",
+    "Ensured a vertical-friendly 4:5 composition by specifying foreground/background depth."
+  ]
+}

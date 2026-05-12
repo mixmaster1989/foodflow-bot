@@ -9,7 +9,8 @@ import sys
 sys.path.append('.')
 
 from sqlalchemy import select
-from database.base import Base, engine, async_session
+
+from database.base import Base, async_session, engine
 from database.models import CanonicalProduct
 
 logging.basicConfig(level=logging.INFO)

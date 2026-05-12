@@ -1,12 +1,14 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.auth import CurrentUser
 from api.dependencies import get_db_session
 from api.main import limiter
-from sqlalchemy.ext.asyncio import AsyncSession
-from services.ai_insight import AIInsightService
 from services.ai_guide import AIGuideService
-import logging
+from services.ai_insight import AIInsightService
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +28,8 @@ async def get_ai_insight(
     Phantom mode: subtle, semi-transparent, non-blocking.
     """
     print(f"DEBUG: GET /api/ai/insight called by {user.id}")
-    
-    # CRITICAL: Fetch context OUTSIDE the generator because the DB session 
+
+    # CRITICAL: Fetch context OUTSIDE the generator because the DB session
     # will be closed after this function returns the StreamingResponse object.
     context = await AIInsightService.get_user_context(user.id, db)
     print(f"DEBUG: context fetched: {context}")
@@ -37,7 +39,7 @@ async def get_ai_insight(
 
     async def event_generator():
         print(f"DEBUG: event_generator started. Action: {action}")
-        
+
         # Route to Большой Гид if action is heavy and Guide is paid/active
         if is_heavy_action and guide_active:
             try:
@@ -49,15 +51,15 @@ async def get_ai_insight(
                     gen = await AIGuideService.get_water_advice(user.id, amount_ml, db, stream=True)
                 else:
                     current_meal = {
-                        "name": detail, 
-                        "calories": "см. в дневнике", 
+                        "name": detail,
+                        "calories": "см. в дневнике",
                         "time": "сейчас",
                         "protein": "?",
                         "fat": "?",
                         "carbs": "?"
                     }
                     gen = await AIGuideService.get_contextual_advice(user.id, current_meal, db, stream=True)
-                
+
                 if gen:
                     async for token in gen:
                         yield f"data: {token}\n\n"
@@ -66,7 +68,7 @@ async def get_ai_insight(
             except Exception as e:
                 logger.error(f"Error streaming from AIGuideService: {e}")
                 # If it failed, gracefully fallback to Whisperer below
-        
+
         # Fallback / Lightweight Action Route: Phantom Whisperer
         async for token in AIInsightService.generate_insight_stream(
             user_id=user.id,
@@ -77,9 +79,9 @@ async def get_ai_insight(
             # SSE format: data: <content>\n\n
             yield f"data: {token}\n\n"
 
-    print(f"DEBUG: returning StreamingResponse")
+    print("DEBUG: returning StreamingResponse")
     return StreamingResponse(
-        event_generator(), 
+        event_generator(),
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",

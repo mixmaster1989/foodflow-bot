@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260506T084522Z",
+  "mode": "channel",
+  "topic": "Как перестать коллекционировать макулатуру и честно посчитать закупку: лайфхак с фотографией чека вместо ручного сканирования штрихкодов.",
+  "scenario": "useful_tip",
+  "text": "<b>Представьте: стоите на кассе с полной тележкой продуктов, сверху внушительный чек и пакеты 🛒📱</b>\n\nПоявляется ощущение, что разбирать это богатство придётся весь вечер. Особенно когда хочется быстро навести порядок в покупках и питании.\n\n<b>Простое решение: сфотографируйте чек и отправьте в бот</b>. В ответ — все цифры по питанию: <b>калории, белки, жиры, углеводы</b>. <tg-spoiler>Не вводите вручную йогурт, сыр или курицу</tg-spoiler>.\n\nСфоткал, отправил — получил. Идеально для большой закупки, когда время на вес золото.\n\n<blockquote>Разбирай вручную или фото чека — выбирай.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, food and lifestyle scene: a person at a supermarket checkout with a full shopping cart, receipt in hand, modern neon-lit store, realistic groceries, subtle futuristic details, clean composition, warm and cool lighting, high detail, cinematic atmosphere",
+  "image_ref": null,
+  "publish_target_chat_id": -1003856929949,
+  "saved_image_path": null
+}

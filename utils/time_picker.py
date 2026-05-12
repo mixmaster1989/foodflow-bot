@@ -70,7 +70,7 @@ def parse_manual_time(text: str) -> datetime | None:
     """
     import re
     s = text.strip().replace(" ", "").replace(".", ":").replace(",", ":")
-    
+
     # Pattern 1: HH:MM
     match = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
     if match:
@@ -90,5 +90,5 @@ def parse_manual_time(text: str) -> datetime | None:
 
     if 0 <= h <= 23 and 0 <= m <= 59:
         return datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
-    
+
     return None

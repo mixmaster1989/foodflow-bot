@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260506T081857Z",
+  "mode": "channel",
+  "topic": "Как превратить скучные продукты из холодильника в сбалансированный ужин за 10 секунд. Показываем скриншот работы AI-повара в FoodFlow.",
+  "scenario": "demo_screenshot",
+  "text": "<b>Открываешь холодильник после работы: половина кабачка, остатки вчерашней курицы и баночка сметаны. Есть хочется, а на поиск рецепта уже нет сил.🥒🍗🧀</b>\n\nСделал фото, отправил в FoodFlow и получил результат: курица с кабачком и сметаной — <b>420 ккал, белки 31 г, жиры 27 г, углеводы 14 г</b>. <b>Обычный ужин из того, что лежит под рукой, превращается в понятные цифры.</b>\n\n<tg-spoiler>А что у тебя сегодня в холодильнике?</tg-spoiler>\n\n<blockquote>Либо видишь цифры, либо гадаешь.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style food lifestyle scene, evening kitchen after work, open fridge with half a zucchini, leftover chicken and a small sour cream jar on the shelf, a person holding a smartphone showing a meal analysis app screen with calories, protein, fat, carbohydrates, realistic lighting, cozy home atmosphere, modern Russian apartment vibe, cinematic composition, highly detailed, natural hands, realistic food textures",
+  "image_ref": null,
+  "publish_target_chat_id": -1003856929949,
+  "saved_image_path": null
+}

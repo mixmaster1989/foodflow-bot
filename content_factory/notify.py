@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from content_factory.publishers.telegram import publish_to_telegram
 from config import settings
+from content_factory.publishers.telegram import publish_to_telegram
 
 logger = logging.getLogger(__name__)
 

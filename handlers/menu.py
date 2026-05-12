@@ -10,7 +10,6 @@ Contains:
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
@@ -53,21 +52,30 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Check user role and gender from DB
     is_curator = False
     is_female = False
+    is_pioneer_user = True  # Assume pioneer until checked
     from datetime import date
 
     from sqlalchemy import and_, func, select
 
     from database.base import get_db
-    from database.models import ConsumptionLog, User, UserSettings, WaterLog, Subscription
-    
+    from database.models import (
+        ConsumptionLog,
+        Subscription,
+        User,
+        UserSettings,
+        WaterLog,
+    )
+
     today = date.today()
     logs = []
-    
+
     async for session in get_db():
         stmt = select(User).where(User.id == user_id)
         user = (await session.execute(stmt)).scalar_one_or_none()
         if user and user.role == "curator":
             is_curator = True
+        if user and not getattr(user, 'is_pioneer', False):
+            is_pioneer_user = False
 
         # Check gender from settings
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -109,19 +117,22 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
 
         goals = {
             "calories": settings_obj.calorie_goal if settings_obj else 2000,
+            "protein": settings_obj.protein_goal if settings_obj else 100,
+            "fat": settings_obj.fat_goal if settings_obj else 70,
+            "carbs": settings_obj.carb_goal if settings_obj else 250,
             "water": settings_obj.water_goal if settings_obj else 2000
         }
-        
+
         # 5. Get user subscription for the menu text
         from datetime import datetime
         sub_stmt = select(Subscription).where(Subscription.user_id == user_id)
         sub = (await session.execute(sub_stmt)).scalar_one_or_none()
-        
+
         sub_text_block = "🆓 FREE"
         if sub and sub.is_active:
             tier_icons = {"pro": "💎 PRO", "basic": "🌟 BASIC", "curator": "👑 CURATOR"}
             tier_display = tier_icons.get(sub.tier, "🆓 FREE")
-            
+
             if not sub.expires_at:
                  sub_text_block = f"{tier_display} | Бессрочно ∞"
             else:
@@ -135,7 +146,7 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
                      else:
                          hours = diff.seconds // 3600
                          sub_text_block = f"{tier_display} | Осталось: {hours} ч."
-        
+
         # 6. Get recent logs for the card
         logs_stmt = select(ConsumptionLog).where(
             and_(
@@ -164,23 +175,27 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
     # Row 3: Stats
     builder.button(text="📊 Статистика", callback_data="menu_stats")
     builder.button(text="⚖️ Вес", callback_data="menu_weight")
-    
+
     # Row 3.5: AI Guide
     builder.button(text="🤖 Личный Гид", callback_data="menu_guide")
 
     # Row 4: System
     builder.button(text="⚙️ Настройки", callback_data="menu_settings")
     builder.button(text="💎 Подписки", callback_data="show_subscriptions")
-    builder.button(text="🎁 Рефералка", callback_data="referrals_menu")
+    if not is_pioneer_user:
+        builder.button(text="🏆 Стать Пионером", callback_data="pioneer_open_offer")
+    else:
+        builder.button(text="🎁 Рефералка", callback_data="referrals_menu")
     builder.button(text="ℹ️ Справка", callback_data="menu_help")
 
     # Row 5: Web App
     from aiogram.types import WebAppInfo
+
     from api.auth import create_access_token
-    
+
     token = create_access_token(data={"sub": user_id})
     vk_app_link = f"https://vk.com/app54530169#token={token}"
-    
+
     builder.button(text="🚀 FoodFlow в VK", url=vk_app_link)
     builder.button(text="📱 App (TG)", web_app=WebAppInfo(url="https://xn--d1aojrdbc.xn--p1ai/foodflow/"))
     builder.button(text="🔑 Вход в App", callback_data="menu_web_login")
@@ -202,16 +217,16 @@ async def show_main_menu(message: types.Message, user_name: str, user_id: int, u
         rows = [2, 1, 1, 1, 2, 1, 3, 3, 2, 1]  # Added row for Guide
     else:
         rows = [2, 1, 1, 1, 2, 1, 3, 2, 1]  # Added row for Guide
-    
+
     if message.from_user.id in settings.ADMIN_IDS:
         # If admin, the last row (Row 6) has 4 buttons now
         rows.append(4)
-    
+
     builder.adjust(*rows)
 
 
     # Generate the dynamic dashboard card
-    from services.image_renderer import draw_daily_card
+    from services.svg_renderer import draw_daily_card
     photo_bytes = draw_daily_card(user_name, today, logs, total_metrics, goals, water_total)
 
     # Use InputMediaPhoto instead of Animation
@@ -340,12 +355,13 @@ async def menu_help_handler(callback: types.CallbackQuery) -> None:
 @router.callback_query(F.data == "menu_web_login")
 async def menu_web_login_handler(callback: types.CallbackQuery) -> None:
     """Show Telegram ID and individual password for web access."""
-    from utils.auth_utils import generate_user_password
     from aiogram.types import WebAppInfo
+
+    from utils.auth_utils import generate_user_password
 
     user_id = callback.from_user.id
     password = generate_user_password(user_id)
-    
+
     # We use a special URL that might pre-fill the data or just the login page
     web_app_url = "https://xn--d1aojrdbc.xn--p1ai/foodflow/"
 

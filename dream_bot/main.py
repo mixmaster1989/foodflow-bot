@@ -1,15 +1,17 @@
 import asyncio
 import logging
+
 from aiogram import Bot, Dispatcher
+
 from config import TELEGRAM_TOKEN
 from database.base import init_db
-from handlers import start, dream, payment, admin
+from handlers import admin, dream, payment, start
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
     await init_db()
-    
+
     bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher()
 

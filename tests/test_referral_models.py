@@ -1,6 +1,6 @@
 from sqlalchemy import text
 
-from database.models import User, ReferralEvent, ReferralReward
+from database.models import ReferralEvent, ReferralReward, User
 
 
 async def test_referral_tables_exist_and_columns_present(db_session):

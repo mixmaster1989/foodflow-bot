@@ -1,6 +1,5 @@
 import logging
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -26,11 +25,11 @@ class NutritionResult(BaseModel):
     fat: float
     carbs: float
     fiber: float
-    weight_grams: Optional[float] = None  # Actual portion weight (None = per 100g)
+    weight_grams: float | None = None  # Actual portion weight (None = per 100g)
     weight_missing: bool = False          # True if no weight was specified in query
     source: str                           # "cache", "normalization_service", "ai_failed"
     anomaly_status: AnomalyDecision
-    warning_message: Optional[str] = None
+    warning_message: str | None = None
 
 
 class KBJUCoreService:
@@ -52,7 +51,7 @@ class KBJUCoreService:
         cls,
         query: str,
         db: AsyncSession,
-        weight_grams: Optional[float] = None,
+        weight_grams: float | None = None,
     ) -> NutritionResult:
         """
         Main entrypoint.
@@ -117,7 +116,7 @@ class KBJUCoreService:
     # ──────────────────────────────────────────
 
     @classmethod
-    async def _fetch_via_normalization(cls, query: str) -> Optional[dict]:
+    async def _fetch_via_normalization(cls, query: str) -> dict | None:
         """Delegate to the existing NormalizationService pipeline."""
         try:
             from services.normalization import NormalizationService
@@ -133,7 +132,7 @@ class KBJUCoreService:
     # ──────────────────────────────────────────
 
     @classmethod
-    def _normalize_to_100g(cls, raw: dict, weight_grams: Optional[float]) -> dict:
+    def _normalize_to_100g(cls, raw: dict, weight_grams: float | None) -> dict:
         """
         Convert NormalizationService output to per-100g etalon values.
         
@@ -143,7 +142,7 @@ class KBJUCoreService:
         If weight_missing=True, NormalizationService already returns per-100g.
         """
         base_name = raw.get("base_name", raw.get("name", "unknown")).strip().lower()
-        
+
         cal = float(raw.get("calories") or 0)
         prot = float(raw.get("protein") or 0)
         fat = float(raw.get("fat") or 0)
@@ -175,7 +174,7 @@ class KBJUCoreService:
     def _build_result_from_cache(
         cls,
         cached: CanonicalProduct,
-        weight_grams: Optional[float],
+        weight_grams: float | None,
     ) -> NutritionResult:
         """Build NutritionResult from a cached canonical product, scaling to portion."""
         factor = (weight_grams / 100.0) if weight_grams else 1.0
@@ -197,11 +196,11 @@ class KBJUCoreService:
     def _build_result(
         cls,
         per100: dict,
-        weight_grams: Optional[float],
+        weight_grams: float | None,
         weight_missing: bool,
         source: str,
         decision: AnomalyDecision,
-        warning: Optional[str],
+        warning: str | None,
     ) -> NutritionResult:
         """Build final NutritionResult, scaling per-100g etalon to actual portion."""
         factor = (weight_grams / 100.0) if weight_grams else 1.0
@@ -225,7 +224,7 @@ class KBJUCoreService:
     # ──────────────────────────────────────────
 
     @classmethod
-    def _anomaly_guard(cls, per100: dict) -> tuple[AnomalyDecision, Optional[str]]:
+    def _anomaly_guard(cls, per100: dict) -> tuple[AnomalyDecision, str | None]:
         """Validate realistic per-100g KBJU ranges before caching."""
         c = per100.get("calories", 0)
         p = per100.get("protein", 0)
@@ -275,11 +274,11 @@ class KBJUCoreService:
     async def _save_to_cache(cls, per100: dict, db: AsyncSession):
         """Save per-100g etalon to canonical_products (unverified, pending night audit)."""
         base = per100["base_name"].lower()
-        
+
         # Double-check: don't overwrite a verified record
         stmt = select(CanonicalProduct).where(CanonicalProduct.base_name == base)
         existing = (await db.execute(stmt)).scalar_one_or_none()
-        
+
         if existing:
             if existing.is_verified:
                 logger.info(f"KBJUCore: Skipping cache write — '{base}' already verified.")

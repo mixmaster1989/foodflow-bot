@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "First-person perspective (POV) of a person holding a sleek, bezel-less futuristic smartphone in a premium high-tech grocery store. The phone screen displays a blurry camera interface scanning a gourmet pre-packaged healthy meal on a wooden shelf. Subtle teal and lime green holographic data rings and abstract nutrition charts float around the product. The background features warm wooden shelves, vibrant fresh vegetables, and soft blue neon accent lighting strips along the aisles. Cinematic lighting, photorealistic, 8k resolution, shallow depth of field, high-end lifestyle photography style.",
+  "negative_prompt": "readable text, letters, numbers, watermark, QR code, logo, brand name, distorted hands, extra fingers, blurry face, messy environment, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used a POV (first-person) angle to make the user feel like they are the 'Pioneer' mentioned in the text.",
+    "Focused on the 'scanning' action (photo of meal/receipt) to visually represent the bot's main function.",
+    "Balanced warm wood tones with the brand's signature teal and green neon to maintain the 'premium lifestyle + cyberpunk' aesthetic.",
+    "Specified 'abstract' data and 'blurry' UI to ensure no gibberish text or fake numbers appear, keeping the image clean for social media."
+  ]
+}

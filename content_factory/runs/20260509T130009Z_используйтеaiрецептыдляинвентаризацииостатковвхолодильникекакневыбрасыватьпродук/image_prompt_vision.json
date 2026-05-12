@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end, photorealistic lifestyle shot of a modern 'leftover' dinner bowl on a sleek dark wood kitchen counter. The bowl contains sliced grilled chicken, golden corn kernels, and a soft-boiled egg. Subtle cyberpunk aesthetic with glowing teal and lime green neon light strips integrated into the kitchen backsplash and counter edges. In the blurred foreground, a hand holds a futuristic smartphone, its screen emitting a soft blue glow as if scanning the food. Cinematic lighting, shallow depth of field, premium textures, 8k resolution, teal and orange color grading, vertical composition.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, brand name, distorted hands, extra fingers, blurry face, messy kitchen, cheap plastic, low resolution, grainy.",
+  "notes": [
+    "Focused on the 'leftover bowl' mentioned in the text (chicken, corn, egg) to make it relatable but premium.",
+    "Integrated the teal/green neon accents from the brand references into the kitchen architecture.",
+    "Used the 'phone scanning' motif from the shopping ref to visually represent the bot's photo-analysis feature.",
+    "Kept the composition vertical (4:5) for social media compatibility."
+  ]
+}

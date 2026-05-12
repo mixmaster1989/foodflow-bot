@@ -22,7 +22,6 @@ from database.models import ConsumptionLog, Product, Receipt
 from services.ai import AIService
 from services.kbju_core import KBJUCoreService
 from services.photo_queue import PhotoQueueManager
-from config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -100,7 +99,7 @@ async def show_fridge_summary(callback: types.CallbackQuery, state: FSMContext =
             except Exception:
                 pass
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    
+
     from services.ai_guide import AIGuideService
     async for session in get_db():
         await AIGuideService.track_activity(callback.from_user.id, "fridge", session)
@@ -220,7 +219,7 @@ async def show_item_detail(callback: types.CallbackQuery) -> None:
         )
 
         back_callback = f"fridge_list:{page}" if source == 0 else "fridge_search_back"
-        
+
         builder = InlineKeyboardBuilder()
         builder.button(text="🍽️ Съесть", callback_data=f"fridge_eat:{product.id}:{page}:{source}")
         builder.button(text="🗑️ Удалить полностью", callback_data=f"fridge_del:{product.id}:{page}:{source}")
@@ -268,7 +267,7 @@ async def handle_consume_choice(callback: types.CallbackQuery, state: FSMContext
     product_id = int(parts[2])
     page = int(parts[3]) if len(parts) > 3 else 0
     source = int(parts[4]) if len(parts) > 4 else 0
-    
+
     if mode == "whole":
         await consume_product(callback, product_id, page, amount=1, unit="qty", source=source)
 
@@ -321,7 +320,7 @@ async def consume_product(callback, product_id, page, amount, unit, log_calories
                 # 🚀 IMPROVEMENT: Estimate weight per unit using KBJUCore
                 core_result = await KBJUCoreService.get_product_nutrition(product.base_name or product.name, session)
                 estimated_weight_per_unit = core_result.weight_grams or 100.0 # Fallback to 100g if still unknown
-                
+
                 consumed_weight = estimated_weight_per_unit * amount
                 calculated_calories = (consumed_weight / 100) * product.calories if product.calories else 0
                 # We can't reduce weight_g since it's None.
@@ -519,14 +518,14 @@ async def process_single_label(message: types.Message, bot: Bot, state: FSMConte
             raise ValueError("Не удалось распознать. Попробуй еще раз.")
 
         user_id = message.from_user.id
-        
+
         # 🚀 INTEGRATION: Check KBJUCore for verified data
         async for session in get_db():
             core_result = await KBJUCoreService.get_product_nutrition(product_data["name"], session)
-            
+
             # Use KBJUCore values if it's a CACHE HIT, otherwise fallback to AI labels
             prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
-            
+
             product = Product(
                 user_id=user_id,
                 source="manual_label",
@@ -585,13 +584,13 @@ async def process_single_dish(message: types.Message, bot: Bot, state: FSMContex
             raise ValueError("Не удалось распознать блюдо.")
 
         user_id = message.from_user.id
-        
+
         # 🚀 INTEGRATION: Check KBJUCore for verified data
         async for session in get_db():
             core_result = await KBJUCoreService.get_product_nutrition(product_data["name"], session)
-            
+
             prefix = "💎 [ЭТАЛОН] " if core_result.source == "cache" else ""
-            
+
             product = Product(
                 user_id=user_id,
                 source="manual_dish",

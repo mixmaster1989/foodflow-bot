@@ -1,6 +1,8 @@
 
 import asyncio
+
 from services.reports import generate_admin_stats_csv
+
 
 async def test_csv():
     csv_io = await generate_admin_stats_csv(days=5)

@@ -1,5 +1,4 @@
 import sqlite3
-from datetime import datetime
 
 db_path = '/home/user1/foodflow-bot_new/foodflow.db'
 conn = sqlite3.connect(db_path)

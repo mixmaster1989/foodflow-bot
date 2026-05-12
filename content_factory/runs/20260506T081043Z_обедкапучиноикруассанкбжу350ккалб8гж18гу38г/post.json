@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260506T081043Z",
+  "mode": "to_me",
+  "topic": "Обед: Капучино и круассан. КБЖУ: 350 ккал, Б: 8г, Ж: 18г, У: 38г.",
+  "scenario": "demo_screenshot",
+  "text": "<b>Идёшь по весенней улице, по пути берёшь капучино и круассан ☕🥐</b>\n\nУнесло делами, а потом просто достаёшь телефон и отправляешь фото в FoodFlow 📱.\n\n<b>Отправил фото — получил ответ: 350 ккал, белки 8 г, жиры 18 г, углеводы 38 г</b>.\n\nВот так выглядит <b>обычный перекус на бегу — без догадок и лишней возни</b>.\n\n<blockquote>Либо получаешь чёткие цифры, либо снова гадаешь.</blockquote>",
+  "image_prompt": "Mockup generated locally via TelegramRenderer",
+  "image_ref": "/home/user1/foodflow-bot_new/content_factory/runs/20260506T081043Z_обедкапучиноикруассанкбжу350ккалб8гж18гу38г/demo_mockup.png",
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

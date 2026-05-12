@@ -1,10 +1,9 @@
 """Saved dishes router for FoodFlow API."""
 from datetime import datetime
 
+import pytz
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
-
-import pytz
 
 from api.auth import CurrentUser, DBSession
 from api.schemas import SavedDishCreate, SavedDishLog, SavedDishRead
@@ -33,7 +32,7 @@ async def create_saved_dish(
     """Save a new meal template."""
     # Convert Pydantic models to dicts for JSON storage
     components_dicts = [comp.model_dump() for comp in dish.components]
-    
+
     new_dish = SavedDish(
         user_id=user.id,
         name=dish.name,
@@ -45,7 +44,7 @@ async def create_saved_dish(
         total_carbs=dish.total_carbs,
         total_fiber=dish.total_fiber,
     )
-    
+
     session.add(new_dish)
     await session.commit()
     await session.refresh(new_dish)
@@ -62,7 +61,7 @@ async def delete_saved_dish(
     dish = await session.get(SavedDish, dish_id)
     if not dish or dish.user_id != user.id:
         raise HTTPException(status_code=404, detail="Saved dish not found")
-        
+
     await session.delete(dish)
     await session.commit()
     return {"message": "Saved dish deleted successfully"}
@@ -79,7 +78,7 @@ async def log_saved_dish(
     dish = await session.get(SavedDish, dish_id)
     if not dish or dish.user_id != user.id:
         raise HTTPException(status_code=404, detail="Saved dish not found")
-        
+
     msk_tz = pytz.timezone("Europe/Moscow")
     target_date = datetime.now(msk_tz).replace(tzinfo=None)
     if log_req.date:
@@ -100,6 +99,6 @@ async def log_saved_dish(
             date=target_date,
         )
         session.add(log)
-        
+
     await session.commit()
     return {"message": "Saved dish logged successfully"}

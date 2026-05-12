@@ -2,6 +2,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+
 def analyze_yesterday():
     db_path = "foodflow.db"
     conn = sqlite3.connect(db_path)
@@ -13,7 +14,7 @@ def analyze_yesterday():
     # 1. New Users
     cursor.execute("SELECT COUNT(*) FROM users WHERE date(created_at) = ?", (yesterday,))
     new_users_count = cursor.fetchone()[0]
-    
+
     cursor.execute("SELECT id, username, first_name, created_at FROM users WHERE date(created_at) = ?", (yesterday,))
     new_users_details = cursor.fetchall()
 
@@ -28,7 +29,7 @@ def analyze_yesterday():
     # 4. New Subscriptions
     cursor.execute("SELECT COUNT(*) FROM subscriptions WHERE date(starts_at) = ?", (yesterday,))
     new_subs_count = cursor.fetchone()[0]
-    
+
     cursor.execute("SELECT user_id, tier, payment_source FROM subscriptions WHERE date(starts_at) = ?", (yesterday,))
     new_subs_details = cursor.fetchall()
 
@@ -49,29 +50,29 @@ def analyze_yesterday():
     cursor.execute("SELECT feedback_type, answer FROM user_feedback WHERE date(created_at) = ?", (yesterday,))
     feedbacks = cursor.fetchall()
 
-    print(f"\n--- Summary ---")
+    print("\n--- Summary ---")
     print(f"New Users: {new_users_count}")
     for u in new_users_details:
         print(f"  - {u[0]} (@{u[1] if u[1] else 'N/A'}, {u[2]}): {u[3]}")
-    
+
     print(f"Active Users: {active_users_count}")
     print(f"Meals Logged: {meals_count}")
     print(f"New Subscriptions: {new_subs_count}")
     for s in new_subs_details:
         print(f"  - User {s[0]}: {s[1]} (via {s[2]})")
-    
-    print(f"\nFeature Usage:")
+
+    print("\nFeature Usage:")
     for f in feature_usage:
         print(f"  - {f[0]}: {f[1]}")
-    
-    print(f"\nReferral Events:")
+
+    print("\nReferral Events:")
     for r in ref_events:
         print(f"  - {r[0]}: {r[1]}")
 
     print(f"\nAI Potential Issues (mentions of 'error' in guide): {ai_errors}")
 
     if feedbacks:
-        print(f"\nUser Feedback:")
+        print("\nUser Feedback:")
         for f in feedbacks:
             print(f"  - {f[0]}: {f[1]}")
 

@@ -1,17 +1,14 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
-import sys
 import os
+import sys
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database.base import async_session
-from sqlalchemy import select, and_
-from database.models import UserSettings, ConsumptionLog
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +18,7 @@ bot = Bot(token=settings.BOT_TOKEN)
 
 async def main():
     target_users = []
-    
+
     if len(sys.argv) > 1 and sys.argv[1].isdigit():
         # Test mode for specific user
         target_users.append(int(sys.argv[1]))
@@ -30,7 +27,7 @@ async def main():
         # User requested specific active candidates
         target_users = [5153798702, 1734637013, 1015270932, 295543071]
         logger.info(f"LIVE MODE: Broadcasting to predefined VIP active users: {target_users}")
-        
+
         if not target_users:
             return
 
@@ -38,7 +35,7 @@ async def main():
         [InlineKeyboardButton(text="✅ Да, буду вести каждый день", callback_data="guide_test:accept")],
         [InlineKeyboardButton(text="❌ Нет, сейчас нет времени на это", callback_data="guide_test:decline")]
     ])
-    
+
     text = (
         "👋 Привет! Это создатели бота FoodFlow.\n\n"
         "Мы собрали новую, мощную функцию: <b>Проактивный ИИ-Гид</b>. Он не просто считает калории, а анализирует твои цели, "
@@ -57,7 +54,7 @@ async def main():
             await asyncio.sleep(0.3)
         except Exception as e:
             logger.error(f"Failed to send to {uid}: {e}")
-            
+
     logger.info(f"Broadcast complete! Successfully sent to {success_count} users.")
     await bot.session.close()
 

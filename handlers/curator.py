@@ -207,6 +207,9 @@ async def curator_ward_history(callback: types.CallbackQuery) -> None:
         ward_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
         goals = {
             "calories": ward_settings.calorie_goal if ward_settings and ward_settings.calorie_goal else 2000,
+            "protein": ward_settings.protein_goal if ward_settings else 100,
+            "fat": ward_settings.fat_goal if ward_settings else 70,
+            "carbs": ward_settings.carb_goal if ward_settings else 250,
             "water": ward_settings.water_goal if ward_settings else 2000
         }
 
@@ -252,7 +255,7 @@ async def curator_ward_history(callback: types.CallbackQuery) -> None:
 
     from aiogram.types import BufferedInputFile
 
-    from services.image_renderer import draw_daily_card
+    from services.svg_renderer import draw_daily_card
 
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as pool:
@@ -373,7 +376,7 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     # But row() added buttons stay as is.
 
     # Generate Image
-    from services.image_renderer import draw_daily_card
+    from services.svg_renderer import draw_daily_card
 
     # Pack data for renderer
     total_metrics = {
@@ -385,6 +388,9 @@ async def curator_ward_detail(callback: types.CallbackQuery) -> None:
     }
     goals = {
         "calories": goal_cal,
+        "protein": ward_settings.protein_goal if ward_settings else 100,
+        "fat": ward_settings.fat_goal if ward_settings else 70,
+        "carbs": ward_settings.carb_goal if ward_settings else 250,
         "water": ward_settings.water_goal if ward_settings else 2000
     }
 
@@ -459,7 +465,7 @@ async def curator_ai_report(callback: types.CallbackQuery) -> None:
             return
 
         # Generate image card
-        from services.image_renderer import draw_daily_card
+        from services.svg_renderer import draw_daily_card
         image_bio = draw_daily_card(
             user_name=report_data["ward_name"],
             target_date=report_data["date"],

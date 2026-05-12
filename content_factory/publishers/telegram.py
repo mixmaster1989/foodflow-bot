@@ -1,4 +1,5 @@
 import logging
+
 from aiogram import Bot
 
 from config import settings
@@ -30,11 +31,12 @@ async def publish_to_telegram(
     bot = Bot(token=token)
     try:
         logger.info(f"Publishing Content Factory post to chat_id={effective_chat_id}...")
-        
+
         photo = None
         if image_url and image_url != "error" and image_url != "error_no_url":
             if image_url.startswith("data:image"):
                 import base64
+
                 from aiogram.types import BufferedInputFile
                 try:
                     format, imgstr = image_url.split(';base64,')
@@ -44,8 +46,16 @@ async def publish_to_telegram(
                 except Exception as e:
                     logger.warning(f"Base64 decode error: {e}")
                     photo = None
+            elif image_url.startswith("http"):
+                from aiogram.types import URLInputFile
+                photo = URLInputFile(image_url)
             else:
-                photo = image_url
+                import os
+                if os.path.exists(image_url):
+                    from aiogram.types import FSInputFile
+                    photo = FSInputFile(image_url)
+                else:
+                    photo = image_url # Fallback
 
         if photo:
             await bot.send_photo(
@@ -60,7 +70,7 @@ async def publish_to_telegram(
                 text=text,
                 parse_mode=parse_mode,
             )
-        
+
         logger.info("Post published to Telegram.")
         return True
     except Exception as e:

@@ -1,15 +1,16 @@
 import asyncio
 import logging
-import sys
 import os
+import sys
+
 from aiogram import Bot
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import settings
 from api.auth import create_access_token
+from config import settings
 from database.models import User
 
 logging.basicConfig(level=logging.INFO)
@@ -17,26 +18,26 @@ logger = logging.getLogger("broadcast")
 
 async def broadcast_web():
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     # Database setup
     engine = create_async_engine(settings.DATABASE_URL)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
-    
+
     async with async_session() as session:
         stmt = select(User)
         result = await session.execute(stmt)
         users = result.scalars().all()
-        
+
     logger.info(f"Found {len(users)} users. Starting broadcast...")
-    
+
     success_count = 0
     fail_count = 0
-    
+
     for user in users:
         user_id = user.id
         token = create_access_token(data={"sub": user_id})
         link = f"https://tretyakov-igor.tech/?token={token}"
-        
+
         # Message 1: Magic Link
         msg1_text = (
             "🌐 <b>Ваша персональная ссылка для входа:</b>\n\n"
@@ -45,7 +46,7 @@ async def broadcast_web():
             "Откройте её в любом браузере (Chrome, Safari) — вы войдёте в свой аккаунт <b>без Telegram</b>.\n\n"
             "💡 <i>Ссылка действует 30 дней. Сохраните в закладки!</i>"
         )
-        
+
         # Message 2: Explanation
         msg2_text = (
             "❤️ <b>Важное обновление от команды FoodFlow</b>\n\n"
@@ -58,23 +59,23 @@ async def broadcast_web():
             "Ваши данные никуда не денутся. Мы на вашей стороне. 💪\n\n"
             "С заботой, команда FoodFlow 🥗"
         )
-        
+
         try:
             # Send Message 1
             await bot.send_message(chat_id=user_id, text=msg1_text, parse_mode="HTML")
             await asyncio.sleep(0.3) # Short delay
-            
+
             # Send Message 2
             await bot.send_message(chat_id=user_id, text=msg2_text, parse_mode="HTML")
             await asyncio.sleep(0.7) # Delay between users
-            
+
             success_count += 1
             logger.info(f"Sent to {user_id} ({success_count}/{len(users)})")
-            
+
         except Exception as e:
             fail_count += 1
             logger.warning(f"Failed to send to {user_id}: {e}")
-            
+
     logger.info(f"Broadcast complete! Success: {success_count}, Failed: {fail_count}")
     await bot.session.close()
 

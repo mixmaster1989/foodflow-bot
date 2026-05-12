@@ -1,8 +1,7 @@
 import pytest
-from sqlalchemy import select
 
-from database.models import ReferralReward, ReferralEvent
-from handlers.referrals import referrals_menu, ref_reward_activate
+from database.models import ReferralEvent, ReferralReward
+from handlers.referrals import ref_reward_activate, referrals_menu
 
 
 @pytest.mark.asyncio

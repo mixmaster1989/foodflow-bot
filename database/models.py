@@ -1,5 +1,9 @@
 from datetime import datetime
 
+import pytz
+
+MOSCOW_TZ = pytz.timezone("Europe/Moscow")
+
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -28,7 +32,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True)  # Telegram ID
     username = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=lambda: datetime.now(MOSCOW_TZ))
     is_verified = Column(Boolean, default=False)
     role = Column(String, default="user")
     curator_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
@@ -40,7 +44,7 @@ class User(Base):
     language_code = Column(String, nullable=True)
     is_premium = Column(Boolean, default=False)
     is_founding_member = Column(Boolean, default=False)
-    last_activity = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    last_activity = Column(DateTime, default=lambda: datetime.now(MOSCOW_TZ), onupdate=lambda: datetime.now(MOSCOW_TZ))
     referral_token_expires_at = Column(DateTime, nullable=True)
     onboarding_reminded = Column(Boolean, default=False)
     # Web-only registration fields
@@ -48,7 +52,14 @@ class User(Base):
     password_hash = Column(String, nullable=True)
     is_web_only = Column(Boolean, default=False)
     is_blocked = Column(Boolean, default=False)
-    
+
+    # Pioneer Program (inline channel subscription + referral bonuses)
+    is_pioneer = Column(Boolean, default=False)
+    pioneer_offered = Column(Boolean, default=False)
+    pioneer_bonus_days = Column(Integer, default=0)
+    pioneer_refs_count = Column(Integer, default=0)
+    pioneer_ref_requested = Column(Boolean, default=False)
+
     # VK Integration
     vk_id = Column(BigInteger, unique=True, nullable=True, index=True)
 
@@ -206,11 +217,11 @@ class UserSettings(Base):
     # Recipe limits
     recipe_refresh_count = Column(Integer, default=0)
     last_recipe_refresh_date = Column(String, nullable=True) # ISO format date
-    
+
     # AI Guide settings
     guide_config = Column(JSON, nullable=True) # Onboarding answers & personality
     guide_active_until = Column(DateTime, nullable=True)
-    
+
     user = relationship("User", backref="settings")
 
 class UserActivity(Base):
@@ -220,7 +231,7 @@ class UserActivity(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     feature_name = Column(String, nullable=False) # e.g., "fridge", "recipes", "weight", "water"
     last_used_at = Column(DateTime, default=datetime.now)
-    
+
     user = relationship("User", backref="activities")
 
 class ShoppingListItem(Base):
@@ -375,24 +386,24 @@ class UserFeedback(Base):
 class CanonicalProduct(Base):
     """Cached (canonical) KBJU data for products to avoid redundant AI calls."""
     __tablename__ = "canonical_products"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     base_name = Column(String, unique=True, nullable=False, index=True)
     display_name = Column(String, nullable=True)
     category = Column(String, nullable=True)
-    
+
     calories = Column(Float, default=0.0)
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)
     carbs = Column(Float, default=0.0)
     fiber = Column(Float, default=0.0)
-    
+
     source = Column(String, default="ai_gemini_2_5")
     per_unit = Column(String, default="per_100g")
-    
+
     version = Column(Integer, default=1)
     is_verified = Column(Boolean, default=False)
-    
+
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 class GuideHistory(Base):
@@ -405,5 +416,16 @@ class GuideHistory(Base):
     tokens = Column(Integer, default=0) # Estimated tokens
     is_summary = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
-    
+
     user = relationship("User", backref="guide_histories")
+
+class ProductEvent(Base):
+    """Granular product events for analytics and funnels."""
+    __tablename__ = "product_events"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), index=True)
+    event_name = Column(String, index=True)
+    payload = Column(JSON, default={})
+    created_at = Column(DateTime, default=lambda: datetime.now(MOSCOW_TZ))
+
+    user = relationship("User", backref="product_events")

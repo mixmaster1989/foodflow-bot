@@ -5,13 +5,14 @@ import sys
 sys.path.append('.')
 
 from sqlalchemy import select, text
-from database.base import Base, engine, async_session
+
+from database.base import async_session
 from database.models import CanonicalProduct
 
 logging.basicConfig(level=logging.INFO)
 
 async def populate_top10():
-    # Роль Судьи (human/expert reasoning). 
+    # Роль Судьи (human/expert reasoning).
     # Жестко выверенные данные на 100 грамм:
     # 1. Банан (USDA) - 89 kcal
     # 2. Яблоко (USDA) - 52 kcal
@@ -39,10 +40,10 @@ async def populate_top10():
     async with async_session() as db:
         for item in judgement:
             bn, dn, c, p, f, carbs, fib = item
-            
+
             stmt = select(CanonicalProduct).where(CanonicalProduct.base_name == bn)
             existing = (await db.execute(stmt)).scalar_one_or_none()
-            
+
             if existing:
                 existing.calories = c
                 existing.protein = p
@@ -63,7 +64,7 @@ async def populate_top10():
                     source="ai_human_judge",
                 )
                 db.add(new_prod)
-        
+
         await db.commit()
         logging.info("Top 10 items added/updated to CanonicalProduct cache.")
 

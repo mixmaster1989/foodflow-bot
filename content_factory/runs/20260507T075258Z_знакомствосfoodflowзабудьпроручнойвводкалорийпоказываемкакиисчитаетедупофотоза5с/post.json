@@ -1,0 +1,11 @@
+{
+  "created_at_utc": "20260507T075258Z",
+  "mode": "to_me",
+  "topic": "Знакомство с FoodFlow: забудь про ручной ввод калорий. Показываем как ИИ считает еду по фото за 5 секунд.",
+  "scenario": "promo_action",
+  "text": "<b>Заказал еду и хочешь понять состав без расчётов? FoodFlow упростит! 🍽️📸</b>\n\n<b>Сфоткай блюдо или чек</b>, кинь в чат — сервис разберёт содержимое и выдаст инфу о приёме пищи.\n\nЗа подписку на канал — <b>доп. дни доступа</b>. Бонусы за друзей. Так проще присматривать за рационом <tg-spoiler>без трат сил на ручные записи и поиски продуктов</tg-spoiler>.\n\n<blockquote>/start или ручка: выбирай сейчас.</blockquote>",
+  "image_prompt": "Photorealistic cyberpunk style, cozy modern Russian lifestyle scene, a person in casual clothes at a table with a delivered meal box, smartphone showing a nutrition app chat interface, warm neon lights, clean food photography, realistic details, soft futuristic city glow in the background, appetizing takeout food, premium Telegram promo vibe",
+  "image_ref": null,
+  "publish_target_chat_id": 432823154,
+  "saved_image_path": null
+}

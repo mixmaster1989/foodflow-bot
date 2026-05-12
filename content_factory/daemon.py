@@ -39,7 +39,7 @@ async def _job_wrapper() -> None:
             last_res = res
             if res.get("ok"):
                 break
-            
+
             # Если не прошли редактуру, сохраняем причину для следующей попытки
             if res.get("reason") == "blocked_by_editorial":
                 history.append({

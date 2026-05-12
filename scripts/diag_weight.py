@@ -5,8 +5,9 @@ import sys
 # Add project root to sys.path
 sys.path.append(os.getcwd())
 
-from services.normalization import NormalizationService
 from dotenv import load_dotenv
+
+from services.normalization import NormalizationService
 
 load_dotenv()
 

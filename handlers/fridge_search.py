@@ -205,7 +205,7 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
 
         # 1. Smart Search Logic (Python-side filtering)
         keywords = query.lower().split()
-        
+
         # 🚀 IMPROVEMENT: Use KBJUCore for query normalization
         core_query = await KBJUCoreService.get_product_nutrition(query, session)
         base_query = core_query.base_name.lower() if core_query.base_name else ""
@@ -222,7 +222,7 @@ async def show_search_results(message: types.Message, state: FSMContext, page: i
         for p in all_products:
             name_norm = p.name.lower()
             p_base_name = p.base_name.lower() if p.base_name else ""
-            
+
             # Match if:
             # 1. ALL keywords are in name
             # 2. OR base_name matches base_query

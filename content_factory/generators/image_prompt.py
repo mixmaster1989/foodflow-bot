@@ -6,9 +6,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from content_factory.http_client import openrouter_post
-
 from config import settings
+from content_factory.http_client import openrouter_post
 
 logger = logging.getLogger(__name__)
 

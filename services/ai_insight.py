@@ -1,11 +1,13 @@
 import json
 import logging
+
 import aiohttp
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from database.models import User, UserSettings, Subscription
+
 from config import settings
+from database.models import User, UserSettings
 
 logger = logging.getLogger(__name__)
 
@@ -19,45 +21,45 @@ class AIInsightService:
         # 1. Basic Profile with preloaded subscription
         stmt = select(User).where(User.id == user_id).options(selectinload(User.subscription))
         user = (await db.execute(stmt)).scalar_one_or_none()
-        
+
         if not user:
             logger.warning(f"User {user_id} not found for context")
             return ""
 
         settings_stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         user_settings = (await db.execute(settings_stmt)).scalar_one_or_none()
-        
+
         # 2. Recent activity (last 24h)
         # (Simplified for now, can be expanded to summarize habits)
-        
+
         context = []
         name = user.first_name or user.username or "friend"
         context.append(f"User's name is {name}.")
-        
+
         if user_settings:
             gender_label = "Male" if user_settings.gender == "male" else "Female" if user_settings.gender == "female" else "Unknown"
             context.append(f"User is {user_settings.age or 'unknown'} years old, {gender_label}.")
             context.append(f"Goal: {user_settings.goal or 'healthy living'}. Target calories: {user_settings.calorie_goal}kcal.")
-        
+
         # Subscriptions / Tier
         tier = "free"
         if user.subscription:
             tier = user.subscription.tier
         context.append(f"Subscription Tier: {tier.upper()}.")
-        
+
         # Guide Preset
         personality = "soft"
         if user_settings and user_settings.guide_config:
             personality = user_settings.guide_config.get("personality", "soft")
         context.append(f"Guide Preset: {personality}.")
-        
+
         return " ".join(context)
 
     @classmethod
     async def generate_insight_stream(cls, user_id: int, context: str, action_type: str, action_detail: str):
         """Streams AI commentary via a generator (SSE compatible)."""
         print(f"DEBUG: generate_insight_stream started for user {user_id}")
-        
+
         # Adaptive Persona Prompt (Whisperer)
         personality = "soft"
         if "Guide Preset: hard" in context:
@@ -93,7 +95,7 @@ class AIInsightService:
             "max_tokens": 500
         }
 
-        print(f"DEBUG: Starting OpenRouter stream...")
+        print("DEBUG: Starting OpenRouter stream...")
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -107,20 +109,20 @@ class AIInsightService:
                     async for line in response.content:
                         if not line:
                             continue
-                        
+
                         decoded_line = line.decode('utf-8').strip()
                         print(f"DEBUG: raw_line: {decoded_line}")
                         if decoded_line.startswith("data: "):
                             data_str = decoded_line[6:]
                             if data_str == "[DONE]":
                                 break
-                            
+
                             try:
                                 data = json.loads(data_str)
                                 choices = data.get("choices", [])
                                 if choices:
                                     delta = choices[0].get("delta", {})
-                                    
+
                                     reasoning = delta.get("reasoning") or delta.get("thought")
                                     if reasoning:
                                         print(f"DEBUG: AI thinking: {reasoning}", flush=True)

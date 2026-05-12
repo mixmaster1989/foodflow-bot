@@ -1,8 +1,9 @@
 from aiogram import Router, types
 from aiogram.filters import Command
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+
 from database.base import SessionLocal
-from database.models import User, DreamLog
+from database.models import DreamLog, User
 
 router = Router()
 
@@ -17,7 +18,7 @@ async def cmd_stats(message: types.Message):
         # Общая статистика
         total_users = (await session.execute(select(func.count(User.id)))).scalar()
         total_dreams = (await session.execute(select(func.count(DreamLog.id)))).scalar()
-        
+
         usage_stats = (await session.execute(
             select(
                 func.sum(DreamLog.prompt_tokens),

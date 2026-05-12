@@ -1,15 +1,14 @@
 import logging
 from datetime import datetime, timedelta
-import json
 
 from aiogram import F, Router, types
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database.base import get_db
-from database.models import UserSettings, Subscription, ConsumptionLog
+from database.models import ConsumptionLog, Subscription, UserSettings
 from services.ai_guide import AIGuideService
 
 router = Router()
@@ -20,6 +19,27 @@ class GuideOnboarding(StatesGroup):
     waiting_for_preferences = State()
     waiting_for_weak_spots = State()
     waiting_for_personality = State()
+
+@router.callback_query(F.data == "guide_claim_gift")
+async def handle_guide_gift_claim(callback: types.CallbackQuery):
+    """Show Guide presentation after user clicks 'Claim Gift'."""
+    await callback.answer()
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🌸 Поддерживающий", callback_data="first_guide_pers:soft")
+    builder.button(text="🦾 Строгий", callback_data="first_guide_pers:hard")
+    builder.button(text="📊 Аналитик", callback_data="first_guide_pers:direct")
+    builder.adjust(1)
+    
+    await callback.message.edit_text(
+        "🤖 <b>Знакомься — твой Личный ИИ-Гид!</b>\n\n"
+        "Я буду анализировать каждый твой приём пищи в реальном времени и давать советы, "
+        "чтобы ты быстрее пришел к цели.\n\n"
+        "<b>Тебе начислено 3 дня бесплатного доступа!</b> 🎁\n\n"
+        "Выбери мой характер:",
+        parse_mode="HTML",
+        reply_markup=builder.as_markup()
+    )
 
 @router.message(Command("guide"))
 @router.callback_query(F.data == "menu_guide")
@@ -35,16 +55,16 @@ async def show_guide_menu(target: types.Message | types.CallbackQuery, state: FS
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings_obj = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         # Check if user has PRO
         sub_stmt = select(Subscription).where(Subscription.user_id == user_id)
         sub = (await session.execute(sub_stmt)).scalar_one_or_none()
-        
+
         is_pro = sub and sub.tier == "pro" and sub.is_active
         is_active = settings_obj and settings_obj.guide_active_until and settings_obj.guide_active_until > datetime.now()
-        
+
         builder = InlineKeyboardBuilder()
-        
+
         if not is_pro:
             text = (
                 "🤖 <b>Личный ИИ-Гид</b>\n\n"
@@ -66,7 +86,7 @@ async def show_guide_menu(target: types.Message | types.CallbackQuery, state: FS
             config = settings_obj.guide_config or {}
             personality = config.get("personality", "soft")
             pers_map = {"soft": "🌸 Поддерживающий", "hard": "🦾 Строгий", "direct": "📊 Аналитик"}
-            
+
             text = (
                 "🤖 <b>Твой Личный ИИ-Гид активен!</b>\n\n"
                 f"🎭 <b>Характер:</b> {pers_map.get(personality, personality)}\n"
@@ -75,25 +95,25 @@ async def show_guide_menu(target: types.Message | types.CallbackQuery, state: FS
             )
             builder.button(text="⚙️ Изменить характер", callback_data="guide_personality_choice")
             builder.button(text="📋 Перепройти анкету", callback_data="guide_onboarding_start")
-        
+
         builder.button(text="🔙 Назад", callback_data="main_menu")
         builder.adjust(1)
-        
+
         await msg.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data == "guide_activate_start")
 async def guide_activate_mock(callback: types.CallbackQuery, state: FSMContext):
     """Mock activation for Guide (granting access for testing)."""
     user_id = callback.from_user.id
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == user_id)
         settings_obj = (await session.execute(stmt)).scalar_one_or_none()
-        
+
         if settings_obj:
             settings_obj.guide_active_until = datetime.now() + timedelta(days=30)
             await session.commit()
-            
+
     await callback.answer("🎉 Функция активирована! (Тестовый период)", show_alert=True)
     await start_onboarding(callback, state)
 
@@ -102,7 +122,7 @@ async def start_onboarding(callback: types.CallbackQuery, state: FSMContext):
     """Start the onboarding questionnaire."""
     await callback.answer()
     await state.set_state(GuideOnboarding.waiting_for_schedule)
-    
+
     await callback.message.answer(
         "📝 <b>Анкета Личного Гида (1/4)</b>\n\n"
         "Расскажи о своем распорядке дня. Во сколько ты обычно просыпаешься, завтракаешь и когда у тебя последний прием пищи?\n\n"
@@ -136,13 +156,13 @@ async def process_preferences(message: types.Message, state: FSMContext):
 async def process_weak_spots(message: types.Message, state: FSMContext):
     await state.update_data(weak_spots=message.text)
     await state.set_state(GuideOnboarding.waiting_for_personality)
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(text="🌸 Поддерживающий", callback_data="guide_pers:soft")
     builder.button(text="🦾 Строгий", callback_data="guide_pers:hard")
     builder.button(text="📊 Аналитик", callback_data="guide_pers:direct")
     builder.adjust(1)
-    
+
     await message.answer(
         "🎭 <b>Анкета (4/4)</b>\n\n"
         "И последнее: какой характер мне выбрать?\n\n"
@@ -157,7 +177,7 @@ async def process_weak_spots(message: types.Message, state: FSMContext):
 async def process_personality(callback: types.CallbackQuery, state: FSMContext):
     personality = callback.data.split(":")[1]
     data = await state.get_data()
-    
+
     config = {
         "personality": personality,
         "answers": {
@@ -166,14 +186,14 @@ async def process_personality(callback: types.CallbackQuery, state: FSMContext):
             "weak_spots": data.get("weak_spots")
         }
     }
-    
+
     async for session in get_db():
         stmt = select(UserSettings).where(UserSettings.user_id == callback.from_user.id)
         settings_obj = (await session.execute(stmt)).scalar_one_or_none()
         if settings_obj:
             settings_obj.guide_config = config
             await session.commit()
-            
+
     await state.clear()
     await callback.message.answer(
         "🎉 <b>Настройка завершена!</b>\n\n"
@@ -261,4 +281,4 @@ async def activate_guide_first_log(callback: types.CallbackQuery, state: FSMCont
 # Helper to register router - will be called in main.py
 def register_guide_handlers(main_router):
     main_router.include_router(router)
-from sqlalchemy import select # Duplicate import for safety or fix main imports
+from sqlalchemy import select  # Duplicate import for safety or fix main imports

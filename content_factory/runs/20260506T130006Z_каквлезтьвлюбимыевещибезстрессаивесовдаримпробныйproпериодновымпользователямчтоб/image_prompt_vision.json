@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "model": "google/gemini-3-flash-preview",
+  "prompt": "A high-end vertical lifestyle photography shot of a vibrant, healthy salad bowl on a sleek wooden table with integrated teal neon lighting strips. In the background, a blurred, stylish interior of a modern apartment at dusk. Hovering above the plate is a subtle, translucent holographic interface showing abstract data visualizations and glowing green diagrams, no text. The lighting is a mix of warm natural sunset and cool cyberpunk teal and blue accents. Premium cinematic quality, 8k resolution, photorealistic textures, soft bokeh background.",
+  "negative_prompt": "text, letters, numbers, words, watermark, logo, QR code, branding, distorted hands, blurry face, messy kitchen, cheap furniture, low resolution, cartoon, illustration.",
+  "notes": [
+    "Used a 'healthy plate' as the central focus to align with the 'photograph your plate' feature mentioned in the text.",
+    "Incorporated teal and green neon accents to maintain brand consistency with the reference images.",
+    "The 'holographic interface' represents the AI analysis of the food without using illegal text or UI elements.",
+    "Selected a premium lifestyle setting to evoke the feeling of 'getting in shape' for spring in a high-status way.",
+    "Vertical composition (4:5 aspect ratio) for social media compatibility."
+  ]
+}

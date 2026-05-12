@@ -1,9 +1,12 @@
-import sys
 import os
+import sys
+
 sys.path.append(os.getcwd())
 
 import asyncio
+
 import aiohttp
+
 from config import settings
 
 PILOT_USERS = {
@@ -31,7 +34,7 @@ MESSAGE_TEMPLATE = """
 async def send_message(user_id, name):
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendMessage"
     text = f"Привет, {name}!" + MESSAGE_TEMPLATE
-    
+
     payload = {
         "chat_id": user_id,
         "text": text,

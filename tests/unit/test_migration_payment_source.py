@@ -11,9 +11,6 @@
 import os
 import sqlite3
 import tempfile
-from unittest.mock import patch
-
-import pytest
 
 
 def _create_legacy_schema(cursor: sqlite3.Cursor):

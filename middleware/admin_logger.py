@@ -31,7 +31,7 @@ class AdminLoggerMiddleware(BaseMiddleware):
                 user = event.message.from_user
                 user_id = user.id
                 user_info = f"{user.full_name} (ID: {user.id})"
-                
+
                 # Identify content type
                 if event.message.text:
                     event_info = f"Message: {event.message.text}"

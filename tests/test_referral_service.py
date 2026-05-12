@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from database.models import User, Subscription, ReferralEvent, ReferralReward
+from database.models import ReferralEvent, ReferralReward, Subscription, User
 from services.referral_service import ReferralService
 
 

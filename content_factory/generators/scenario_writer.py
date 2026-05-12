@@ -36,7 +36,49 @@ SCENARIO_DESCRIPTIONS = {
     "result": "через неделю с FoodFlow жизнь изменилась — контроль без напряга",
     "myth_buster": "разбить миф о питании (еда после 18:00, запрещённые продукты и т.д.)",
     "lazy_pro": "ленивый профи: ем всё что хочу, просто контролирую количество",
+    "demo_screenshot": "подводка к реальному скриншоту с разбором еды ботом",
+    "useful_tip": "конкретный полезный совет про питание или привычки",
+    "user_story": "история/кейс пользователя (цифры, результаты)",
+    "promo_action": "анонс акции или бонуса (например, Pioneer-программа)",
 }
+
+def pick_balanced_scenario(state: FactoryState) -> str:
+    target_distribution = {
+        "demo_screenshot": 0.30,
+        "useful_tip": 0.25,
+        "user_story": 0.20,
+        "promo_action": 0.15,
+        "generic_promo": 0.10
+    }
+
+    history = state.last_scenarios[-30:]
+    if len(history) < 5:
+        defaults = ["demo_screenshot", "useful_tip", "user_story", "promo_action", "generic_promo"]
+        choice = defaults[len(history) % len(defaults)]
+    else:
+        counts = {k: 0 for k in target_distribution}
+        for s in history:
+            if s in counts:
+                counts[s] += 1
+            elif s in FIXED_SCENARIOS:
+                counts["generic_promo"] += 1
+
+        total = len(history)
+        max_deficit = -100.0
+        best_choice = "demo_screenshot"
+
+        for k, target_pct in target_distribution.items():
+            current_pct = counts[k] / total
+            deficit = target_pct - current_pct
+            if deficit > max_deficit:
+                max_deficit = deficit
+                best_choice = k
+
+        choice = best_choice
+
+    if choice == "generic_promo":
+        return random.choice(FIXED_SCENARIOS)
+    return choice
 
 
 async def generate_scenario(state: FactoryState) -> dict:
@@ -58,6 +100,8 @@ async def generate_scenario(state: FactoryState) -> dict:
     fixed_scenarios_text = "\n".join(
         f'  - "{k}": {v}' for k, v in SCENARIO_DESCRIPTIONS.items()
     )
+
+    forced_scenario = pick_balanced_scenario(state)
 
     prompt = f"""Ты — Сценарист контент-завода Telegram-канала FoodFlow.
 
@@ -121,12 +165,9 @@ FoodFlow — Telegram-бот для умного учёта питания. Гл
 
 ## ПРАВИЛА ДЛЯ СЦЕНАРИЯ
 
-Можешь выбрать один из существующих сценариев ИЛИ придумать новый.
-Примеры новых сценариев которые могли бы существовать:
-- "social_proof": "другие уже считают — ты ещё нет, отстаёшь"
-- "before_after": "было: хаос в голове. стало: ясность за 10 секунд"
-- "fear_of_missing": "продолжаешь гадать пока другие знают точно"
-- "daily_ritual": "считать КБЖУ как чистить зубы — стало нормой"
+ТЕБЕ НАЗНАЧЕН СТРОГИЙ СЦЕНАРИЙ ДЛЯ ЭТОГО ПОСТА: "{forced_scenario}"
+Твоя задача — придумать Ситуацию и Тему именно под этот сценарий! Не выбирай другой.
+Если сценарий "demo_screenshot", "user_story", "useful_tip" или "promo_action", придумай ситуацию, которая подходит к этому формату (например, для demo_screenshot — конкретный приём пищи, для promo_action — желание начать новую жизнь и т.д.).
 
 ## ПРАВИЛА ДЛЯ ТЕМЫ
 
@@ -150,8 +191,7 @@ FoodFlow — Telegram-бот для умного учёта питания. Гл
     "category": "snake_case_название",
     "brief": "краткое описание сцены: где, что происходит, что человек чувствует"
   }},
-  "scenario": "название_сценария",
-  "scenario_description": "1 предложение: угол подачи",
+  "scenario": "{forced_scenario}",
   "topic": "конкретный тезис поста (1-2 предложения)"
 }}
 """

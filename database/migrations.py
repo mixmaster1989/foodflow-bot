@@ -213,6 +213,12 @@ def _run_sqlite_migrations():
                     ("ref_paid_count", "INTEGER DEFAULT 0"),
                     ("vk_id", "BIGINT"),
                     ("is_blocked", "BOOLEAN DEFAULT 0"),
+                    # Pioneer Program
+                    ("is_pioneer", "BOOLEAN DEFAULT 0"),
+                    ("pioneer_offered", "BOOLEAN DEFAULT 0"),
+                    ("pioneer_bonus_days", "INTEGER DEFAULT 0"),
+                    ("pioneer_refs_count", "INTEGER DEFAULT 0"),
+                    ("pioneer_ref_requested", "BOOLEAN DEFAULT 0"),
                 ]
             )
 

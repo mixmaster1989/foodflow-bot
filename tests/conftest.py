@@ -2,7 +2,7 @@
 Pytest fixtures for FoodFlow Bot tests.
 """
 import os
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aioresponses import aioresponses
@@ -17,8 +17,8 @@ os.environ['GLOBAL_PASSWORD'] = "test-password"
 
 # Import all models to ensure they are registered with Base.metadata
 # Import engine from database.base once it's configured
-from database.base import Base, engine
 import database.models  # noqa: F401 — регистрирует все модели в Base.metadata
+from database.base import Base, engine
 from database.models import (
     Product,
     Receipt,
@@ -48,6 +48,15 @@ async def db_session():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+@pytest.fixture(autouse=True)
+async def mock_log_event():
+    """Silence log_event by default in all tests across all handlers."""
+    with patch("utils.analytics.log_event", new_callable=AsyncMock) as m, \
+         patch("handlers.i_ate.log_event", new_callable=AsyncMock), \
+         patch("handlers.onboarding.log_event", new_callable=AsyncMock), \
+         patch("handlers.universal_input.log_event", new_callable=AsyncMock):
+        yield m
 
 
 @pytest.fixture

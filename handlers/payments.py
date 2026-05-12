@@ -23,8 +23,8 @@ from database.models import (
     PAYMENT_SOURCE_YOOKASSA,
     Subscription,
 )
-from services.referral_service import ReferralService
 from services.payment_service import YooKassaService
+from services.referral_service import ReferralService
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -114,7 +114,7 @@ async def handle_choose_payment_type(callback: types.CallbackQuery):
     price_rub = tier_info["price_rub"]
 
     builder = InlineKeyboardBuilder()
-    
+
     # Currency Selection
     builder.button(
         text="⭐ Оплатить через Stars",
@@ -124,7 +124,7 @@ async def handle_choose_payment_type(callback: types.CallbackQuery):
         text="💳 Оплатить Картой (RUB)",
         callback_data=f"buy_once:{tier}:RUB",
     )
-    
+
     builder.button(text="🔙 Назад к тарифам", callback_data="show_subscriptions")
     builder.adjust(1)
 
@@ -240,10 +240,10 @@ async def handle_choose_duration(callback: types.CallbackQuery):
     if len(parts) < 3:
         await callback.answer("❌ Ошибка параметров", show_alert=True)
         return
-        
+
     tier = parts[1]
     currency = parts[2] # "XTR" or "RUB"
-    
+
     if tier not in TIERS:
         await callback.answer("❌ Неизвестный тариф", show_alert=True)
         return
@@ -326,7 +326,7 @@ async def handle_buy_once_duration(callback: types.CallbackQuery, bot: Bot):
 
     tier_info = TIERS[tier]
     dur = DURATIONS[months]
-    
+
     base_price = tier_info["price_rub"] if currency == "RUB" else tier_info["price_stars"]
     total_price = calc_price(base_price, months, dur["discount"])
     user_id = callback.from_user.id
@@ -359,22 +359,22 @@ async def handle_buy_once_duration(callback: types.CallbackQuery, bot: Bot):
                 "months": months,
                 "type": "one-time"
             }
-            
+
             # Get bot info for return url
             bot_info = await bot.get_me()
             return_url = f"https://t.me/{bot_info.username}"
-            
+
             payment = await YooKassaService.create_payment(
                 amount=total_price,
                 description=f"{title} for user {user_id}",
                 metadata=metadata,
                 return_url=return_url
             )
-            
+
             if not payment:
                 await callback.answer("❌ Ошибка создания платежа в ЮKassa", show_alert=True)
                 return
-                
+
             link = payment.confirmation.confirmation_url
             payment_id = payment.id
         else:
@@ -395,10 +395,10 @@ async def handle_buy_once_duration(callback: types.CallbackQuery, bot: Bot):
         builder = InlineKeyboardBuilder()
         btn_text = f"💳 Оплатить {total_price} ₽" if currency == "RUB" else f"⭐ Оплатить {total_price} Stars"
         builder.button(text=btn_text, url=link)
-        
+
         if currency == "RUB" and payment_id:
             builder.button(text="✅ Проверить оплату", callback_data=f"check_pay:{payment_id}")
-            
+
         builder.button(text="🔙 Назад", callback_data=f"buy_once:{tier}:{currency}")
         builder.adjust(1)
 
@@ -429,13 +429,13 @@ async def handle_buy_once_duration(callback: types.CallbackQuery, bot: Bot):
 async def handle_check_yookassa_payment(callback: types.CallbackQuery):
     """Check the status of a YooKassa payment and activate subscription if paid."""
     payment_id = callback.data.split(":")[1]
-    
+
     payment = await YooKassaService.check_payment_status(payment_id)
-    
+
     if not payment:
         await callback.answer("❌ Ошибка при проверке статуса платежа.", show_alert=True)
         return
-        
+
     if payment.status == "succeeded":
         # Payment is successful!
         metadata = payment.metadata
@@ -446,11 +446,11 @@ async def handle_check_yookassa_payment(callback: types.CallbackQuery):
             f"✅ YooKassa payment {payment_id} succeeded for user {user_id}, "
             f"tier={tier}, months={months}, amount={payment.amount.value} {payment.amount.currency}"
         )
-        
+
         # Calculate expiry
         now = datetime.now()
         expires = now + timedelta(days=30 * months)
-        
+
         # Update DB
         async for session in get_db():
             stmt = select(Subscription).where(Subscription.user_id == user_id)
@@ -486,10 +486,10 @@ async def handle_check_yookassa_payment(callback: types.CallbackQuery):
             await ReferralService.handle_successful_payment(user_id=user_id, tier=tier)
         except Exception as e:
             logger.error(f"[REFERRAL] Failed to handle referral bonuses for YooKassa payment {payment_id}: {e}", exc_info=True)
-            
+
         tier_info = TIERS.get(tier, {"title": tier, "emoji": "💎"})
         dur_label = DURATIONS.get(months, {}).get("label", f"{months} мес")
-        
+
         await callback.message.edit_text(
             f"🎉 <b>Оплата подтверждена!</b>\n\n"
             f"Тариф: {tier_info.get('emoji', '')} <b>{tier_info['title']}</b>\n"
@@ -499,7 +499,7 @@ async def handle_check_yookassa_payment(callback: types.CallbackQuery):
             parse_mode="HTML"
         )
         await callback.answer("Подписка активирована!", show_alert=True)
-        
+
     elif payment.status == "pending":
         await callback.answer("⏳ Оплата еще в процессе. Попробуйте проверить через минуту.", show_alert=True)
     elif payment.status == "waiting_for_capture":

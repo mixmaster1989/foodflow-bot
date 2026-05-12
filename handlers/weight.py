@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from database.base import get_db
 from database.models import UserSettings, WeightLog
+from utils.analytics import log_event
 
 router = Router()
 
@@ -55,7 +56,7 @@ async def fallback_numeric_weight(message: types.Message) -> None:
     """
     weight = _try_parse_weight_value(message.text)
     # Filter above ensures weight is not None and in range
-    
+
     async for session in get_db():
         settings_stmt = select(UserSettings).where(UserSettings.user_id == message.from_user.id)
         settings = (await session.execute(settings_stmt)).scalar_one_or_none()
@@ -70,10 +71,12 @@ async def fallback_numeric_weight(message: types.Message) -> None:
             recorded_at=datetime.now()
         )
         session.add(log)
-        
+
         if settings:
             settings.weight = weight
         await session.commit()
+
+    await log_event(message.from_user.id, "weight_logged", {"weight": weight, "mode": "fallback"})
 
     builder = InlineKeyboardBuilder()
     builder.button(text="⚖️ К весу", callback_data="menu_weight")
@@ -135,7 +138,7 @@ async def show_weight_menu(callback: types.CallbackQuery) -> None:
             await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         from services.ai_guide import AIGuideService
         await AIGuideService.track_activity(user_id, "weight", session)
-        
+
         await callback.answer()
 
 
@@ -199,7 +202,8 @@ async def save_weight(message: types.Message, state: FSMContext) -> None:
                 settings.weight = weight
 
             await session.commit()
-            
+            await log_event(message.from_user.id, "weight_logged", {"weight": weight, "mode": "input"})
+
             from services.ai_guide import AIGuideService
             await AIGuideService.track_activity(message.from_user.id, "weight", session)
 

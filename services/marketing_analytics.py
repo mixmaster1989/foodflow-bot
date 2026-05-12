@@ -300,7 +300,7 @@ async def get_hourly_activity(days: int = 7) -> str:
 async def get_acquisition_sources() -> str:
     """Aggregated acquisition source report with 'Today' breakdown."""
     today = datetime.now().date()
-    
+
     async for session in get_db():
         rows = (await session.execute(
             select(UserFeedback.answer, UserFeedback.created_at).where(
@@ -315,22 +315,22 @@ async def get_acquisition_sources() -> str:
     # Aggregate by source
     counts: dict[str, int] = {}
     today_counts: dict[str, int] = {}
-    
+
     for answer_json, created_at in rows:
         try:
             data = json.loads(answer_json)
             key = data.get("source", "other")
         except (json.JSONDecodeError, TypeError):
             key = "other"
-            
+
         counts[key] = counts.get(key, 0) + 1
-        
+
         if created_at and created_at.date() == today:
             today_counts[key] = today_counts.get(key, 0) + 1
 
     total = sum(counts.values())
     total_today = sum(today_counts.values())
-    
+
     lines = [f"📋 Источники привлечения (всего: {total})\n"]
 
     # Today breakdown (if any)

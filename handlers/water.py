@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database.base import get_db
 from database.models import WaterLog
+from utils.analytics import log_event
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -47,10 +48,12 @@ async def process_add_water(callback: types.CallbackQuery, state: FSMContext, us
         session.add(log)
         await session.commit()
 
+    await log_event(user_id, "water_logged", {"amount_ml": amount_ml})
+
     from services.ai_guide import AIGuideService
-    
+
     await callback.answer(f"✅ Добавлено {amount_ml} мл воды!", show_alert=True)
-    
+
     # 1. Update main menu immediately First
     from handlers.menu import show_main_menu
     await show_main_menu(callback.message, callback.from_user.first_name, user_id, user_tier)

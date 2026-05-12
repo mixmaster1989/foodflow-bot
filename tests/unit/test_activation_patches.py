@@ -10,10 +10,8 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy import select
 
 from database.models import PAYMENT_SOURCE_TRIAL, Subscription, User, UserSettings
-
 
 # ============================================================
 # ПРАВКА №1 — Финальный экран онбординга
@@ -46,7 +44,8 @@ async def test_finish_onboarding_has_no_inline_buttons(
     mock_callback_query.message.delete = AsyncMock()
     mock_callback_query.message.answer = AsyncMock()
 
-    with patch("handlers.onboarding.get_db") as mock_get_db:
+    with patch("handlers.onboarding.get_db") as mock_get_db, \
+         patch("handlers.onboarding.run_onboarding_demo", new_callable=AsyncMock):
         async def db_gen():
             yield db_session
         mock_get_db.return_value = db_gen()
@@ -95,7 +94,8 @@ async def test_finish_onboarding_uses_chat_first_name(
     mock_callback_query.message.delete = AsyncMock()
     mock_callback_query.message.answer = AsyncMock()
 
-    with patch("handlers.onboarding.get_db") as mock_get_db:
+    with patch("handlers.onboarding.get_db") as mock_get_db, \
+         patch("handlers.onboarding.run_onboarding_demo", new_callable=AsyncMock):
         async def db_gen():
             yield db_session
         mock_get_db.return_value = db_gen()
@@ -127,7 +127,8 @@ async def test_finish_onboarding_fallback_name_when_no_first_name(
     mock_callback_query.message.delete = AsyncMock()
     mock_callback_query.message.answer = AsyncMock()
 
-    with patch("handlers.onboarding.get_db") as mock_get_db:
+    with patch("handlers.onboarding.get_db") as mock_get_db, \
+         patch("handlers.onboarding.run_onboarding_demo", new_callable=AsyncMock):
         async def db_gen():
             yield db_session
         mock_get_db.return_value = db_gen()
@@ -207,7 +208,7 @@ async def test_i_ate_start_sets_waiting_for_description(
     mock_callback_query, mock_fsm_context
 ):
     """i_ate_start устанавливает FSM state waiting_for_description — чтобы ловить ввод."""
-    from handlers.i_ate import i_ate_start, IAteStates
+    from handlers.i_ate import IAteStates, i_ate_start
 
     mock_callback_query.answer = AsyncMock()
     mock_callback_query.message.edit_media = AsyncMock()

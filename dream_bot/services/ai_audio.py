@@ -1,10 +1,12 @@
-import aiohttp
-import os
-import json
 import base64
-import re
+import json
 import logging
-from config import OPENROUTER_API_KEY, GROK_PROXY
+import os
+import re
+
+import aiohttp
+
+from config import GROK_PROXY, OPENROUTER_API_KEY
 
 TTS_SYSTEM = (
     "Ты — голосовой чтец. Прочти дословно текст пользователя — слово в слово, ничего не добавляя и не убирая. "

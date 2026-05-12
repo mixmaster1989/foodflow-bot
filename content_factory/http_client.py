@@ -5,7 +5,6 @@ aiohttp автоматически читает HTTP_PROXY/HTTPS_PROXY из си
 """
 from __future__ import annotations
 
-import json
 import aiohttp
 
 

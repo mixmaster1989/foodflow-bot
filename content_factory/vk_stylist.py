@@ -5,9 +5,8 @@ import logging
 import re
 from dataclasses import dataclass
 
-from content_factory.http_client import openrouter_post
-
 from config import settings
+from content_factory.http_client import openrouter_post
 
 logger = logging.getLogger(__name__)
 

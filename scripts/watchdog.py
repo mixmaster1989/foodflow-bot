@@ -1,11 +1,11 @@
 import asyncio
-import os
-import sys
-import psutil
-import subprocess
 import json
 import logging
-from datetime import datetime
+import os
+import subprocess
+import sys
+
+import psutil
 from aiogram import Bot
 
 # Добавляем путь к проекту
@@ -70,7 +70,7 @@ async def check_resources(bot: Bot, admin_id: int):
 
         status = proc['pm2_env']['status']
         restarts = proc['pm2_env']['restart_time']
-        
+
         # Check if status is not online
         if status not in ['online', 'one-launch-status']:
             msg = f"🔴 **ПРОЦЕСС УПАЛ!**\nИмя: `{name}`\nСтатус: `{status}`"
@@ -83,15 +83,15 @@ async def check_resources(bot: Bot, admin_id: int):
             msg = f"🔄 **ЧАСТЫЕ ПЕРЕЗАПУСКИ!**\nИмя: `{name}`\nВсего рестартов: `{restarts}`\nРост: `+{restarts - prev_restarts}`"
             await bot.send_message(admin_id, msg, parse_mode="Markdown")
             logger.warning(f"Process {name} restarting too fast: +{restarts - prev_restarts}")
-        
+
         state['last_pm2_restarts'][name] = restarts
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
     admin_id = settings.ADMIN_IDS[0]
-    
+
     logger.info("🛡️ FoodFlow Watchdog started...")
-    
+
     # Send "I'm alive" notification (optional, during test)
     # await bot.send_message(admin_id, "🛡️ Мониторинг Watchdog запущен.")
 
@@ -100,7 +100,7 @@ async def main():
             await check_resources(bot, admin_id)
         except Exception as e:
             logger.error(f"Watchdog error: {e}")
-        
+
         # Check every 5 minutes
         await asyncio.sleep(300)
 

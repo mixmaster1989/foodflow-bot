@@ -12,24 +12,25 @@
     --dry-run   только показать список без отправки
     --segment   sv1 | sv2 | all (по умолчанию all)
 """
+import argparse
 import asyncio
 import os
 import sys
-import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from database.base import engine, init_db
-from database.models import User, UserSettings, UserFeedback, ConsumptionLog, Base
+from database.models import ConsumptionLog, User, UserFeedback, UserSettings
 
 SURVEY_START = "2026-04-16"
 SURVEY_END   = "2026-04-27"
@@ -70,7 +71,7 @@ def _days_ago_label(registered_at: datetime) -> str:
     if days == 0:   return "сегодня"
     if days == 1:   return "вчера"
     if days < 7:    return f"{days} дня назад" if days < 5 else f"{days} дней назад"
-    return f"на прошлой неделе"
+    return "на прошлой неделе"
 
 
 async def get_segments(session: AsyncSession):
@@ -155,7 +156,7 @@ async def run(dry_run: bool, segment: str):
         sv1_users, sv2_users = await get_segments(session)
 
     print(f"\n{'='*50}")
-    print(f"📊 Сегменты:")
+    print("📊 Сегменты:")
     print(f"  sv1 (0 логов):   {len(sv1_users)} чел.")
     print(f"  sv2 (ушли):      {len(sv2_users)} чел.")
     print(f"  dry_run:         {dry_run}")

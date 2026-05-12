@@ -6,7 +6,7 @@ Contains:
 import asyncio
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 
@@ -239,13 +239,13 @@ class AIService:
                         continue
         return None
     @classmethod
-    async def get_completion(cls, prompt: str, model: Optional[str] = None) -> str | None:
+    async def get_completion(cls, prompt: str, model: str | None = None) -> str | None:
         """Get a generic text completion from AI (G guide/general)."""
         if model:
             target_models = [model]
         else:
             target_models = cls.GUIDE_MODELS
-            
+
         for target_model in target_models:
             headers = {
                 "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -277,14 +277,14 @@ class AIService:
         return None
 
     @classmethod
-    async def get_completion_stream(cls, prompt: str, model: Optional[str] = None):
+    async def get_completion_stream(cls, prompt: str, model: str | None = None):
         """Get a streamed text completion from AI."""
         import json
         if model:
             target_models = [model]
         else:
             target_models = cls.GUIDE_MODELS
-            
+
         for target_model in target_models:
             headers = {
                 "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -316,17 +316,17 @@ class AIService:
                                     await asyncio.sleep(0.5)
                                     continue
                                 break # Move to next model
-                                
+
                             async for line in response.content:
                                 if not line:
                                     continue
-                                
+
                                 decoded_line = line.decode("utf-8").strip()
                                 if decoded_line.startswith("data: "):
                                     data_str = decoded_line[6:].strip()
                                     if data_str == "[DONE]":
                                         break
-                                    
+
                                     try:
                                         data = json.loads(data_str)
                                         if "choices" in data and len(data["choices"]) > 0:
@@ -342,6 +342,6 @@ class AIService:
                             await asyncio.sleep(0.5)
                             continue
                         break # Move to next model
-        
+
         # If all models fail, yield empty
         yield ""

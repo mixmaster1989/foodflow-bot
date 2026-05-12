@@ -1,12 +1,10 @@
 """
 Tests for marketing analytics service.
 """
-import io
 import os
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Set test environment variables before importing modules
@@ -18,17 +16,15 @@ os.environ.setdefault('GLOBAL_PASSWORD', 'test-password')
 
 from database.base import Base, engine
 from database.models import (
-    ConsumptionLog,
     PAYMENT_SOURCE_FEEDBACK,
     PAYMENT_SOURCE_REFERRAL,
     PAYMENT_SOURCE_STARS,
     PAYMENT_SOURCE_TRIAL,
     PAYMENT_SOURCE_YOOKASSA,
+    ConsumptionLog,
     ReferralEvent,
     Subscription,
     User,
-    UserFeedback,
-    UserSettings,
 )
 from services.marketing_analytics import (
     export_csv,

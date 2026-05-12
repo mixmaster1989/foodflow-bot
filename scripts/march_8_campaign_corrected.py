@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aiogram import Bot
 from aiogram.types import FSInputFile
+
 from config import settings
 
 # --- КОНФИГУРАЦИЯ ---
@@ -43,13 +44,13 @@ async def send_congrats(bot: Bot, user_id: int, name: str, text: str, photo_path
         if DRY_RUN:
             logger.info(f"[DRY_RUN] Отправка {user_id} ({name}). Текст: {text[:60]}...")
             return True
-        
+
         if photo_path and os.path.exists(photo_path):
             photo = FSInputFile(photo_path)
             await bot.send_photo(chat_id=user_id, photo=photo, caption=text, parse_mode="HTML")
         else:
             await bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
-            
+
         logger.info(f"✅ Успешно отправлено: {user_id} ({name})")
         return True
     except Exception as e:
@@ -59,7 +60,7 @@ async def send_congrats(bot: Bot, user_id: int, name: str, text: str, photo_path
 async def main():
     logger.info(f"🚀 ТЕСТОВЫЙ ЗАПУСК. Режим DRY_RUN: {DRY_RUN}")
     bot = Bot(token=settings.BOT_TOKEN)
-    
+
     # 1. Проверка Зеленой группы
     logger.info("--- ГРУППА ЗЕЛЕНАЯ ---")
     for u_id, name in USERS_GREEN.items():

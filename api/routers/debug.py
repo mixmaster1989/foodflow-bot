@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Request
 import logging
+
+from fastapi import APIRouter, Request
 
 router = APIRouter()
 logger = logging.getLogger("api.debug")
@@ -11,14 +12,14 @@ async def remote_log(request: Request):
         msg = data.get("message", "No message")
         level = data.get("level", "INFO")
         detail = data.get("detail", "")
-        
+
         # Log to server console/logs
         log_msg = f"📱 [MOBILE-DEBUG] {msg} | {detail}"
         if level == "ERROR":
             logger.error(log_msg)
         else:
             logger.info(log_msg)
-            
+
         return {"status": "received"}
     except Exception as e:
         logger.error(f"Error in remote logging: {e}")

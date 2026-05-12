@@ -1,13 +1,12 @@
 
 import asyncio
-import logging
 import sys
-import os
 
 # Add project root to path
 sys.path.append('/home/user1/foodflow-bot_new')
 
 from services.herbalife_expert import herbalife_expert
+
 
 async def test():
     tests = ["1 порция Грин Макс", "2 ложки Грин Макс", "1 ложка Грин Макс"]

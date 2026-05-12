@@ -36,7 +36,7 @@ async def contact_dev_start(callback: types.CallbackQuery, state: FSMContext):
 async def process_support_message(message: types.Message, state: FSMContext, bot: Bot):
     """Forward user message to admins."""
     user_info = f"User: {message.from_user.full_name} (@{message.from_user.username}) [ID: {message.from_user.id}]"
-    
+
     # Notify admins about the new message
     for admin_id in settings.ADMIN_IDS:
         try:

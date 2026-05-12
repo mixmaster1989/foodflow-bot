@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -66,6 +66,12 @@ jobs:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: |
             pytest tests/ --cov=handlers --cov=services --cov-report=xml --cov-report=term --tb=short -v
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
       - name: Skip pytest (no tests yet)
         if: steps.check-tests.outputs.tests_exist == 'false'
         run: |
