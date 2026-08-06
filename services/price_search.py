@@ -89,6 +89,7 @@ class PriceSearchService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=60
                     ) as response:
                         if response.status == 200:

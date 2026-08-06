@@ -25,6 +25,7 @@ from database.models import (
     UserFeedback,
     UserSettings,
 )
+from utils.i18n import t, get_locale
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,11 @@ async def generate_curator_morning_summary(curator_id: int) -> str | None:
     date_str = yesterday.strftime("%d.%m.%Y")
 
     async for session in get_db():
+        # Get curator settings for locale
+        curator_settings_stmt = select(UserSettings).where(UserSettings.user_id == curator_id)
+        curator_settings = (await session.execute(curator_settings_stmt)).scalar_one_or_none()
+        curator_locale = curator_settings.locale if curator_settings else "ru"
+
         # Get all wards
         stmt = select(User).where(User.curator_id == curator_id)
         wards = (await session.execute(stmt)).scalars().all()
@@ -87,7 +93,7 @@ async def generate_curator_morning_summary(curator_id: int) -> str | None:
             for log in logs:
                 time_str = log.date.strftime("%H:%M")
                 cal = int(log.calories or 0)
-                food_lines.append(f"  <code>{time_str}</code> — {log.product_name} ({cal} ккал)")
+                food_lines.append(f"  <code>{time_str}</code> — {log.product_name} ({cal} {t('reports.unit_kcal', locale=curator_locale)})")
 
             active_wards.append({
                 "name": ward_name,
@@ -104,21 +110,31 @@ async def generate_curator_morning_summary(curator_id: int) -> str | None:
 
     # Build report text
     lines = [
-        f"📋 <b>Утренняя сводка за {date_str}</b>",
-        f"👥 Подопечных: <b>{len(active_wards) + len(inactive_wards)}</b>\n",
+        t("reports.curator_summary_title", locale=curator_locale, date=date_str),
+        t("reports.curator_wards_count", locale=curator_locale, count=len(active_wards) + len(inactive_wards)),
     ]
 
     # Active wards with detailed logs
     if active_wards:
-        lines.append(f"<b>Заполнили дневник ({len(active_wards)}):</b>\n")
+        lines.append(t("reports.curator_filled_diary", locale=curator_locale, count=len(active_wards)))
         for w in active_wards:
             cal_pct = int((w['total_cal'] / w['goal_cal']) * 100) if w['goal_cal'] > 0 else 0
-            fiber_str = f"  Кл:{w['total_fiber']}" if w['total_fiber'] else ""
+            fiber_str = f"  {t('reports.curator_fiber_short', locale=curator_locale)}:{w['total_fiber']}" if w['total_fiber'] else ""
             lines.append(
-                f"{w['status']} <b>{w['name']}</b> — "
-                f"{w['total_cal']}/{w['goal_cal']} ккал ({cal_pct}%) | "
-                f"Б:{w['total_prot']}  Ж:{w['total_fat']}  У:{w['total_carbs']}"
-                f"{fiber_str}"
+                t(
+                    "reports.curator_ward_row",
+                    locale=curator_locale,
+                    status=w['status'],
+                    name=w['name'],
+                    cal=w['total_cal'],
+                    goal=w['goal_cal'],
+                    unit_kcal=t("reports.unit_kcal", locale=curator_locale),
+                    percent=cal_pct,
+                    prot=w['total_prot'],
+                    fat=w['total_fat'],
+                    carbs=w['total_carbs'],
+                    fiber_str=fiber_str
+                )
             )
             for fl in w["food_lines"]:
                 lines.append(fl)
@@ -126,7 +142,7 @@ async def generate_curator_morning_summary(curator_id: int) -> str | None:
 
     # Inactive wards
     if inactive_wards:
-        lines.append(f"😴 <b>Не заполняли ({len(inactive_wards)}):</b>")
+        lines.append(t("reports.curator_not_filled_diary", locale=curator_locale, count=len(inactive_wards)))
         lines.append(", ".join(inactive_wards))
 
     return "\n".join(lines)
@@ -154,6 +170,7 @@ async def generate_ward_ai_report(ward_id: int) -> dict | None:
         # Get settings (goals)
         settings_stmt = select(UserSettings).where(UserSettings.user_id == ward_id)
         ward_settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        ward_locale = ward_settings.locale if ward_settings else "ru"
         goals = {
             "calories": ward_settings.calorie_goal if ward_settings and ward_settings.calorie_goal else 2000,
             "protein": ward_settings.protein_goal if ward_settings and ward_settings.protein_goal else 100,
@@ -185,15 +202,26 @@ async def generate_ward_ai_report(ward_id: int) -> dict | None:
     food_list_lines = []
     for log in logs:
         time_str = log.date.strftime("%H:%M")
-        weight_str = f" ({int(log.weight)}г)" if getattr(log, 'weight', None) else ""
-        fiber_str = f", Кл:{log.fiber:.1f}г" if log.fiber else ""
+        weight_str = t("reports.curator_weight_format", locale=ward_locale, weight=int(log.weight), unit_g=t("reports.unit_grams_short", locale=ward_locale)) if getattr(log, 'weight', None) else ""
+        fiber_str = t("reports.curator_fiber_format", locale=ward_locale, fiber=log.fiber, unit_g=t("reports.unit_grams_short", locale=ward_locale)) if log.fiber else ""
         food_list_lines.append(
-            f"• {time_str} — {log.product_name}{weight_str}: "
-            f"{int(log.calories or 0)} ккал | "
-            f"Б:{log.protein:.1f}г Ж:{log.fat:.1f}г У:{log.carbs:.1f}г{fiber_str}"
+            t(
+                "reports.curator_food_line",
+                locale=ward_locale,
+                time=time_str,
+                name=log.product_name,
+                weight=weight_str,
+                cal=int(log.calories or 0),
+                unit_kcal=t("reports.unit_kcal", locale=ward_locale),
+                prot=log.protein,
+                fat=log.fat,
+                carbs=log.carbs,
+                unit_g=t("reports.unit_grams_short", locale=ward_locale),
+                fiber=fiber_str
+            )
         )
 
-    food_list_text = "\n".join(food_list_lines) if food_list_lines else "Нет данных"
+    food_list_text = "\n".join(food_list_lines) if food_list_lines else t("reports.curator_no_data", locale=ward_locale)
 
     # Prepare data for AI prompt
     prompt_data = {
@@ -208,7 +236,7 @@ async def generate_ward_ai_report(ward_id: int) -> dict | None:
     # Get AI report
     ai_text = await get_nutrition_report(prompt_data)
     if not ai_text:
-        ai_text = "📊 <b>Отчет готов!</b>\nПодробности на изображении 👆"
+        ai_text = t("reports.ai_report_fallback")
 
     return {
         "ward_name": ward_name,
@@ -243,12 +271,7 @@ async def generate_daily_report(user_id: int) -> str | None:
 
         # --- CASE 0: No Activity ---
         if not logs:
-            return (
-                "🌙 <b>Итоги дня</b>\n\n"
-                "Сегодня вы ничего не записали в дневник. 😔\n"
-                "А ведь здесь мог быть красивый отчет о ваших успехах!\n\n"
-                "<i>Попробуйте завтра записать хотя бы завтрак — это затягивает!</i> ✨"
-            )
+            return t("reports.no_activity_title")
 
         # --- CASE 1: Activity Found ---
 
@@ -288,24 +311,10 @@ async def generate_daily_report(user_id: int) -> str | None:
         date_str = datetime.now().strftime("%d %B")
 
         report = (
-            f"📊 <b>Сводка за сегодня</b>\n"
-            f"<i>{date_str}</i>\n\n"
-
-            f"🔥 <b>Калории</b>\n"
-            f"{make_bar(cal_percent)} {int(cal_percent)}%\n"
-            f"Потреблено: <b>{int(total_cal)}</b> / {int(goal_cal)}\n"
-            f"Осталось: <b>{int(remaining_cal)}</b>\n\n"
-
-            f"🥬 <b>Клетчатка</b>\n"
-            f"{make_bar(fiber_percent)} {int(fiber_percent)}%\n"
-            f"Съедено: <b>{total_fiber:.1f}г</b> / {int(goal_fiber)}г\n\n"
-
-            f"🧬 <b>БЖУ (Баланс)</b>\n"
-            f"🔵 Белки: {int(total_prot)}г ({p_pct}%)\n"
-            f"🟡 Жиры: {int(total_fat)}г ({f_pct}%)\n"
-            f"🟠 Углеводы: {int(total_carbs)}г ({c_pct}%)\n\n"
-
-            f"📝 Записей в дневнике: {len(logs)}"
+            t("reports.summary_title", date=date_str) +
+            t("reports.calories_section", bar=make_bar(cal_percent), percent=int(cal_percent), total=int(total_cal), goal=int(goal_cal), remaining=int(remaining_cal)) +
+            t("reports.fiber_section", bar=make_bar(fiber_percent), percent=int(fiber_percent), total=total_fiber, goal=int(goal_fiber)) +
+            t("reports.balance_section", prot=int(total_prot), fat=int(total_fat), carbs=int(total_carbs), p_pct=p_pct, f_pct=f_pct, c_pct=c_pct, count=len(logs))
         )
 
         return report
@@ -329,16 +338,16 @@ async def generate_detailed_report(user_id: int, target_date: date = None) -> st
 
         date_str = target_date.strftime("%d.%m.%Y")
         if target_date == datetime.now().date():
-            date_str += " (Сегодня)"
+            date_str += t("reports.unit_today")
 
         if not logs:
             return (
-                f"📋 <b>Дневник за {date_str}</b>\n\n"
-                "Записей не обнаружено. Чистый холст! 🎨"
+                t("reports.diary_title", date=date_str) +
+                t("reports.diary_empty")
             )
 
         # Build detailed list
-        lines = [f"📋 <b>Дневник за {date_str}</b>\n"]
+        lines = [t("reports.diary_title", date=date_str)]
 
         total_cal = 0
         total_prot = 0
@@ -361,7 +370,7 @@ async def generate_detailed_report(user_id: int, target_date: date = None) -> st
                 emoji = "🌙"
 
             cal = int(log.calories) if log.calories else 0
-            lines.append(f"{emoji} <code>{time_formatted}</code> — {log.product_name} — <b>{cal}</b> ккал")
+            lines.append(t("reports.meal_line", emoji=emoji, time=time_formatted, name=log.product_name, cal=cal))
 
             total_cal += log.calories or 0
             total_prot += log.protein or 0
@@ -369,23 +378,19 @@ async def generate_detailed_report(user_id: int, target_date: date = None) -> st
             total_carbs += log.carbs or 0
             total_fiber += log.fiber or 0
 
-        lines.append("\n<b>Итого за день:</b>")
-        lines.append(f"🔥 <b>{int(total_cal)}</b> ккал")
+        lines.append(t("reports.total_day"))
+        lines.append(t("reports.total_cal", total=int(total_cal)))
 
-        macros = [
-            f"🥩 Б: <b>{int(total_prot)}</b>г",
-            f"🥑 Ж: <b>{int(total_fat)}</b>г",
-            f"🍞 У: <b>{int(total_carbs)}</b>г"
-        ]
+        macros_str = t("reports.macros_format", prot=int(total_prot), fat=int(total_fat), carbs=int(total_carbs))
         if total_fiber:
-            macros.append(f"🥬 Кл: <b>{int(total_fiber)}</b>г")
+            macros_str += t("reports.macros_fiber_format", fiber=int(total_fiber))
 
-        lines.append(" | ".join(macros))
+        lines.append(macros_str)
 
         return "\n".join(lines)
 
 
-async def send_daily_visual_report(user_id: int, bot) -> bool:
+async def send_daily_visual_report(user_id: int, bot, caption: str = None) -> bool:
     """Generate and send visual daily report card."""
     import logging
 
@@ -401,7 +406,7 @@ async def send_daily_visual_report(user_id: int, bot) -> bool:
         async for session in get_db():
             # 1. Fetch User Data
             user = await session.get(User, user_id)
-            user_name = user.first_name if user else "Пользователь"
+            user_name = user.first_name if user else t("reports.default_user")
 
             # 2. Fetch Settings (Goals)
             stmt_settings = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -443,13 +448,16 @@ async def send_daily_visual_report(user_id: int, bot) -> bool:
                 total_metrics=total_metrics,
                 goals=goals
             )
+            if image_bio is None:
+                logger.error(f"draw_daily_card returned None for user {user_id}")
+                return False
 
             # 6. Send to Telegram
             photo = BufferedInputFile(image_bio.getvalue(), filename="progress.png")
             await bot.send_photo(
                 chat_id=user_id,
                 photo=photo,
-                caption="📈 <b>Ваш прогресс на текущий момент</b>",
+                caption=caption or t("reports.progress_caption"),
                 parse_mode="HTML"
             )
             return True
@@ -460,8 +468,10 @@ async def send_daily_visual_report(user_id: int, bot) -> bool:
 
     return False
 
-async def generate_admin_daily_digest() -> str:
+async def generate_admin_daily_digest(locale: str = None) -> str:
     """Generate global daily statistics for administrators."""
+    if not locale:
+        locale = get_locale()
     yesterday = (datetime.now() - timedelta(days=1)).date()
     date_str = yesterday.strftime("%d.%m.%Y")
 
@@ -537,20 +547,31 @@ async def generate_admin_daily_digest() -> str:
     active_percent = (active_users_count / total_users_count * 100) if total_users_count > 0 else 0
 
     report = (
-        f"👑 <b>Admin Daily Digest ({date_str})</b>\n\n"
-        f"👥 <b>Пользователи:</b>\n"
-        f"  • Новых за день: <b>+{new_users_count}</b> (реф: {ref_signup_count})\n"
-        f"  • Всего в системе: <b>{total_users_count}</b>\n\n"
-        f"📈 <b>Активность за вчера:</b>\n"
-        f"  • Активных юзеров (DAU): <b>{active_users_count}</b> ({active_percent:.1f}%)\n"
-        f"  • Записей еды: <b>{logs_count}</b>\n"
-        f"  • Ответов на опросы: <b>{feedback_count}</b>\n\n"
-        f"💸 <b>Продажи (Прокси-сводка):</b>\n"
-        f"  • RUB (Карты): <b>{rev_rub} ₽</b> ({pays_rub} шт)\n"
-        f"  • Stars (Телега): <b>{rev_stars} ⭐</b> ({pays_stars} шт)\n\n"
-        f"💾 <b>Система:</b>\n"
-        f"  • Размер БД: <b>{db_size:.1f} MB</b>\n"
+        t("reports.admin_digest_title", locale=locale, date=date_str) +
+        t("reports.admin_users_header", locale=locale) +
+        t("reports.admin_users_new", locale=locale, count=new_users_count, ref=ref_signup_count) +
+        t("reports.admin_users_total", locale=locale, count=total_users_count) +
+        t("reports.admin_activity_header", locale=locale) +
+        t("reports.admin_activity_dau", locale=locale, count=active_users_count, percent=active_percent) +
+        t("reports.admin_activity_logs", locale=locale, count=logs_count) +
+        t("reports.admin_activity_feedback", locale=locale, count=feedback_count) +
+        t("reports.admin_sales_header", locale=locale) +
+        t("reports.admin_sales_rub", locale=locale, rev=rev_rub, pays=pays_rub) +
+        t("reports.admin_sales_stars", locale=locale, rev=rev_stars, pays=pays_stars) +
+        t("reports.admin_system_header", locale=locale) +
+        t("reports.admin_system_db", locale=locale, size=db_size)
     )
+
+    try:
+        from content_factory.guerrilla.metrics import format_guerrilla_daily_digest_html
+
+        guerrilla_block = format_guerrilla_daily_digest_html(yesterday)
+        if guerrilla_block:
+            report = f"{report}\n{guerrilla_block}\n"
+    except Exception as e:
+        logger.error("Guerrilla daily digest failed: %s", e, exc_info=True)
+        report = report + t("reports.admin_guerrilla_failed", locale=locale, error=type(e).__name__)
+
     return report
 
 async def generate_admin_stats_csv(days: int = 30) -> io.BytesIO:

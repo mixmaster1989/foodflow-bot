@@ -47,6 +47,61 @@ class AIBrainService:
 
     MODEL = "google/gemini-3.1-flash-lite-preview" # Fast, Smart enough
 
+    SYSTEM_PROMPT_ES = """
+You are the Brain of the FoodFlow bot (AI nutritionist). Your task is to understand the user's intent and extract data.
+
+RULES FOR DETERMINING NOMENCLATURE (Single item vs List):
+1. CULINARY CONTEXT (Single dish): If products are grammatically linked (prepositions "with", "of", "in") or describe components of a single dish (salad, soup, stew, porridge, sandwich, omelet) — it is a SINGLE dish.
+   - Example: "Ensalada de pepino y tomate" -> intent: 'log_consumption', multi: false, product: 'Ensalada de pepino y tomate'.
+   - Example: "Yogur con bayas y miel" -> intent: 'log_consumption', multi: false, product: 'Yogur con bayas y miel'.
+   - Example: "Omelet de 3 huevos con queso" -> intent: 'log_consumption', multi: false, product: 'Omelet de 3 huevos con queso'.
+
+2. FOOD BASKET (List/Batch): If products are clearly heterogeneous, cannot be on the same plate, or describe grocery shopping — it is a LIST.
+   - Example: "Compré leche, pan y comí un plátano" -> multi: true.
+   - Example: "Desayuno: huevos. Almuerzo: sopa." -> multi: true.
+
+3. VOICE INPUT WITHOUT PUNCTUATION: Speech-to-text often returns a single stream without commas. Different dishes are still clear from context — separate them by:
+   - change of context (beverage after solid food: "...un vaso de kéfir", "café negro")
+   - new weight/volume for another product: "arroz 200 g 50 g de pescado hervido" = arroz + pescado
+   - heterogeneous categories: soup + tea + kefir don't live on the same plate
+   - Example: "arroz 200 g 50 g de pescado hervido café negro sopa de pescado con cebada té con limón un vaso de kéfir"
+     -> multi: true, items: [arroz 200g, pescado hervido 50g, café negro, sopa de pescado con cebada, té con limón, vaso de kéfir]
+   - Example: "huevos fritos de dos huevos café sándwich con queso"
+     -> multi: true, items: [huevos fritos de 2 huevos, café, sándwich con queso]
+
+Available intents:
+1. 'log_consumption' — the user EXPLICITLY indicated they ATE it.
+2. 'add_to_fridge' — the user EXPLICITLY indicated they BOUGHT or want to ADD it.
+3. 'unknown' — if there is no explicit action verb or it is just a product name.
+4. 'nonsense' — if the input is gibberish, random letters, swearing or nonsense (e.g. "asdfgh", "hola como estas").
+
+IF SINGLE PRODUCT — return JSON object:
+{
+  "intent": "log_consumption" | "add_to_fridge" | "unknown" | "nonsense",
+  "is_nonsense": false, # true if it is gibberish
+  "ai_comment": "Polite witty refusal in Spanish if it is nonsense",
+  "product": "Full name of the dish/product",
+  "weight": 100 | null,
+  "quantity": 1,
+  "multi": false,
+  "original_text": "original text"
+}
+
+IF MULTIPLE PRODUCTS — return JSON:
+{
+  "intent": "log_consumption",
+  "is_nonsense": false,
+  "multi": true,
+  "items": [
+    {"product": "Product 1", "weight": 100 | null},
+    {"product": "Product 2", "weight": null}
+  ],
+  "original_text": "original text"
+}
+
+STRICT: Do not write anything other than JSON.
+"""
+
     SYSTEM_PROMPT = """
 Ты — Мозг бота FoodFlow (AI диетолог). Твоя задача — понять намерение пользователя и извлечь данные.
 
@@ -112,8 +167,11 @@ class AIBrainService:
             force_single: Force AI to treat input as one single dish
         """
 
+        from utils.i18n import get_locale
+        locale = get_locale()
+
         # Prepare specialized instructions if forced
-        system_instruction = cls.SYSTEM_PROMPT
+        system_instruction = cls.SYSTEM_PROMPT_ES if locale == "es" else cls.SYSTEM_PROMPT
         if force_multi:
             system_instruction += "\n\nCRITICAL: You MUST split this input into multiple products (multi: true). Even if they look like one dish, find components."
         elif force_single:
@@ -132,6 +190,7 @@ class AIBrainService:
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": text}
             ],
+            "temperature": 0.0,
             "response_format": {"type": "json_object"}
         }
 
@@ -148,6 +207,7 @@ class AIBrainService:
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
                             json=payload,
+                            proxy=settings.openrouter_proxy,
                             timeout=10
                         ) as response:
                             if response.status == 200:
@@ -226,6 +286,7 @@ class AIBrainService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=10
                     ) as response:
                         if response.status == 200:
@@ -263,38 +324,83 @@ class AIBrainService:
         """
         import base64
 
+        from utils.i18n import get_locale
+        locale = get_locale()
+
         # Core Vision Prompt (The "Intelligence" of the bot)
-        prompt = prompt_override or """
-        Analyze this image for a food-tracking AI assistant.
-        
-        TASK:
-        1. Determine if the image contains:
-           - FOOD/DISH (ready to eat)
-           - GROCERY PRODUCT (packaged)
-           - RECEIPT (grocery receipt with list of items)
-           - PRICE TAG (shelf label with price/name)
-        
-        2. If it's NOT food/receipt/product (e.g., person, animal, car, landscape, non-food object):
-           - Set is_edible: false
-           - Write a friendly, witty refusal in "ai_comment" in RUSSIAN. 
-             Example: "Котики — это друзья, а не еда! Пожалей пушистика. 😉"
-        
-        3. If it IS food/product/receipt:
-           - Set is_edible: true
-           - Extract "food_name" (short name in RU, e.g. "Борщ", "Черника")
-           - Set is_receipt: true if it's a receipt.
-           - Set is_pricetag: true if it's a shelf price tag.
-        
-        RETURN ONLY JSON:
-        {
-          "is_edible": true,
-          "food_name": "Название (RU)",
-          "is_receipt": false,
-          "is_pricetag": false,
-          "ai_comment": null,
-          "description": "Full visual description"
-        }
-        """
+        if not prompt_override:
+            if locale == "es":
+                prompt = """
+                Analyze this image for a food-tracking AI assistant.
+                
+                TASK:
+                1. Determine if the image contains:
+                   - FOOD/DISH (ready to eat)
+                   - GROCERY PRODUCT (packaged)
+                   - RECEIPT (grocery receipt with list of items)
+                   - PRICE TAG (shelf label with price/name)
+                
+                2. If it's NOT food/receipt/product (e.g., person, animal, car, landscape, non-food object):
+                   - Set is_edible: false
+                   - Write a friendly, witty refusal in "ai_comment" in SPANISH. 
+                     Example: "¡Los gatitos son amigos, no comida! Pobre gatito. 😉"
+                
+                3. If it IS food/product/receipt:
+                   - Set is_edible: true
+                   - Extract "food_name" (short name in ES, e.g. "Tortilla", "Arándano").
+                     CRITICAL FOR MULTI-DISH IMAGES / TABLE FEASTS:
+                     If the image contains multiple distinct dishes or a table of food (a feast, family dinner, separate items), you MUST systematically identify all key individual dishes (scanning the image strictly from left to right, top to bottom) and list them separated by commas in "food_name" (e.g. "Patatas fritas, pollo, ensalada de verduras"). This scanning method guarantees absolute consistency!
+                     STRICTLY FORBIDDEN: Do NOT return generic, non-informative terms like "Almuerzo", "Cena", "Desayuno", "Comida", "Banquete", "Plato" for "food_name". Always be specific and list the actual foods!
+                   - Set is_receipt: true if it's a receipt.
+                   - Set is_pricetag: true if it's a shelf price tag.
+                
+                RETURN ONLY JSON:
+                {
+                  "is_edible": true,
+                  "food_name": "Nombre (ES)",
+                  "is_receipt": false,
+                  "is_pricetag": false,
+                  "ai_comment": null,
+                  "description": "Full visual description"
+                }
+                """
+            else:
+                prompt = """
+                Analyze this image for a food-tracking AI assistant.
+                
+                TASK:
+                1. Determine if the image contains:
+                   - FOOD/DISH (ready to eat)
+                   - GROCERY PRODUCT (packaged)
+                   - RECEIPT (grocery receipt with list of items)
+                   - PRICE TAG (shelf label with price/name)
+                
+                2. If it's NOT food/receipt/product (e.g., person, animal, car, landscape, non-food object):
+                   - Set is_edible: false
+                   - Write a friendly, witty refusal in "ai_comment" in RUSSIAN. 
+                     Example: "Котики — это друзья, а не еда! Пожалей пушистика. 😉"
+                
+                3. If it IS food/product/receipt:
+                   - Set is_edible: true
+                   - Extract "food_name" (short name in RU, e.g. "Борщ", "Черника").
+                     CRITICAL FOR MULTI-DISH IMAGES / TABLE FEASTS:
+                     If the image contains multiple distinct dishes or a table of food (a feast, family dinner, separate items), you MUST systematically identify all key individual dishes (scanning the image strictly from left to right, top to bottom) and list them separated by commas in "food_name" (e.g. "Жареная картошка, курица, овощной салат"). This scanning method guarantees absolute consistency!
+                     STRICTLY FORBIDDEN: Do NOT return generic, non-informative terms like "Обед", "Ужин", "Завтрак", "Еда", "Застолье", "Тарелка" for "food_name". Always be specific and list the actual foods!
+                   - Set is_receipt: true if it's a receipt.
+                   - Set is_pricetag: true if it's a shelf price tag.
+                
+                RETURN ONLY JSON:
+                {
+                  "is_edible": true,
+                  "food_name": "Название (RU)",
+                  "is_receipt": false,
+                  "is_pricetag": false,
+                  "ai_comment": null,
+                  "description": "Full visual description"
+                }
+                """
+        else:
+            prompt = prompt_override
 
         # Determine image source
         b64_image = None
@@ -318,7 +424,23 @@ class AIBrainService:
 
                     # Download to memory
                     io_obj = await bot.download_file(file_path)
-                    b64_image = base64.b64encode(io_obj.read()).decode('utf-8')
+
+                    # Save a copy of the photo locally to the server for debugging/logging
+                    import os
+                    from datetime import datetime
+                    photos_dir = "/home/user1/foodflow-bot_new/photos_log"
+                    os.makedirs(photos_dir, exist_ok=True)
+                    user_id = message_or_path.from_user.id if hasattr(message_or_path, "from_user") else "unknown"
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    save_path = f"{photos_dir}/{user_id}_{timestamp}_{file_id[-10:]}.jpg"
+
+                    io_obj.seek(0)
+                    img_data = io_obj.read()
+                    with open(save_path, "wb") as img_file:
+                        img_file.write(img_data)
+                    logger.info(f"📸 Saved uploaded photo to server: {save_path}")
+
+                    b64_image = base64.b64encode(img_data).decode('utf-8')
 
             if not b64_image:
                 logger.error("Could not obtain base64 image data")
@@ -332,8 +454,9 @@ class AIBrainService:
             }
 
             vision_models = [
-                "google/gemini-2.5-flash-lite-preview-09-2025",
-                "qwen/qwen2.5-vl-72b-instruct",
+                "qwen/qwen3.5-flash-02-23",
+                "google/gemini-3.5-flash-lite",
+                "google/gemini-2.0-flash-001",
                 "qwen/qwen3-vl-8b-instruct"
             ]
 
@@ -356,6 +479,7 @@ class AIBrainService:
                                     ]
                                 }
                             ],
+                            "temperature": 0.0,
                             "response_format": {"type": "json_object"}
                         }
 
@@ -413,7 +537,37 @@ class AIBrainService:
             "X-Title": "FoodFlow Bot",
         }
 
-        prompt = f"""
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = f"""
+            You are a friendly and polite FoodFlow assistant.
+            Your task is to analyze the list of products in the fridge and return JSON.
+            
+            List of products: {products_str}
+            
+            RETURN JSON object:
+            {{
+              "summary": "Summary text (max 3 sentences). Tone: friendly, professional, light irony. NO slang.",
+              "tags": [
+                {{"tag": "Leche", "emoji": "🥛"}},
+                {{"tag": "Pollo", "emoji": "🍗"}}
+              ]
+            }}
+            
+            Rules for tags:
+            - Choose 3-4 keywords for search.
+            - CRITICAL: Tags ("tag") must be WORDS that PHYSICALLY exist in the product names.
+            - "emoji": Choose ONE standard emoji fitting the meaning. Do not use rare symbols.
+            - Example: if there is "Leche Alpura", tag="Leche", emoji="🥛".
+            - FORBIDDEN: Inventing categories that are not present in the text.
+            - If the list is weird, return an empty list of tags.
+            
+            Write in Spanish language. ONLY JSON.
+            """
+        else:
+            prompt = f"""
 Ты — дружелюбный и вежливый ассистент FoodFlow.
 Твоя задача — проанализировать список продуктов в холодильнике и вернуть JSON.
 

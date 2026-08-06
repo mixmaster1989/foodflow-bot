@@ -61,6 +61,45 @@ ALLOWED_TAGS = {'b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del',
 # Промпт для нутрициолога
 # =====================================================
 
+NUTRITION_PROMPT_ES = """Ты — AI-нутрициолог, анализирующий питание пользователя. (Spanish Template)
+Actúa como un nutricionista de IA que analiza la dieta del usuario.
+
+📊 DATOS DEL {date}:
+{food_list}
+
+TOTAL del día:
+🔥 Calorías: {total_cal} kcal
+🥩 Proteínas: {total_prot}g
+🥑 Grasas: {total_fat}g
+🍞 Carbohidratos: {total_carb}g
+
+📋 LÍMITES RECOMENDADOS:
+- Calorías: ~2000 kcal (o la meta del usuario)
+
+📝 TAREA:
+Genera un informe redactado estrictamente bajo esta plantilla en español:
+
+✅ <b>Puntos fuertes:</b>
+• [1-2 puntos sobre lo que estuvo bien]
+
+⚠️ <b>Puntos a mejorar:</b>
+• [1-2 puntos sobre lo que se puede mejorar]
+
+💡 <b>Consejo para hoy:</b>
+[Un consejo práctico y específico]
+
+📈 <b>Calificación del día:</b> X/10
+
+REGLAS DE FORMATO:
+1. Usa ÚNICAMENTE estas etiquetas HTML: <b>, <i>, <u>, <s>, <code>, <a>, <tg-spoiler>
+2. Para salto de línea usa saltos ordinarios (Enter)
+3. Para listas usa • o -
+4. NO uses: <p>, <div>, <span>, <ul>, <li>, <h1>-<h6>, <font>, <br>
+5. Tono: amistoso, profesional, sin juzgar.
+6. Longitud: 10-12 líneas. SIN saludos ni encabezados (ya están en la imagen).
+
+Devuelve ÚNICAMENTE el texto HTML listo."""
+
 NUTRITION_PROMPT = """Ты — AI-нутрициолог, анализирующий питание пользователя.
 
 📊 ДАННЫЕ ЗА {date}:
@@ -161,7 +200,7 @@ async def call_openrouter(model: str, prompt: str) -> str | None:
     }
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30) as resp:
+            async with session.post(OPENROUTER_URL, json=payload, headers=headers, proxy=settings.openrouter_proxy, timeout=30) as resp:
                 if resp.status != 200:
                     logger.error(f"OpenRouter error {resp.status}: {await resp.text()}")
                     return None
@@ -171,8 +210,9 @@ async def call_openrouter(model: str, prompt: str) -> str | None:
         logger.error(f"OpenRouter request failed: {e}")
         return None
 
-async def get_nutrition_report(food_data: dict, retries: int = 2) -> str:
-    prompt = NUTRITION_PROMPT.format(**food_data)
+async def get_nutrition_report(food_data: dict, locale: str = "ru", retries: int = 2) -> str:
+    prompt_template = NUTRITION_PROMPT_ES if locale == "es" else NUTRITION_PROMPT
+    prompt = prompt_template.format(**food_data)
     for attempt in range(retries):
         for model in MODELS:
             response = await call_openrouter(model, prompt)
@@ -200,6 +240,7 @@ async def get_yesterday_data(user_id: int):
         # 2. Get Settings (Goals)
         stmt_settings = select(UserSettings).where(UserSettings.user_id == user_id)
         users_settings = (await session.execute(stmt_settings)).scalar_one_or_none()
+        locale = users_settings.locale if users_settings else "ru"
         goals = {
             "calories": users_settings.calorie_goal if users_settings else 2000,
             "protein": users_settings.protein_goal if users_settings else 100,
@@ -230,12 +271,16 @@ async def get_yesterday_data(user_id: int):
     total_fiber = sum(log.fiber or 0 for log in logs)
 
     # Format for AI Prompt
-    food_list_text = "\n".join([f"• {log.product_name}: {int(log.calories or 0)} ккал" for log in logs])
+    if locale == "es":
+        food_list_text = "\n".join([f"• {log.product_name}: {int(log.calories or 0)} kcal" for log in logs])
+    else:
+        food_list_text = "\n".join([f"• {log.product_name}: {int(log.calories or 0)} ккал" for log in logs])
 
     return {
         "user_name": user_name,
         "date": yesterday,
         "logs": logs, # Raw objects for Image
+        "locale": locale,
         "totals": {
             "calories": total_cal,
             "protein": total_prot,
@@ -246,7 +291,7 @@ async def get_yesterday_data(user_id: int):
         "goals": goals,
         "prompt_data": { # Data for text prompt
             "date": yesterday.strftime("%d.%m.%Y"),
-            "food_list": food_list_text if food_list_text else "Нет данных",
+            "food_list": food_list_text if food_list_text else ("Sin datos" if locale == "es" else "Нет данных"),
             "total_cal": int(total_cal),
             "total_prot": round(total_prot, 1),
             "total_fat": round(total_fat, 1),
@@ -355,10 +400,13 @@ async def run_daily_report():
                 continue
 
             # B. Generate AI Text Report
-            report_text = await get_nutrition_report(data['prompt_data'])
+            report_text = await get_nutrition_report(data['prompt_data'], locale=data.get('locale', 'ru'))
             if not report_text:
                 # Fallback text if AI fails
-                report_text = "📊 <b>Ваш отчет готов!</b>\nПодробности на изображении 👆"
+                if data.get('locale') == 'es':
+                    report_text = "📊 <b>¡Tu informe está listo!</b>\nLos detalles se encuentran en la imagen 👆"
+                else:
+                    report_text = "📊 <b>Ваш отчет готов!</b>\nПодробности на изображении 👆"
 
             # C. Generate Image (Pillow)
             image_bio = draw_daily_card(

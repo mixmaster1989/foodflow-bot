@@ -44,7 +44,7 @@ async def get_http_session() -> aiohttp.ClientSession:
         async with _get_lock():
             if _session is None or _session.closed:
                 connector = aiohttp.TCPConnector(limit=50, limit_per_host=20)
-                _session = aiohttp.ClientSession(connector=connector)
+                _session = aiohttp.ClientSession(connector=connector, trust_env=True)
                 logger.info("HTTP session initialized (limit=50, limit_per_host=20)")
     return _session
 

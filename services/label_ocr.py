@@ -26,7 +26,7 @@ class LabelOCRService:
         # Free first, but retry quickly then jump to paid
         "qwen/qwen2.5-vl-32b-instruct:free",
         # Paid earlier to avoid long stalls on free limits
-        "google/gemini-2.5-flash-lite",
+        "google/gemini-3.5-flash-lite",
         # Remaining fallbacks
         "qwen/qwen3.6-plus:free",
         "mistralai/mistral-small-3.2-24b-instruct:free",
@@ -46,21 +46,41 @@ class LabelOCRService:
 
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-        prompt = (
-            "You are scanning a Russian food label photo. "
-            "Return ONLY JSON (no markdown) with the following keys: "
-            "{\"name\": \"Название товара (RU)\", "
-            "\"brand\": \"Бренд (если указан)\", "
-            "\"weight\": \"Вес/объем с единицами\", "
-            "\"calories\": 0, "
-            "\"protein\": 0, "
-            "\"fat\": 0, "
-            "\"carbs\": 0, "
-            "\"fiber\": 0}. "
-            "Calories/Macros should be per 100g/ml if available. "
-            "Look for 'Клетчатка', 'Пищевые волокна', 'Fiber' for the fiber field. "
-            "If data is missing, set the value to 0 if reasonable (e.g. fiber in oil), or null if unsure."
-        )
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = (
+                "You are scanning a Spanish food label photo. "
+                "Return ONLY JSON (no markdown) with the following keys: "
+                "{\"name\": \"Nombre del producto (ES)\", "
+                "\"brand\": \"Marca (si se indica)\", "
+                "\"weight\": \"Peso/volumen con unidades\", "
+                "\"calories\": 0, "
+                "\"protein\": 0, "
+                "\"fat\": 0, "
+                "\"carbs\": 0, "
+                "\"fiber\": 0}. "
+                "Calories/Macros should be per 100g/ml if available. "
+                "Look for 'Fibra', 'Fibra alimentaria', 'Fiber' for the fiber field. "
+                "If data is missing, set the value to 0 if reasonable, or null if unsure."
+            )
+        else:
+            prompt = (
+                "You are scanning a Russian food label photo. "
+                "Return ONLY JSON (no markdown) with the following keys: "
+                "{\"name\": \"Название товара (RU)\", "
+                "\"brand\": \"Бренд (если указан)\", "
+                "\"weight\": \"Вес/объем с единицами\", "
+                "\"calories\": 0, "
+                "\"protein\": 0, "
+                "\"fat\": 0, "
+                "\"carbs\": 0, "
+                "\"fiber\": 0}. "
+                "Calories/Macros should be per 100g/ml if available. "
+                "Look for 'Клетчатка', 'Пищевые волокна', 'Fiber' for the fiber field. "
+                "If data is missing, set the value to 0 if reasonable (e.g. fiber in oil), or null if unsure."
+            )
 
         import asyncio
         retry_attempts = 3
@@ -93,6 +113,7 @@ class LabelOCRService:
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
                             json=payload,
+                            proxy=settings.openrouter_proxy,
                             timeout=60
                         ) as response:
                             if response.status == 200:

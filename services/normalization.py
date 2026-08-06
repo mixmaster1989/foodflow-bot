@@ -55,7 +55,7 @@ class NormalizationService:
     MODELS: list[str] = [
         "perplexity/sonar",                                    # Primary: Best quality with web search
         "openai/gpt-4o-mini-search-preview",                   # Secondary Search: Reliable web fallback
-        "google/gemini-2.5-flash-lite-preview-09-2025",       # Fast: Smart KBJU fallback
+        "google/gemini-3.5-flash-lite",       # Fast: Smart KBJU fallback
         "qwen/qwen2.5-vl-72b-instruct",                        # Robust: Final fallback
     ]
 
@@ -75,30 +75,58 @@ class NormalizationService:
             "X-Title": "FoodFlow Bot"
         }
 
-        prompt = (
-            "You are a smart receipt assistant. I have a list of raw product names from a Russian grocery receipt. "
-            "Many names are abbreviated or contain OCR errors (e.g., 'СЕЛЬКИ насло' -> 'Масло подсолнечное', 'Шинка ВЕЛОСИПЕД' -> 'Ветчина'). "
-            "Your task:\n"
-            "1. Identify the real product name using web search if needed.\n"
-            "2. PRESERVE brand names if recognizable (e.g., 'МИЛКА' -> 'Милка', 'Lays' -> 'Lays').\n"
-            "3. PRESERVE weight/volume if present (e.g., '450г', '1л', '200мл').\n"
-            "4. Categorize it (e.g., Молочные продукты, Мясо, Овощи, Снеки, Бакалея).\n"
-            "5. Find nutrition per 100g: Calories, Protein, Fat, Carbs, Fiber (Клетчатка).\n"
-            "6. Return a JSON object with a list of normalized items. Keep the original order.\n"
-            "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n"
-            "IMPORTANT: If a product has NO fiber (e.g. water, oil, meat, sugar), set \"fiber\": 0 explicitly!\n\n"
-            "Input List:\n"
-            f"{items_str}\n\n"
-            "CRITICAL OUTPUT REQUIREMENTS:\n"
-            "- Return ONLY the JSON object. Nothing before it, nothing after it.\n"
-            "- Do NOT include markdown formatting (no ```json or ```).\n"
-            "- Do NOT add explanations, comments, or any text after the JSON.\n"
-            "- Your response must start with { and end with }.\n"
-            "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 250, \"protein\": 10.5, \"fat\": 5.2, \"carbs\": 30.0, \"fiber\": 1.2}]}\n"
-            "- Example of WRONG response: {\"normalized\": [...]}\n**Пояснения:** ...\n\n"
-            "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
-            "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0, \"fiber\": 0}]}"
-        )
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = (
+                "You are a smart receipt assistant. I have a list of raw product names from a Spanish grocery receipt. "
+                "Many names are abbreviated or contain OCR errors (e.g., 'ACEIT de oliva' -> 'Aceite de oliva', 'JAMON SERRAN' -> 'Jamón serrano'). "
+                "Your task:\n"
+                "1. Identify the real product name using web search if needed.\n"
+                "2. PRESERVE brand names if recognizable (e.g., 'Milka' -> 'Milka', 'Lays' -> 'Lays').\n"
+                "3. PRESERVE weight/volume if present (e.g., '450g', '1l', '200ml').\n"
+                "4. Categorize it (e.g., Lácteos, Carnes, Verduras, Snacks, Abarrotes).\n"
+                "5. Find nutrition per 100g: Calories, Protein, Fat, Carbs, Fiber.\n"
+                "6. Return a JSON object with a list of normalized items. Keep the original order.\n"
+                "IMPORTANT: All names and categories MUST be in SPANISH language.\n"
+                "IMPORTANT: If a product has NO fiber (e.g. water, oil, meat, sugar), set \"fiber\": 0 explicitly!\n\n"
+                "Input List:\n"
+                f"{items_str}\n\n"
+                "CRITICAL OUTPUT REQUIREMENTS:\n"
+                "- Return ONLY the JSON object. Nothing before it, nothing after it.\n"
+                "- Do NOT include markdown formatting (no ```json or ```).\n"
+                "- Do NOT add explanations, comments, or any text after the JSON.\n"
+                "- Your response must start with { and end with }.\n"
+                "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 250, \"protein\": 10.5, \"fat\": 5.2, \"carbs\": 30.0, \"fiber\": 1.2}]}\n"
+                "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
+                "{\"normalized\": [{\"original\": \"...\", \"name\": \"Nombre con marca y peso (ES)\", \"category\": \"Categoría (ES)\", \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0, \"fiber\": 0}]}"
+            )
+        else:
+            prompt = (
+                "You are a smart receipt assistant. I have a list of raw product names from a Russian grocery receipt. "
+                "Many names are abbreviated or contain OCR errors (e.g., 'СЕЛЬКИ насло' -> 'Масло подсолнечное', 'Шинка ВЕЛОСИПЕД' -> 'Ветчина'). "
+                "Your task:\n"
+                "1. Identify the real product name using web search if needed.\n"
+                "2. PRESERVE brand names if recognizable (e.g., 'МИЛКА' -> 'Милка', 'Lays' -> 'Lays').\n"
+                "3. PRESERVE weight/volume if present (e.g., '450г', '1л', '200мл').\n"
+                "4. Categorize it (e.g., Молочные продукты, Мясо, Овощи, Снеки, Бакалея).\n"
+                "5. Find nutrition per 100g: Calories, Protein, Fat, Carbs, Fiber (Клетчатка).\n"
+                "6. Return a JSON object with a list of normalized items. Keep the original order.\n"
+                "IMPORTANT: All names and categories MUST be in RUSSIAN language.\n"
+                "IMPORTANT: If a product has NO fiber (e.g. water, oil, meat, sugar), set \"fiber\": 0 explicitly!\n\n"
+                "Input List:\n"
+                f"{items_str}\n\n"
+                "CRITICAL OUTPUT REQUIREMENTS:\n"
+                "- Return ONLY the JSON object. Nothing before it, nothing after it.\n"
+                "- Do NOT include markdown formatting (no ```json or ```).\n"
+                "- Do NOT add explanations, comments, or any text after the JSON.\n"
+                "- Your response must start with { and end with }.\n"
+                "- Example of CORRECT response: {\"normalized\": [{\"original\": \"...\", \"name\": \"...\", \"category\": \"...\", \"calories\": 250, \"protein\": 10.5, \"fat\": 5.2, \"carbs\": 30.0, \"fiber\": 1.2}]}\n"
+                "- Example of WRONG response: {\"normalized\": [...]}\n**Пояснения:** ...\n\n"
+                "Output Format (JSON ONLY, NO TEXT BEFORE OR AFTER):\n"
+                "{\"normalized\": [{\"original\": \"...\", \"name\": \"Название с брендом и весом (RU)\", \"category\": \"Категория (RU)\", \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0, \"fiber\": 0}]}"
+            )
 
         import asyncio
 
@@ -121,6 +149,7 @@ class NormalizationService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=aiohttp.ClientTimeout(total=60),
                     ) as response:
                         if response.status == 200:
@@ -150,7 +179,7 @@ class NormalizationService:
                                         "name": norm_data.get('name', raw_name),
                                         "price": item.get('price', 0.0),
                                         "quantity": item.get('quantity', 1.0),
-                                        "category": norm_data.get('category', 'Uncategorized'),
+                                        "category": norm_data.get('category', 'Categorías' if locale == "es" else 'Uncategorized'),
                                         "calories": norm_data.get('calories', 0),
                                         "protein": norm_data.get('protein', 0),
                                         "fat": norm_data.get('fat', 0),
@@ -194,22 +223,78 @@ class NormalizationService:
             "X-Title": "FoodFlow Bot"
         }
 
-        prompt = f'''Analyze this food intake description: "{description}"
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = f'''Analyze this food intake description: "{description}"
+
+TASK:
+1. Determine if the input is actually FOOD or a meal. 
+   - If it's nonsense, a non-food object, or just a greeting (e.g. "asdf", "hello", "table") -> is_food: false.
+   - If it's a food/meal -> is_food: true.
+2. Extract the food name (in Spanish)
+3. Extract the "base_name" (generic essence in Spanish)
+4. Detect if weight/portion is specified.
+5. Calculate KBJU STRICTLY PER 100 GRAMS. Even if the user specifies a weight like "900g" or "130g", your "calories", "protein", "fat", "carbs", and "fiber" values MUST be the nutritional value per 100g of the product. The bot will do the math later.
+
+GENERIC PRODUCTS RULE (Elegant Handling):
+- If the description is too vague (e.g., just "seeds", "meat", "salad", "fish"), do NOT return 0 calories.
+- Instead, provide an AVERAGE KBJU per 100g for the most common items in that category.
+- Append " (promedio)" to the "name" and "base_name" fields.
+- Example: "semillas" -> name: "Semillas (promedio)", calories: ~550 (per 100g), etc.
+
+STRICT KBJU RULE:
+- Never return 0 calories for items that are clearly food. 0 is for water/tea/coffee ONLY.
+
+RETURN JSON ONLY:
+{{
+  "is_food": true,
+  "error_message": null,
+  "name": "Nombre del producto (ES)",
+  "base_name": "Esencia del producto (ES)",
+  "weight_grams": 150,
+  "weight_missing": false,
+  "calories": 134,
+  "protein": 1.7,
+  "fat": 0.5,
+  "carbs": 34.2,
+  "fiber": 3.9
+}}
+
+If it is NOT food:
+{{
+  "is_food": false,
+  "error_message": "Explicación educada en español de por qué esto no es comida",
+  "name": "{description}",
+  "base_name": "{description}",
+  "weight_grams": null,
+  "weight_missing": true,
+  "calories": 0,
+  "protein": 0,
+  "fat": 0,
+  "carbs": 0,
+  "fiber": 0
+}}
+
+CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
+        else:
+            prompt = f'''Analyze this food intake description: "{description}"
 
 TASK:
 1. Determine if the input is actually FOOD or a meal. 
    - If it's nonsense, a non-food object, or just a greeting (e.g. "asdf", "hello", "table") -> is_food: false.
    - If it's a food/meal -> is_food: true.
 2. Extract the food name (in Russian)
-3. Extract the "base_name" (generic essence)
+3. Extract the "base_name" (generic essence in Russian)
 4. Detect if weight/portion is specified.
-5. Calculate KBJU.
+5. Calculate KBJU STRICTLY PER 100 GRAMS. Even if the user specifies a weight like "900g" or "130g", your "calories", "protein", "fat", "carbs", and "fiber" values MUST be the nutritional value per 100g of the product. The bot will do the math later.
 
 GENERIC PRODUCTS RULE (Elegant Handling):
 - If the description is too vague (e.g., just "seeds", "meat", "salad", "fish"), do NOT return 0 calories.
-- Instead, provide an AVERAGE KBJU for the most common items in that category.
+- Instead, provide an AVERAGE KBJU per 100g for the most common items in that category.
 - Append " (в среднем)" to the "name" and "base_name" fields.
-- Example: "семена" -> name: "Семена (в среднем)", calories: ~550, etc.
+- Example: "семена" -> name: "Семена (в среднем)", calories: ~550 (per 100g), etc.
 
 STRICT KBJU RULE:
 - Never return 0 calories for items that are clearly food. 0 is for water/tea/coffee ONLY.
@@ -254,7 +339,7 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
         target_models = [
             "perplexity/sonar",
             "openai/gpt-4o-mini",
-            "google/gemini-2.5-flash-lite-preview-09-2025"
+            "google/gemini-3.5-flash-lite"
         ]
 
         for model in target_models:
@@ -345,7 +430,39 @@ CRITICAL: Return ONLY JSON, no markdown, no explanations.'''
             "X-Title": "FoodFlow Bot"
         }
 
-        prompt = f'''Analyze these food items and return KBJU for EACH:
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = f'''Analyze these food items and return KBJU for EACH:
+
+{items_text}
+
+RULES:
+- If weight is specified, calculate KBJU for that weight.
+- If weight is NOT specified, calculate for a standard portion and set weight_missing: true.
+- SPECIAL RULE FOR GRAINS/CEREALS: For products like 'arroz', 'avena', etc., ALWAYS return KBJU for the **BOILED/COOKED** version by default. Only return raw/dry values if explicitly specified as 'dry/raw'.
+- Return a JSON array (NOT object) with one entry per item.
+
+RETURN JSON ARRAY ONLY:
+[
+  {{
+    "name": "Pamelo 230g",
+    "base_name": "Pamelo",
+    "weight_grams": 230,
+    "weight_missing": false,
+    "calories": 68,
+    "protein": 0.6,
+    "fat": 0.04,
+    "carbs": 17.7,
+    "fiber": 1.8
+  }},
+  ...
+]
+
+CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
+        else:
+            prompt = f'''Analyze these food items and return KBJU for EACH:
 
 {items_text}
 
@@ -420,7 +537,7 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
         fallback = []
         for item in items:
             fallback.append({
-                "name": f"{item['product']} {item.get('weight', '')}г".strip(),
+                "name": f"{item['product']} {item.get('weight', '')}g" if locale == "es" else f"{item['product']} {item.get('weight', '')}г".strip(),
                 "base_name": item['product'],
                 "weight_grams": item.get('weight'),
                 "weight_missing": item.get('weight') is None,
@@ -435,19 +552,33 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
     @classmethod
     async def suggest_dish_name(cls, ingredients: list[str]) -> str:
         """Suggest a culinary name for a list of ingredients."""
+        from utils.i18n import get_locale
+        locale = get_locale()
+        
+        default_dish = "Mi plato" if locale == "es" else "Мое блюдо"
         if not ingredients:
-            return "Мое блюдо"
+            return default_dish
 
         ing_str = ", ".join(ingredients)
 
-        prompt = (
-            f"Ingredients: {ing_str}\n"
-            "Task: Name this dish in Russian (max 3-4 words). "
-            "Examples: 'Oats, Milk, Berries' -> 'Овсяная каша с ягодами'. "
-            "'Eggs, Tomato' -> 'Яичница с помидорами'. "
-            "'Bread, Cheese' -> 'Бутерброд с сыром'. "
-            "Return ONLY the name, nothing else."
-        )
+        if locale == "es":
+            prompt = (
+                f"Ingredients: {ing_str}\n"
+                "Task: Name this dish in Spanish (max 3-4 words). "
+                "Examples: 'Oats, Milk, Berries' -> 'Avena con bayas'. "
+                "'Eggs, Tomato' -> 'Huevos con tomate'. "
+                "'Bread, Cheese' -> 'Sándwich de queso'. "
+                "Return ONLY the name, nothing else."
+            )
+        else:
+            prompt = (
+                f"Ingredients: {ing_str}\n"
+                "Task: Name this dish in Russian (max 3-4 words). "
+                "Examples: 'Oats, Milk, Berries' -> 'Овсяная каша с ягодами'. "
+                "'Eggs, Tomato' -> 'Яичница с помидорами'. "
+                "'Bread, Cheese' -> 'Бутерброд с сыром'. "
+                "Return ONLY the name, nothing else."
+            )
 
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -477,4 +608,4 @@ CRITICAL: Return ONLY a JSON array, no markdown, no explanations.'''
                 logger.error(f"Dish Naming Failed ({model}): {e}")
                 continue
 
-        return "Мое блюдо"
+        return default_dish

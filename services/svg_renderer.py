@@ -23,6 +23,53 @@ def draw_svg_dashboard(
     Renders a premium nutrition dashboard using SVG + Jinja2 + CairoSVG.
     """
     try:
+        # Sanitize and ensure all keys exist in total_metrics
+        if not isinstance(total_metrics, dict):
+            total_metrics = {}
+        else:
+            total_metrics = dict(total_metrics)
+
+        defaults_totals = {
+            "calories": 0.0,
+            "protein": 0.0,
+            "fat": 0.0,
+            "carbs": 0.0,
+            "fiber": 0.0
+        }
+        for k, v in defaults_totals.items():
+            if k not in total_metrics or total_metrics[k] is None:
+                total_metrics[k] = v
+            else:
+                try:
+                    total_metrics[k] = float(total_metrics[k])
+                except (ValueError, TypeError):
+                    total_metrics[k] = v
+
+        # Sanitize and ensure all keys exist in goals
+        if not isinstance(goals, dict):
+            goals = {}
+        else:
+            goals = dict(goals)
+
+        defaults_goals = {
+            "calories": 2000,
+            "protein": 100,
+            "fat": 70,
+            "carbs": 250,
+            "fiber": 30,
+            "water": 2000
+        }
+        for k, v in defaults_goals.items():
+            if k not in goals or goals[k] is None or goals[k] == 0:
+                goals[k] = v
+            else:
+                try:
+                    goals[k] = float(goals[k])
+                    if goals[k] == 0:
+                        goals[k] = v
+                except (ValueError, TypeError):
+                    goals[k] = v
+
         # 1. Prepare Template
         with open(TEMPLATE_PATH, "r") as f:
             template = Template(f.read())
@@ -41,6 +88,7 @@ def draw_svg_dashboard(
         calculated_height = max(900, 750 + len(logs) * 90 + 100)
 
         # 3. Context for Jinja2
+        from utils.i18n import t
         context = {
             "height": calculated_height,
             "user_name": user_name,
@@ -53,7 +101,8 @@ def draw_svg_dashboard(
             "cal_offset": offset,
             "min": min, # Helper for template
             "int": int,
-            "round": round
+            "round": round,
+            "t": t
         }
 
         # 4. Render SVG string

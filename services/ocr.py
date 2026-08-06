@@ -36,7 +36,7 @@ class OCRService:
         "qwen/qwen2.5-vl-32b-instruct:free",          # Free 1: Best quality
         "qwen/qwen3.6-plus:free",                     # Free 2: Fast & Smart
         "mistralai/mistral-small-3.2-24b-instruct:free", # Free 3: Working & Multimodal
-        "google/gemini-2.5-flash-lite-preview-09-2025", # Paid 1: Cheapest ($0.00016), 7 items
+        "google/gemini-3.5-flash-lite", # Paid 1: Cheapest ($0.00016), 7 items
         "openai/gpt-4.1-mini",                        # Paid 2: Fastest (471ms), 7 items
         "openai/gpt-4o-mini",                         # Paid 3: Legacy Fallback
     ]
@@ -83,6 +83,7 @@ class OCRService:
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json=payload,
+                    proxy=settings.openrouter_proxy,
                     timeout=aiohttp.ClientTimeout(total=20),
                 ) as response:
                     if response.status == 200:

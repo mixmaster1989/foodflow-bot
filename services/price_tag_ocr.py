@@ -40,7 +40,7 @@ class PriceTagOCRService:
         "nvidia/nemotron-nano-12b-v2-vl:free",
 
         # Paid models (fallback when free models are rate-limited)
-        "google/gemini-2.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
+        "google/gemini-3.5-flash-lite",               # Paid 1: Cheapest Google ($0.10/$0.40)
         "mistralai/pixtral-12b",                      # Paid 2: Cheapest overall ($0.10/$0.10)
         "qwen/qwen-vl-plus",                          # Paid 3: Best accuracy ($0.21/$0.63)
     ]
@@ -91,18 +91,35 @@ class PriceTagOCRService:
 
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-        prompt = (
-            "You are scanning a Russian price tag photo from a grocery store. "
-            "Return ONLY JSON (no markdown) with the following keys: "
-            "{\"product_name\": \"Название товара БЕЗ объема (RU)\", "
-            "\"volume\": \"Объем/вес с единицами (например: 500 мл, 1 кг, 300 г)\", "
-            "\"price\": 0.0, "
-            "\"store\": \"Название магазина (если указано)\", "
-            "\"date\": \"YYYY-MM-DD (если указано)\"}. "
-            "IMPORTANT: Extract volume/weight as a SEPARATE field, not in product_name. "
-            "If data is missing, set the value to null. "
-            "Price should be a float number in rubles."
-        )
+        from utils.i18n import get_locale
+        locale = get_locale()
+
+        if locale == "es":
+            prompt = (
+                "You are scanning a Spanish price tag photo from a grocery store. "
+                "Return ONLY JSON (no markdown) with the following keys: "
+                "{\"product_name\": \"Nombre del producto sin el volumen (ES)\", "
+                "\"volume\": \"Volumen/peso con unidades (ej: 500 ml, 1 kg, 300 g)\", "
+                "\"price\": 0.0, "
+                "\"store\": \"Nombre de la tienda (si se indica)\", "
+                "\"date\": \"YYYY-MM-DD (si se indica)\"}. "
+                "IMPORTANT: Extract volume/weight as a SEPARATE field, not in product_name. "
+                "If data is missing, set the value to null. "
+                "Price should be a float number in local currency (pesos/etc.)."
+            )
+        else:
+            prompt = (
+                "You are scanning a Russian price tag photo from a grocery store. "
+                "Return ONLY JSON (no markdown) with the following keys: "
+                "{\"product_name\": \"Название товара БЕЗ объема (RU)\", "
+                "\"volume\": \"Объем/вес с единицами (например: 500 мл, 1 кг, 300 г)\", "
+                "\"price\": 0.0, "
+                "\"store\": \"Название магазина (если указано)\", "
+                "\"date\": \"YYYY-MM-DD (если указано)\"}. "
+                "IMPORTANT: Extract volume/weight as a SEPARATE field, not in product_name. "
+                "If data is missing, set the value to null. "
+                "Price should be a float number in rubles."
+            )
 
         payload = {
             "model": model,
@@ -132,6 +149,7 @@ class PriceTagOCRService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=60
                     ) as response:
                         if response.status == 200:

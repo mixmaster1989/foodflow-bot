@@ -12,7 +12,7 @@ from database.models import User, UserSettings
 logger = logging.getLogger(__name__)
 
 class AIInsightService:
-    MODEL = "google/gemini-2.5-flash-lite-preview-09-2025"
+    MODEL = "google/gemini-3.5-flash-lite"
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
     @classmethod
@@ -52,6 +52,7 @@ class AIInsightService:
         if user_settings and user_settings.guide_config:
             personality = user_settings.guide_config.get("personality", "soft")
         context.append(f"Guide Preset: {personality}.")
+        context.append(f"Locale: {user_settings.locale if user_settings else 'ru'}.")
 
         return " ".join(context)
 
@@ -67,14 +68,26 @@ class AIInsightService:
         elif "Guide Preset: direct" in context:
             personality = "direct"
 
-        system_prompt = (
-            "Ты — внутренний микро-голос интерфейса (phantom whisper). "
-            f"Твой характер: [{personality}] (soft=поддерживающий, hard=строгий, direct=сухой). "
-            "Context: {context}. "
-            "User just did: {action_type} ({action_detail}). "
-            "Task: Прокомментируй это ДЕЙСТВИЕ ровно одним коротким предложением (максимум 15 слов) на русском языке. "
-            "CRITICAL: Используй имя из контекста. Не придумывай имена. Без приветствий. Просто быстрая реакция."
-        ).format(context=context, action_type=action_type, action_detail=action_detail)
+        locale = "es" if "Locale: es" in context else "ru"
+
+        if locale == "es":
+            system_prompt = (
+                "Eres la micro-voz interna de la interfaz (susurro fantasma). "
+                f"Tu personalidad: [{personality}] (soft=de apoyo, hard=estricto, direct=seco). "
+                "Context: {context}. "
+                "User just did: {action_type} ({action_detail}). "
+                "Task: Comenta sobre esta ACCIÓN con exactamente una frase corta (máximo 15 palabras) en español. "
+                "CRITICAL: Usa el nombre del contexto. No inventes nombres. Sin saludos. Solo una reacción rápida."
+            ).format(context=context, action_type=action_type, action_detail=action_detail)
+        else:
+            system_prompt = (
+                "Ты — внутренний микро-голос интерфейса (phantom whisper). "
+                f"Твой характер: [{personality}] (soft=поддерживающий, hard=строгий, direct=сухой). "
+                "Context: {context}. "
+                "User just did: {action_type} ({action_detail}). "
+                "Task: Прокомментируй это ДЕЙСТВИЕ ровно одним коротким предложением (максимум 15 слов) на русском языке. "
+                "CRITICAL: Используй имя из контекста. Не придумывай имена. Без приветствий. Просто быстрая реакция."
+            ).format(context=context, action_type=action_type, action_detail=action_detail)
 
         print(f"DEBUG: whisper system_prompt: {system_prompt}")
 
@@ -99,7 +112,7 @@ class AIInsightService:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(cls.OPENROUTER_URL, headers=headers, json=payload) as response:
+                async with session.post(cls.OPENROUTER_URL, headers=headers, json=payload, proxy=settings.openrouter_proxy) as response:
                     print(f"DEBUG: OpenRouter status: {response.status}")
                     if response.status != 200:
                         raw_err = await response.text()

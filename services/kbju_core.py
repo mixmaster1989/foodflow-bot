@@ -20,16 +20,27 @@ class AnomalyDecision(str, Enum):
 class NutritionResult(BaseModel):
     base_name: str
     display_name: str = ""
+    
+    # Portion values (scaled to weight_grams if portion weight is specified)
     calories: float
     protein: float
     fat: float
     carbs: float
     fiber: float
+    
+    # Raw base values (strictly per 100g, never scaled)
+    calories100: float = 0.0
+    protein100: float = 0.0
+    fat100: float = 0.0
+    carbs100: float = 0.0
+    fiber100: float = 0.0
+    
     weight_grams: float | None = None  # Actual portion weight (None = per 100g)
     weight_missing: bool = False          # True if no weight was specified in query
     source: str                           # "cache", "normalization_service", "ai_failed"
     anomaly_status: AnomalyDecision
     warning_message: str | None = None
+
 
 
 class KBJUCoreService:
@@ -83,6 +94,7 @@ class KBJUCoreService:
             return NutritionResult(
                 base_name=normalized_query,
                 calories=0.0, protein=0.0, fat=0.0, carbs=0.0, fiber=0.0,
+                calories100=0.0, protein100=0.0, fat100=0.0, carbs100=0.0, fiber100=0.0,
                 source="ai_failed",
                 anomaly_status=AnomalyDecision.BLOCK,
                 warning_message="Не удалось получить данные о продукте.",
@@ -186,6 +198,14 @@ class KBJUCoreService:
             fat=round(cached.fat * factor, 1),
             carbs=round(cached.carbs * factor, 1),
             fiber=round(cached.fiber * factor, 1),
+            
+            # Base unscaled per-100g values
+            calories100=round(cached.calories, 1),
+            protein100=round(cached.protein, 1),
+            fat100=round(cached.fat, 1),
+            carbs100=round(cached.carbs, 1),
+            fiber100=round(cached.fiber, 1),
+            
             weight_grams=weight_grams,
             weight_missing=(weight_grams is None),
             source="cache",
@@ -212,6 +232,14 @@ class KBJUCoreService:
             fat=round(per100["fat"] * factor, 1),
             carbs=round(per100["carbs"] * factor, 1),
             fiber=round(per100["fiber"] * factor, 1),
+            
+            # Base unscaled per-100g values
+            calories100=round(per100["calories"], 1),
+            protein100=round(per100["protein"], 1),
+            fat100=round(per100["fat"], 1),
+            carbs100=round(per100["carbs"], 1),
+            fiber100=round(per100["fiber"], 1),
+            
             weight_grams=weight_grams,
             weight_missing=weight_missing,
             source=source,

@@ -71,10 +71,10 @@
               stroke-linecap="round" transform="rotate(-90)" filter="url(#neonGlow)" />
       
       <text font-family="Inter, sans-serif" font-size="56" font-weight="900" fill="#ffffff" text-anchor="middle" y="10">{{ totals.calories|int }}</text>
-      <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.4)" text-anchor="middle" y="40">ККАЛ</text>
+      <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.4)" text-anchor="middle" y="40">{{ t('dashboard.kcal') }}</text>
       
       {% if cal_pct > 1.0 %}
-      <text font-family="Inter, sans-serif" font-size="14" font-weight="800" fill="#ff416c" text-anchor="middle" y="-55">ПЕРЕБОР!</text>
+      <text font-family="Inter, sans-serif" font-size="14" font-weight="800" fill="#ff416c" text-anchor="middle" y="-55">{{ t('dashboard.excess') }}</text>
       {% endif %}
     </g>
 
@@ -84,32 +84,32 @@
       
       <!-- Protein -->
       <g transform="translate(0, 0)">
-        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">БЕЛКИ</text>
-        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.protein|round(1) }}г</text>
+        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">{{ t('dashboard.protein') }}</text>
+        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.protein|round(1) }}{{ t('dashboard.unit_g') }}</text>
         <rect y="15" width="{{ macro_w }}" height="14" rx="7" fill="rgba(255,255,255,0.05)" />
         <rect y="15" width="{{ macro_w * min(totals.protein / goals.get('protein', 100), 1.0) }}" height="14" rx="7" fill="#ff416c" filter="url(#softGlow)" />
       </g>
 
       <!-- Fat -->
       <g transform="translate(0, 85)">
-        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">ЖИРЫ</text>
-        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.fat|round(1) }}г</text>
+        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">{{ t('dashboard.fat') }}</text>
+        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.fat|round(1) }}{{ t('dashboard.unit_g') }}</text>
         <rect y="15" width="{{ macro_w }}" height="14" rx="7" fill="rgba(255,255,255,0.05)" />
         <rect y="15" width="{{ macro_w * min(totals.fat / goals.get('fat', 70), 1.0) }}" height="14" rx="7" fill="#f8ff00" filter="url(#softGlow)" />
       </g>
 
       <!-- Carbs -->
       <g transform="translate(0, 170)">
-        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">УГЛЕВОДЫ</text>
-        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.carbs|round(1) }}г</text>
+        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">{{ t('dashboard.carbs') }}</text>
+        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.carbs|round(1) }}{{ t('dashboard.unit_g') }}</text>
         <rect y="15" width="{{ macro_w }}" height="14" rx="7" fill="rgba(255,255,255,0.05)" />
         <rect y="15" width="{{ macro_w * min(totals.carbs / goals.get('carbs', 250), 1.0) }}" height="14" rx="7" fill="#00f2fe" filter="url(#softGlow)" />
       </g>
 
       <!-- Fiber -->
       <g transform="translate(0, 255)">
-        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">КЛЕТЧАТКА</text>
-        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.fiber|round(1) }}г</text>
+        <text font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="rgba(255,255,255,0.5)">{{ t('dashboard.fiber') }}</text>
+        <text x="{{ macro_w }}" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="end">{{ totals.fiber|round(1) }}{{ t('dashboard.unit_g') }}</text>
         <rect y="15" width="{{ macro_w }}" height="14" rx="7" fill="rgba(255,255,255,0.05)" />
         <rect y="15" width="{{ macro_w * min(totals.fiber / goals.get('fiber', 30), 1.0) }}" height="14" rx="7" fill="#50ff50" filter="url(#softGlow)" />
       </g>
@@ -119,15 +119,15 @@
   <!-- Water Section (Modern Pill style) -->
   <g transform="translate(30, 560)">
     <rect width="740" height="80" rx="25" fill="url(#glassGradient)" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
-    <text x="30" y="47" font-family="Inter, sans-serif" font-size="22" font-weight="800" fill="#ffffff">💦 ВОДА</text>
-    <text x="710" y="47" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="rgba(255,255,255,0.5)" text-anchor="end">{{ water_total }} / {{ goals.get('water', 2000) }} мл</text>
+    <text x="30" y="47" font-family="Inter, sans-serif" font-size="22" font-weight="800" fill="#ffffff">{{ t('dashboard.water') }}</text>
+    <text x="710" y="47" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="rgba(255,255,255,0.5)" text-anchor="end">{{ water_total }} / {{ goals.get('water', 2000) }} {{ t('dashboard.unit_ml') }}</text>
     <rect x="180" y="32" width="350" height="16" rx="8" fill="rgba(255,255,255,0.05)" />
     <rect x="180" y="32" width="{{ 350 * min(water_total / goals.get('water', 2000), 1.0) }}" height="16" rx="8" fill="#4facfe" filter="url(#neonGlow)" />
   </g>
 
   <!-- Meals Section -->
   <g transform="translate(40, 700)">
-    <text font-family="Inter, sans-serif" font-size="28" font-weight="900" fill="#ffffff" style="letter-spacing: -0.5px;">ДНЕВНИК ЕДЫ</text>
+    <text font-family="Inter, sans-serif" font-size="28" font-weight="900" fill="#ffffff" style="letter-spacing: -0.5px;">{{ t('dashboard.food_log') }}</text>
     
     {% for log in logs %}
     <g transform="translate(0, {{ 60 + loop.index0 * 90 }})">

@@ -37,6 +37,23 @@ class HerbalifeExpertService:
         # Normalize: common Latin letters used in Herbalife abbreviations
         key_norm = clean_text.replace('f', 'ф').replace('n', 'н')
 
+        # Generic common food words that are also Herbalife aliases/flavors
+        generic_foods = {
+            "клубника", "банан", "шоколад", "дыня", "манго", "кокос", 
+            "печенье", "суп", "чай", "батончик", "зелень", "белок", 
+            "овсяный", "витамины", "алоэ", "алое"
+        }
+        
+        # Explicit Herbalife brand/product indicators
+        hl_keywords = {
+            "гербалайф", "herbalife", "коктейль", "ф1", "f1", "оян", 
+            "алоэ", "алое", "найтворкс", "niteworks", "h24", "восстановление силы", 
+            "грин макс", "протеин", "вечерний", "фито комплит", "термо комплит",
+            "клеточный активатор", "желтые таблетки", "бета харт"
+        }
+        
+        has_hl_context = any(kw in clean_text for kw in hl_keywords)
+
         # 1. Fast Path: Straight alias match (Best match - longest alias wins)
         best_match = None
         max_alias_len = -1
@@ -44,6 +61,10 @@ class HerbalifeExpertService:
         for p in products:
             aliases = [a.lower() for a in p.get("aliases", [])]
             for alias in aliases:
+                # Skip generic food aliases if the input does not have explicit Herbalife context keywords
+                if alias in generic_foods and not has_hl_context:
+                    continue
+                
                 is_match = False
                 if alias == clean_text or alias == key_norm:
                     # Perfect match gets huge priority
@@ -59,6 +80,11 @@ class HerbalifeExpertService:
 
         if best_match:
             return best_match
+
+        # If there is absolutely no Herbalife context, do not proceed to semantic fallback
+        # to avoid AI hallucinations matching regular foods to Herbalife.
+        if not has_hl_context:
+            return None
 
         # 2. AI Fallback: Semantic resolution
         from services.ai_brain import AIBrainService

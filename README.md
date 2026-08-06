@@ -148,14 +148,14 @@ foodflow-bot_new/
 1. `qwen/qwen2.5-vl-32b-instruct:free` — приоритет 1 (бесплатная)
 2. `qwen/qwen3.6-plus:free` — приоритет 2 (бесплатная)
 3. `mistralai/mistral-small-3.2-24b-instruct:free` — приоритет 3 (бесплатная)
-4. `google/gemini-2.5-flash-lite-preview-09-2025` — платная fallback
+4. `google/gemini-3.5-flash-lite` — платная fallback
 5. `openai/gpt-4.1-mini` — платная fallback
 6. `openai/gpt-4o-mini` — последний резерв
 
 **Нормализация** — 4 модели:
 1. `perplexity/sonar` — с веб-поиском (основная)
 2. `openai/gpt-4o-mini-search-preview` — веб-поиск резерв
-3. `google/gemini-2.5-flash-lite-preview-09-2025` — быстрый fallback
+3. `google/gemini-3.5-flash-lite` — быстрый fallback
 4. `qwen/qwen2.5-vl-72b-instruct` — финальный fallback
 
 **Визуал**: Pollinations.ai (Flux) — иконки и фоны  

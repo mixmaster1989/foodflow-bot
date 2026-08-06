@@ -11,6 +11,7 @@ from typing import Any
 import aiohttp
 
 from config import settings
+from utils.i18n import get_locale
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class AIService:
     ]
 
     GUIDE_MODELS: list[str] = [
-        "google/gemini-3-flash-preview",              # Primary (paid, for paying users)
+        "google/gemini-3.5-flash-lite",              # Primary (paid, for paying users)
         "google/gemma-4-31b-it:free",                 # Fallback 1
         "qwen/qwen3-next-80b-a3b-instruct:free",      # Fallback 2
         "openai/gpt-oss-120b:free",                   # Fallback 3
@@ -43,33 +44,62 @@ class AIService:
 
         ingredients_str = ", ".join(ingredients)
 
+        locale = get_locale()
         context_str = ""
         if user_settings:
-            goal_map = {
-                "lose_weight": "похудение (низкокалорийные)",
-                "maintain": "поддержание веса (сбалансированные)",
-                "gain_mass": "набор массы (высокобелковые)",
-                "healthy": "здоровое питание"
-            }
-            goal_text = goal_map.get(user_settings.goal, "здоровое питание")
-            allergies = user_settings.allergies if user_settings.allergies else "нет"
+            if locale == "es":
+                goal_map = {
+                    "lose_weight": "pérdida de peso (bajas en calorías)",
+                    "maintain": "mantenimiento de peso (balanceadas)",
+                    "gain_mass": "aumento de masa (altas en proteínas)",
+                    "healthy": "alimentación saludable"
+                }
+                goal_text = goal_map.get(user_settings.goal, "alimentación saludable")
+                allergies = user_settings.allergies if user_settings.allergies else "ninguna"
 
-            context_str = (
-                f"USER PROFILE:\n"
-                f"- Goal: {goal_text}\n"
-                f"- Allergies/Restrictions: {allergies}\n"
-                f"IMPORTANT: Adjust recipes to fit this goal. If goal is weight loss, minimize fat/sugar. If allergies exist, EXCLUDE those ingredients.\n"
+                context_str = (
+                    f"USER PROFILE:\n"
+                    f"- Goal: {goal_text}\n"
+                    f"- Allergies/Restrictions: {allergies}\n"
+                    f"IMPORTANT: Adjust recipes to fit this goal. If goal is weight loss, minimize fat/sugar. If allergies exist, EXCLUDE those ingredients.\n"
+                )
+            else:
+                goal_map = {
+                    "lose_weight": "похудение (низкокалорийные)",
+                    "maintain": "поддержание веса (сбалансированные)",
+                    "gain_mass": "набор массы (высокобелковые)",
+                    "healthy": "здоровое питание"
+                }
+                goal_text = goal_map.get(user_settings.goal, "здоровое питание")
+                allergies = user_settings.allergies if user_settings.allergies else "нет"
+
+                context_str = (
+                    f"USER PROFILE:\n"
+                    f"- Goal: {goal_text}\n"
+                    f"- Allergies/Restrictions: {allergies}\n"
+                    f"IMPORTANT: Adjust recipes to fit this goal. If goal is weight loss, minimize fat/sugar. If allergies exist, EXCLUDE those ingredients.\n"
+                )
+
+        if locale == "es":
+            prompt = (
+                f"I have these ingredients: {ingredients_str}. "
+                f"Suggest 3 simple {category.lower()} recipes using mostly these ingredients. "
+                f"{context_str}"
+                "For each recipe, provide a title, a short description, estimated calories per serving, a list of ingredients with quantities, and step‑by‑step preparation instructions. "
+                "Respond ONLY in Spanish language. "
+                "Return ONLY a JSON object with this format: "
+                "{\"recipes\": [{\"title\": \"...\", \"description\": \"...\", \"calories\": 500, \"ingredients\": [{\"name\": \"...\", \"amount\": \"...\"}], \"steps\": [\"...\"]}]}"
             )
-
-        prompt = (
-            f"I have these ingredients: {ingredients_str}. "
-            f"Suggest 3 simple {category.lower()} recipes using mostly these ingredients. "
-            f"{context_str}"
-            "For each recipe, provide a title, a short description, estimated calories per serving, a list of ingredients with quantities, and step‑by‑step preparation instructions. "
-            "Respond ONLY in Russian language. "
-            "Return ONLY a JSON object with this format: "
-            "{\"recipes\": [{\"title\": \"...\", \"description\": \"...\", \"calories\": 500, \"ingredients\": [{\"name\": \"...\", \"amount\": \"...\"}], \"steps\": [\"...\"]}]}"
-        )
+        else:
+            prompt = (
+                f"I have these ingredients: {ingredients_str}. "
+                f"Suggest 3 simple {category.lower()} recipes using mostly these ingredients. "
+                f"{context_str}"
+                "For each recipe, provide a title, a short description, estimated calories per serving, a list of ingredients with quantities, and step‑by‑step preparation instructions. "
+                "Respond ONLY in Russian language. "
+                "Return ONLY a JSON object with this format: "
+                "{\"recipes\": [{\"title\": \"...\", \"description\": \"...\", \"calories\": 500, \"ingredients\": [{\"name\": \"...\", \"amount\": \"...\"}], \"steps\": [\"...\"]}]}"
+            )
 
         for model in cls.MODELS:
             result = await cls._call_model(model, prompt)
@@ -107,6 +137,7 @@ class AIService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=45
                     ) as response:
                         if response.status == 200:
@@ -145,16 +176,29 @@ class AIService:
         # Second try: recognize product and get average KBZHU
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-        prompt = (
-            "Ты видишь фото продукта питания. Определи что это за продукт и верни усредненные значения КБЖУ и Клетчатки (fiber).\n\n"
-            "Верни ТОЛЬКО JSON объект (без markdown) в формате:\n"
-            '{"name": "Название продукта на русском", "brand": null, "weight": null, '
-            '"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0, "fiber": 0.0}\n\n'
-            "calories, protein, fat, carbs, fiber - это усредненные значения на 100г для этого типа продукта.\n"
-            "ВАЖНО: Если продукт не содержит клетчатки (вода, масло, сахар, мясо без гарнира и т.д.), в поле \"fiber\" укажи строго 0!\n"
-            "Например, для яблока: calories=52, protein=0.3, fat=0.2, carbs=14, fiber=2.4.\n"
-            "Если не можешь определить - верни null для всех полей."
-        )
+        locale = get_locale()
+        if locale == "es":
+            prompt = (
+                "You see a photo of a food product. Identify what product it is and return average nutrition values (KBZHU) and fiber per 100g.\n\n"
+                "Return ONLY a JSON object (without markdown) in this format:\n"
+                '{"name": "Nombre del producto en español", "brand": null, "weight": null, '
+                '"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0, "fiber": 0.0}\n\n'
+                "calories, protein, fat, carbs, fiber - these are average values per 100g for this type of product.\n"
+                "IMPORTANT: If the product contains no fiber (water, oil, sugar, pure meat, etc.), set \"fiber\": 0 explicitly!\n"
+                "For example, for an apple: calories=52, protein=0.3, fat=0.2, carbs=14, fiber=2.4.\n"
+                "If you cannot identify the product - return null for all fields."
+            )
+        else:
+            prompt = (
+                "Ты видишь фото продукта питания. Определи что это за продукт и верни усредненные значения КБЖУ и Клетчатки (fiber).\n\n"
+                "Верни ТОЛЬКО JSON объект (без markdown) в формате:\n"
+                '{"name": "Название продукта на русском", "brand": null, "weight": null, '
+                '"calories": 0, "protein": 0.0, "fat": 0.0, "carbs": 0.0, "fiber": 0.0}\n\n'
+                "calories, protein, fat, carbs, fiber - это усредненные значения на 100г для этого типа продукта.\n"
+                "ВАЖНО: Если продукт не содержит клетчатки (вода, масло, сахар, мясо без гарнира и т.д.), в поле \"fiber\" укажи строго 0!\n"
+                "Например, для яблока: calories=52, protein=0.3, fat=0.2, carbs=14, fiber=2.4.\n"
+                "Если не можешь определить - верни null для всех полей."
+            )
 
         models = [
             "qwen/qwen2.5-vl-32b-instruct:free",
@@ -193,6 +237,7 @@ class AIService:
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
                             json=payload,
+                            proxy=settings.openrouter_proxy,
                             timeout=35, # Moderate timeout for vision
                         ) as response:
                             if response.status == 200:
@@ -212,7 +257,7 @@ class AIService:
                                 try:
                                     data = json.loads(content)
                                     # SUCCESS CRITERIA: Must have a name and it shouldn't be null/empty
-                                    if data and data.get("name") and data.get("name") not in ["Неизвестное блюдо", "Неизвестно"]:
+                                    if data and data.get("name") and data.get("name") not in ["Неизвестное блюдо", "Неизвестно", "Plato desconocido", "Desconocido"]:
                                         logger.info(f"✅ AI ({model}) recognized: {data.get('name')}")
                                         return data
                                     else:
@@ -265,6 +310,7 @@ class AIService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=15
                     ) as response:
                         if response.status == 200:
@@ -308,6 +354,7 @@ class AIService:
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers=headers,
                             json=payload,
+                            proxy=settings.openrouter_proxy,
                             timeout=30
                         ) as response:
                             if response.status != 200:

@@ -9,6 +9,7 @@ from typing import Any
 
 from database.models import Product, UserSettings
 from services.ai import AIService
+from utils.i18n import t, get_locale
 
 logger = logging.getLogger(__name__)
 
@@ -131,80 +132,73 @@ class ConsultantService:
             Dictionary with warnings, recommendations, missing, or None if AI fails
 
         """
+        locale = get_locale()
+
         # Build user profile description
-        gender_text = "мужской" if user_settings.gender == "male" else "женский"
+        gender_text = t("consultant.profile_gender_male", locale=locale) if user_settings.gender == "male" else t("consultant.profile_gender_female", locale=locale)
         goal_text = {
-            "lose_weight": "похудение / дефицит",
-            "maintain": "не набирать / поддерживать вес",
-            "healthy": "здоровое питание / баланс",
-            "gain_mass": "набрать массу",
-        }.get(user_settings.goal, "здоровое питание")
+            "lose_weight": t("consultant.goal_lose_weight", locale=locale),
+            "maintain": t("consultant.goal_maintain", locale=locale),
+            "healthy": t("consultant.goal_healthy", locale=locale),
+            "gain_mass": t("consultant.goal_gain_mass", locale=locale),
+        }.get(user_settings.goal, t("consultant.goal_default", locale=locale))
 
         context_text = {
-            "receipt": "чек из магазина",
-            "fridge": "холодильник",
-            "shopping_list": "список покупок",
-            "shopping": "режим покупок",
-            "general": "общий контекст",
-        }.get(context, "общий контекст")
+            "receipt": t("consultant.context_receipt", locale=locale),
+            "fridge": t("consultant.context_fridge", locale=locale),
+            "shopping_list": t("consultant.context_shopping_list", locale=locale),
+            "shopping": t("consultant.context_shopping", locale=locale),
+            "general": t("consultant.context_general", locale=locale),
+        }.get(context, t("consultant.context_general", locale=locale))
 
         # Build product description
-        product_info = (
-            f"Название: {product.name}\n"
-            f"Категория: {product.category or 'Не указана'}\n"
-            f"Калории: {product.calories:.0f} ккал\n"
-            f"Белки: {product.protein:.1f} г\n"
-            f"Жиры: {product.fat:.1f} г\n"
-            f"Углеводы: {product.carbs:.1f} г"
+        product_info = t(
+            "consultant.product_format",
+            locale=locale,
+            name=product.name,
+            category=product.category or t("shopping_list.curator_no_data", locale=locale, default="No especificada"),
+            calories=product.calories,
+            protein=product.protein,
+            fat=product.fat,
+            carbs=product.carbs
         )
 
         allergies_text = (
-            f"Аллергии/исключения: {user_settings.allergies}"
+            t("consultant.allergies_format", locale=locale, allergies=user_settings.allergies)
             if user_settings.allergies
-            else "Аллергий нет"
+            else t("consultant.no_allergies", locale=locale)
         )
 
         snapshot_text = ""
         if fridge_snapshot:
             total = fridge_snapshot.get("totals", {})
             items = fridge_snapshot.get("items", [])
+            
+            snap_items_str = "\n".join(f"• {i}" for i in items) if items else t("consultant.fridge_snapshot_no_data", locale=locale)
+            
             snapshot_text = (
-                "\n📊 <b>В холодильнике:</b>\n"
-                f"<blockquote>- Продуктов: <code>{len(items)}</code>\n"
-                + ("\n".join(f"• {i}" for i in items) if items else "• Нет данных") + "</blockquote>"
-                "\n🍱 <b>Итого КБЖУ:</b>\n"
+                t("consultant.fridge_snapshot_title", locale=locale) +
+                t("consultant.fridge_snapshot_count", locale=locale, count=len(items)) +
+                snap_items_str + "</blockquote>" +
+                t("consultant.fridge_snapshot_totals", locale=locale) +
                 f"<blockquote>🔥 <code>{total.get('calories', 0):.0f}</code> | 🥩 <code>{total.get('protein', 0):.1f}</code> | 🥑 <code>{total.get('fat', 0):.1f}</code> | 🍞 <code>{total.get('carbs', 0):.1f}</code></blockquote>\n"
             )
 
-        # Build prompt without escaping hell: double braces for literal JSON braces
-        prompt = (
-            "Ты - персональный консультант по питанию. Проанализируй продукт и дай рекомендации.\n\n"
-            "<b>Профиль пользователя:</b>\n"
-            f"- Пол: {gender_text}\n"
-            f"- Рост: {user_settings.height} см\n"
-            f"- Вес: {user_settings.weight} кг\n"
-            f"- Цель: {goal_text}\n"
-            f"- Дневная норма калорий: {user_settings.calorie_goal} ккал\n"
-            f"- Дневная норма белков: {user_settings.protein_goal} г\n"
-            f"- Дневная норма жиров: {user_settings.fat_goal} г\n"
-            f"- Дневная норма углеводов: {user_settings.carb_goal} г\n"
-            f"- {allergies_text}\n\n"
-            f"<b>Продукт:</b>\n{product_info}\n\n"
-            f"{snapshot_text + chr(10) if snapshot_text else ''}"
-            f"<b>Контекст:</b> {context_text}\n\n"
-            "Твоя задача: Дать КРАТКИЙ и ТОЧНЫЙ совет по МЕННО ЭТОМУ продукту.\n"
-            "1. Не перечисляй содержимое холодильника, используй его только чтобы посоветовать с чем сочетать ЭТОТ продукт.\n"
-            "2. Если КБЖУ продукта = 0 (ошибка данных), скажи об этом.\n"
-            "3. Максимум 2-3 пункта советов.\n"
-            "4. Не пиши общие фразы ('Питайтесь правильно').\n"
-            "5. Обращайся к пользователю на 'ты'."
-            "Если продукт полезен - похвали. "
-            "Если чего-то не хватает в рационе - предложи.\n\n"
-            "Верни ТОЛЬКО JSON объект в формате:\n"
-            "{{\"warnings\": [\"⚠️ предупреждение 1\", \"⚠️ предупреждение 2\"], "
-            "\"recommendations\": [\"✅ рекомендация 1\", \"✅ рекомендация 2\"], "
-            "\"missing\": [\"💡 предложение 1\", \"💡 предложение 2\"]}}\n"
-            "Если нет предупреждений/рекомендаций/предложений - верни пустой массив."
+        prompt = t(
+            "consultant.prompt_instructions",
+            locale=locale,
+            gender=gender_text,
+            height=user_settings.height,
+            weight=user_settings.weight,
+            goal=goal_text,
+            calorie_goal=user_settings.calorie_goal,
+            protein_goal=user_settings.protein_goal,
+            fat_goal=user_settings.fat_goal,
+            carb_goal=user_settings.carb_goal,
+            allergies_text=allergies_text,
+            product_info=product_info,
+            snapshot_text=snapshot_text + chr(10) if snapshot_text else '',
+            context_text=context_text
         )
 
         for model in cls.MODELS:
@@ -248,6 +242,7 @@ class ConsultantService:
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
+                        proxy=settings.openrouter_proxy,
                         timeout=45,
                     ) as response:
                         if response.status == 200:
@@ -306,6 +301,7 @@ class ConsultantService:
         recommendations: list[str] = []
         missing: list[str] = []
 
+        locale = get_locale()
         # Check allergies
         if user_settings.allergies:
             allergies_list = [
@@ -314,27 +310,27 @@ class ConsultantService:
             product_name_lower = product.name.lower()
             for allergy in allergies_list:
                 if allergy in product_name_lower:
-                    warnings.append(f"⚠️ В продукте может содержаться {allergy} (аллергия)")
+                    warnings.append(t("consultant.fallback_allergy", locale=locale, allergy=allergy))
 
         # Check calories based on goal
         if user_settings.goal == "lose_weight":
             if product.calories > 400:
-                warnings.append("⚠️ Высокая калорийность для похудения")
+                warnings.append(t("consultant.fallback_high_cal", locale=locale))
         elif user_settings.goal == "gain_mass":
             if product.calories < 200 and product.protein < 10:
-                missing.append("💡 Для набора массы нужны более калорийные продукты с белком")
+                missing.append(t("consultant.fallback_gain_mass", locale=locale))
 
         # Check protein
         if product.protein > 15:
-            recommendations.append("✅ Хороший источник белка")
+            recommendations.append(t("consultant.fallback_protein", locale=locale))
 
         # Check category
-        unhealthy_categories = ["Сладости", "Фастфуд", "Газированные напитки"]
+        unhealthy_categories = ["Сладости", "Фастфуд", "Газированные напитки", "Sweets", "Fast food", "Soft drinks"]
         if product.category in unhealthy_categories and user_settings.goal in (
             "lose_weight",
             "healthy",
         ):
-            warnings.append(f"⚠️ {product.category} не рекомендуется для вашей цели")
+            warnings.append(t("consultant.fallback_unhealthy", locale=locale, category=product.category))
 
         return {
             "warnings": warnings,

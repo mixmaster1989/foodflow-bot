@@ -175,7 +175,7 @@ npm run build
 | `DATABASE_URL` | Database Connection | `sqlite+aiosqlite:///./foodflow.db` |
 
 ### AI Models Used
-- **OCR**: `google/gemini-2.0-flash-exp` (primary)
+- **OCR**: `google/gemini-3.5-flash-lite` (primary)
 - **Normalization**: `perplexity/sonar` (with web search)
 - **Visuals**: `Pollinations.ai (Flux)` for icons and backgrounds
 - **Speech**: `Google Speech Recognition` (via `SpeechRecognition` lib)

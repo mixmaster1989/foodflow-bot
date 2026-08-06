@@ -8,15 +8,18 @@ Contains:
 import logging
 from datetime import datetime
 
+from utils.i18n import t
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 
 from database.base import get_db
 from database.models import (
+    PAYMENT_SOURCE_STARS,
     PAYMENT_SOURCE_TRIAL,
     ConsumptionLog,
     Subscription,
@@ -102,22 +105,18 @@ async def send_weight_reminders(bot: Bot, dp: Dispatcher) -> None:
                     )
                     await state.set_state(WeightStates.waiting_for_morning_weight)
 
-                    prompt_suffix = "(например: 72.5)"
+                    prompt_suffix = t("scheduler.weight_prompt_suffix_default")
                     if settings.weight:
-                        prompt_suffix = f"(прошлый: {settings.weight})"
+                        prompt_suffix = t("scheduler.weight_prompt_suffix_prev", weight=settings.weight)
 
                     sent = await safe_send_message(
                         bot,
                         settings.user_id,
-                        text=(
-                            "⚖️ <b>Доброе утро!</b>\n\n"
-                            "Пора записать вес! Это поможет отслеживать прогресс.\n\n"
-                            f"Напиши свой вес {prompt_suffix} или нажми кнопку ниже."
-                        ),
+                        text=t("scheduler.weight_reminder", prompt_suffix=prompt_suffix),
                         parse_mode="HTML",
                         reply_markup={
                             "inline_keyboard": [[
-                                {"text": "✏️ Записать вес", "callback_data": "weight_input"}
+                                {"text": t("scheduler.weight_reminder_btn"), "callback_data": "weight_input"}
                             ]]
                         }
                     )
@@ -287,14 +286,17 @@ async def expire_subscriptions(bot: Bot) -> None:
     logger.info(f"Checking for expired subscriptions at {now.strftime('%H:%M')}")
 
     async for session in get_db():
-        # Find expired one-time subscriptions
+        # Find expired one-time and non-Telegram subscriptions
         stmt = select(Subscription).where(
             and_(
                 Subscription.is_active == True,  # noqa: E712
-                Subscription.auto_renew == False,  # noqa: E712
                 Subscription.tier != "free",
                 Subscription.expires_at != None,  # noqa: E711
                 Subscription.expires_at <= now,
+                or_(
+                    Subscription.auto_renew == False,  # noqa: E712
+                    Subscription.payment_source != PAYMENT_SOURCE_STARS,
+                ),
             )
         )
         result = await session.execute(stmt)
@@ -309,12 +311,7 @@ async def expire_subscriptions(bot: Bot) -> None:
             try:
                 await safe_send_message(
                     bot, sub.user_id,
-                    text=(
-                        f"⏰ <b>Подписка истекла</b>\n\n"
-                        f"Ваша подписка <b>{old_tier.upper()}</b> завершилась.\n"
-                        f"Вы переведены на бесплатный тариф.\n\n"
-                        f"Чтобы продлить, откройте /start → 💎 Подписки"
-                    ),
+                    text=t("scheduler.subscription_expired", tier=old_tier.upper()),
                     parse_mode="HTML",
                 )
             except Exception as e:
@@ -357,12 +354,7 @@ async def send_onboarding_reminders(bot: Bot) -> None:
                 try:
                     sent = await safe_send_message(
                         bot, user.id,
-                        text=(
-                            "⏳ <b>Эй, мы тебя потеряли!</b>\n\n"
-                            "Мы обратили внимание, что ты запустил FoodFlow, но так и не завершил настройку профиля. А ведь там тебя ждет подарок — <b>7 дней полного PRO-доступа</b> к AI-распознаванию еды и чекам! 🎁\n\n"
-                            "Настройка займет ровно 30 секунд. Просто нажми на команду /start и ответь на пару вопросов (рост, вес, цель), чтобы умный алгоритм смог рассчитать твою норму.\n\n"
-                            "Попробуешь? Жми 👉 /start"
-                        ),
+                        text=t("scheduler.onboarding_reminder"),
                         parse_mode="HTML"
                     )
                     user.onboarding_reminded = True
@@ -463,35 +455,15 @@ async def send_trial_drip(bot: Bot) -> None:
 
             if 46 <= hours_left <= 50:
                 drip_tag = "drip_day1"
-                msg = (
-                    "Привет 👋\n\n"
-                    "Вопрос в лоб: <b>что ты ел сегодня на завтрак?</b>\n\n"
-                    "Просто напиши ответ сюда — покажу КБЖУ. "
-                    "Это займёт секунд 10.\n\n"
-                    "<i>Например: «овсянка 200г и кофе»</i>"
-                )
+                msg = t("scheduler.trial_drip_day1")
 
             elif 22 <= hours_left <= 26:
                 drip_tag = "drip_day2"
-                msg = (
-                    "⏰ <b>Твой PRO заканчивается завтра!</b>\n\n"
-                    "Через 24 часа ты потеряешь доступ к:\n"
-                    "• 📸 Анализу фото еды\n"
-                    "• 🧾 Сканеру чеков\n"
-                    "• 👩‍⚕️ Нейро-нутрициологу\n\n"
-                    "Чтобы сохранить всё это — оформи подписку 👇"
-                )
+                msg = t("scheduler.trial_drip_day2")
 
             elif 0 <= hours_left <= 4:
                 drip_tag = "drip_day3"
-                msg = (
-                    "🔒 <b>PRO закончился (или вот-вот...)</b>\n\n"
-                    "Без подписки бот по-прежнему работает — ручной ввод текстом, вода, вес. "
-                    "Но если хочешь вернуть <b>фото, голос и ИИ-гида</b>:\n\n"
-                    "🚀 <b>Pro — 299 ₽/мес</b> (полный набор)\n"
-                    "💡 <b>Basic — 199 ₽/мес</b> (голос + холодильник)\n\n"
-                    "Выбери свой вариант 👇"
-                )
+                msg = t("scheduler.trial_drip_day3")
 
             if msg and drip_tag:
                 # Проверяем, не отправляли ли уже это сообщение
@@ -511,9 +483,9 @@ async def send_trial_drip(bot: Bot) -> None:
                     from aiogram.utils.keyboard import InlineKeyboardBuilder
                     reply_markup = None
                     if drip_tag != "drip_day1":
-                        # Day 2/3 — ведём на подписки
+                        # Day 2/3 — lead to subscriptions
                         builder = InlineKeyboardBuilder()
-                        builder.button(text="💎 Подписки", callback_data="show_subscriptions")
+                        builder.button(text=t("scheduler.trial_drip_btn"), callback_data="show_subscriptions")
                         builder.adjust(1)
                         reply_markup = builder.as_markup()
                     # Day 1 — без кнопок: живой вопрос, юзер пишет ответ -> universal_input поймает
@@ -592,14 +564,7 @@ async def send_first_log_nudge(bot: Bot) -> None:
             sent = await safe_send_message(
                 bot,
                 user.id,
-                text=(
-                    f"{name}, привет 👋\n\n"
-                    "Заметил — ты настроил профиль, но еду пока не записывал.\n\n"
-                    "<b>Давай прямо сейчас:</b> напиши одной строкой, "
-                    "что ел последним. Например:\n"
-                    "<code>овсянка 200г</code>\n\n"
-                    "Я посчитаю КБЖУ за 3 секунды."
-                ),
+                text=t("scheduler.first_log_nudge", name=name),
                 parse_mode="HTML",
             )
 
@@ -634,12 +599,7 @@ async def send_morning_reminder(bot: Bot) -> None:
             try:
                 sent = await safe_send_message(
                     bot, fb.user_id,
-                    text=(
-                        "☀️ Доброе утро!\n\n"
-                        "Вот и 8 утра — самое время записать завтрак.\n\n"
-                        "Напиши одной строкой что ел: например <code>яичница 2 яйца, кофе</code> — "
-                        "я посчитаю КБЖУ за секунду ⚡"
-                    ),
+                    text=t("scheduler.morning_reminder"),
                     parse_mode="HTML",
                 )
                 fb.answer = f"sent at {now.isoformat()}" if sent else f"blocked at {now.isoformat()}"
