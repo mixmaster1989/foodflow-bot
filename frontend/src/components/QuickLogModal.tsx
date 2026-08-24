@@ -5,6 +5,11 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from './Toast'
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import { SavedMealsModal } from './SavedMealsModal'
+import {
+    initializePortionNutrition,
+    scalePortionNutrition,
+    updatePortionNutritionField,
+} from '../utils/nutrition'
 
 interface QuickLogModalProps {
     isOpen: boolean
@@ -68,12 +73,13 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                 setStage('confirm');
                 setText('');
             } else if (norm) {
+                const portionData = initializePortionNutrition(norm);
                 if (norm.weight_missing) {
-                    setPendingData(norm);
+                    setPendingData(portionData);
                     setStage('clarify_weight');
                     setText('');
                 } else {
-                    setPendingData(norm);
+                    setPendingData(portionData);
                     setStage('confirm');
                     setText('');
                 }
@@ -196,7 +202,7 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                     return
                 }
 
-                setPendingData({ ...pendingData, weight_grams: weight });
+                setPendingData(scalePortionNutrition(pendingData, weight));
                 setStage('confirm');
                 setText('');
             }
@@ -315,20 +321,37 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                                             <input
                                                 type="number"
                                                 value={pendingData.weight_grams || 0}
-                                                onChange={(e) => setPendingData({ ...pendingData, weight_grams: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => {
+                                                    const nextWeight = parseFloat(e.target.value) || 0
+                                                    setPendingData(
+                                                        pendingData.type === 'herbalife'
+                                                            ? { ...pendingData, weight_grams: nextWeight }
+                                                            : scalePortionNutrition(pendingData, nextWeight)
+                                                    )
+                                                }}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500 transition-all"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] text-neutral-500 uppercase tracking-widest mb-1 ml-1 text-left">Калории</label>
+                                            <label className="block text-[10px] text-neutral-500 uppercase tracking-widest mb-1 ml-1 text-left">Калории за порцию</label>
                                             <input
                                                 type="number"
                                                 value={Math.round(pendingData.calories || 0)}
-                                                onChange={(e) => setPendingData({ ...pendingData, calories: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => setPendingData(
+                                                    pendingData.type === 'herbalife'
+                                                        ? { ...pendingData, calories: parseFloat(e.target.value) || 0 }
+                                                        : updatePortionNutritionField(pendingData, 'calories', parseFloat(e.target.value) || 0)
+                                                )}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500 transition-all"
                                             />
                                         </div>
                                     </div>
+
+                                    {pendingData.type !== 'herbalife' && (
+                                        <div className="mb-3 rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-3 py-2 text-center text-[10px] font-medium text-emerald-300/80">
+                                            Итог за {pendingData.weight_grams || 0} г · пересчитывается автоматически
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-4 gap-2">
                                         <div>
@@ -337,7 +360,11 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                                                 type="number"
                                                 step="0.1"
                                                 value={(pendingData.protein || 0).toFixed(1)}
-                                                onChange={(e) => setPendingData({ ...pendingData, protein: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => setPendingData(
+                                                    pendingData.type === 'herbalife'
+                                                        ? { ...pendingData, protein: parseFloat(e.target.value) || 0 }
+                                                        : updatePortionNutritionField(pendingData, 'protein', parseFloat(e.target.value) || 0)
+                                                )}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1 py-1.5 text-center text-white text-xs focus:outline-none focus:border-blue-500"
                                             />
                                         </div>
@@ -347,7 +374,11 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                                                 type="number"
                                                 step="0.1"
                                                 value={(pendingData.fat || 0).toFixed(1)}
-                                                onChange={(e) => setPendingData({ ...pendingData, fat: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => setPendingData(
+                                                    pendingData.type === 'herbalife'
+                                                        ? { ...pendingData, fat: parseFloat(e.target.value) || 0 }
+                                                        : updatePortionNutritionField(pendingData, 'fat', parseFloat(e.target.value) || 0)
+                                                )}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1 py-1.5 text-center text-white text-xs focus:outline-none focus:border-amber-500"
                                             />
                                         </div>
@@ -357,7 +388,11 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                                                 type="number"
                                                 step="0.1"
                                                 value={(pendingData.carbs || 0).toFixed(1)}
-                                                onChange={(e) => setPendingData({ ...pendingData, carbs: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => setPendingData(
+                                                    pendingData.type === 'herbalife'
+                                                        ? { ...pendingData, carbs: parseFloat(e.target.value) || 0 }
+                                                        : updatePortionNutritionField(pendingData, 'carbs', parseFloat(e.target.value) || 0)
+                                                )}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1 py-1.5 text-center text-white text-xs focus:outline-none focus:border-purple-500"
                                             />
                                         </div>
@@ -367,7 +402,11 @@ export function QuickLogModal({ isOpen, onClose, onSuccess }: QuickLogModalProps
                                                 type="number"
                                                 step="0.1"
                                                 value={(pendingData.fiber || 0).toFixed(1)}
-                                                onChange={(e) => setPendingData({ ...pendingData, fiber: parseFloat(e.target.value) || 0 })}
+                                                onChange={(e) => setPendingData(
+                                                    pendingData.type === 'herbalife'
+                                                        ? { ...pendingData, fiber: parseFloat(e.target.value) || 0 }
+                                                        : updatePortionNutritionField(pendingData, 'fiber', parseFloat(e.target.value) || 0)
+                                                )}
                                                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1 py-1.5 text-center text-white text-xs focus:outline-none focus:border-emerald-500"
                                             />
                                         </div>
